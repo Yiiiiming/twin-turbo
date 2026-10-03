@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { trackPoint, projectTrack, mod } from '../engine.js';
+import { TRACK, trackPoint, projectTrack, mod } from '../engine.js';
 
 const sourceURL = new URL('../main.js', import.meta.url);
 const engineURL = new URL('../engine.js', import.meta.url);
@@ -169,6 +169,7 @@ async function loadUI(t, { graphicsAvailable = true } = {}) {
     constructor(canvas, options) {
       this.canvas = canvas; this.options = options;
       this.available = ${JSON.stringify(graphicsAvailable)};
+      this.obstacles = [{ type: 'circle', x: 100, y: 100, radius: 12 }];
       this.resetCalls = []; this.renderCount = 0;
     }
     resetCameras(engine, playerId) {
@@ -210,6 +211,9 @@ test('real main.js delegates scene rendering and draws two player maps on the se
   assert.equal(ui.nodes.get('race-status').textContent, '等待发车');
   assert.equal(ui.nodes.get('pause').disabled, true);
   assert.equal(ui.renderer.canvas, ui.nodes.get('game'));
+  assert.ok(ui.engine.obstacleWorld, 'renderer obstacle data is injected into the engine');
+  assert.equal(ui.engine.obstacleWorld.obstacles.length, 1);
+  assert.equal(ui.engine.obstacleWorld.obstacles[0].radius, ui.renderer.obstacles[0].radius);
   assert.equal(ui.renderer.renderCount, 1);
   assert.equal(ui.renderer.lastRender.engine, ui.engine);
   assert.equal(ui.renderer.resetCalls.length, 1);
@@ -411,6 +415,40 @@ test('rescue shortcuts update real car penalty and player HUD', async t => {
   }
 });
 
+test('both player scoreboards count consecutive full laps despite brief shoulder excursions at a gate', async t => {
+  const ui = await loadUI(t);
+  ui.click('start'); ui.advance(3.1);
+  const gate = TRACK.startDistance + TRACK.length / TRACK.checkpoints;
+  let verifiedLaps = 0;
+  const grassFrames = [0, 0];
+  // Smooth, continuous position samples exercise the actual engine and HUD.
+  // The old logic lost an entire lap after only 1–2 frames beyond the asphalt.
+  for (let s = TRACK.startDistance - 25; s < TRACK.startDistance + TRACK.length * 2 + 10; s += 5) {
+    const circuitDistance = TRACK.startDistance + mod(s - TRACK.startDistance, TRACK.length);
+    for (const [index, car] of ui.engine.cars.entries()) {
+      const lane = index === 0 ? 22 : -18;
+      const bump = Math.max(0, 1 - Math.abs(circuitDistance - gate) / 100) * (62 - Math.abs(lane));
+      const p = trackPoint(s, lane + Math.sign(lane) * bump);
+      car.x = p.x; car.y = p.y; car.angle = p.angle; car.speed = 0;
+    }
+    ui.frame(1 / 120);
+    for (const [index, car] of ui.engine.cars.entries()) if (car.offroad) grassFrames[index]++;
+    const expected = Math.max(0, Math.floor((s - TRACK.startDistance) / TRACK.length));
+    if (expected > verifiedLaps) {
+      for (const car of ui.engine.cars) {
+        assert.equal(car.lap, expected, `player ${car.id} earns full lap ${expected} after a short shoulder excursion`);
+        assert.equal(Number(ui.nodes.get('lap' + car.id).textContent), expected,
+          `player ${car.id} scoreboard updates on the finish crossing frame`);
+        assert.equal(car.missedCheckpoint, false);
+      }
+      verifiedLaps = expected;
+    }
+  }
+  assert.equal(verifiedLaps, 2);
+  assert.ok(grassFrames.every(count => count > 0), 'both cars genuinely leave the asphalt briefly');
+  assert.equal(ui.engine.state, 'racing');
+});
+
 test('a complete real-control race renders results and again/menu actions reset state', async t => {
   const ui = await loadUI(t);
   ui.click('start'); ui.advance(3.1);
@@ -420,7 +458,7 @@ test('a complete real-control race renders results and again/menu actions reset 
     const lane = 24;
     const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, lane);
     const error = mod(Math.atan2(target.y - car.y, target.x - car.x) - car.angle + Math.PI, Math.PI * 2) - Math.PI;
-    let safeSpeed = 470, straightAhead = true;
+    let safeSpeed = 517, straightAhead = true;
     for (let ahead = 0; ahead <= 320; ahead += 40) {
       const curvature = trackPoint(projection.s + ahead).curvature;
       if (!curvature) continue;

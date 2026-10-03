@@ -7,6 +7,7 @@ const hud = $('hud');
 const ctx = hud.getContext('2d');
 const engine = new RaceEngine();
 const renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
+engine.setObstacles(renderer.obstacles || []);
 const keys = new Set();
 const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
@@ -111,7 +112,7 @@ function updateUI(now) {
     $('lap'+car.id).textContent=car.lap;
     $('boost'+car.id).style.width=car.boost+'%';$('boost-label'+car.id).textContent=Math.round(car.boost)+'%';
     $('speed'+car.id).textContent=Math.round(Math.abs(car.speed)*.66);
-    $('offroad'+car.id).textContent=car.rescueCooldown>0?'返回赛道 · 罚停中':car.missedCheckpoint?`漏过检查点 · 按 ${i===0?'Q':'/'} 回赛道`:car.offroad?'草地减速':car.boosting?'NITRO ON':'';
+    $('offroad'+car.id).textContent=car.rescueCooldown>0?'返回赛道 · 罚停中':car.missedCheckpoint?`漏过检查点 · 按 ${i===0?'Q':'/'} 回赛道`:car.impact>.15?'碰撞 · 减速':car.offroad?'草地减速':car.boosting?'NITRO ON':'';
   }
   if(engine.state!==lastState){
     $('menu').classList.toggle('hidden',engine.state!=='menu');$('pause-panel').classList.toggle('hidden',engine.state!=='paused');$('result').classList.toggle('hidden',engine.state!=='finished');

@@ -18,8 +18,10 @@ def module_source(name):
 
 engine_exports = 'RaceEngine, TRACK, trackPoint, projectTrack, mod'
 script = (
-    'const Engine = (() => {\n' + module_source('engine.js')
-    + '\nreturn {' + engine_exports + '};\n})();\n'
+    'const Collisions = (() => {\n' + module_source('collisions.js')
+    + '\nreturn {ObstacleWorld};\n})();\n'
+    + 'const Engine = (({ObstacleWorld}) => {\n' + module_source('engine.js')
+    + '\nreturn {' + engine_exports + '};\n})(Collisions);\n'
     + 'const Rendering = (({' + engine_exports + '}) => {\n'
     + module_source('renderer.js') + '\nreturn {RaceRenderer, sceneWeights};\n})(Engine);\n'
     + '(({' + engine_exports + '}, {RaceRenderer, sceneWeights}) => {\n'

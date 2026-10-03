@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TRACK, trackPoint, projectTrack, RaceEngine } from '../engine.js';
-import { RaceRenderer, updateChaseCamera, perspective, lookAt, multiply, sampleRoadRibbon, sceneWeights, cornerMarkers, sceneryPlacements } from '../renderer.js';
+import { RaceRenderer, updateChaseCamera, perspective, lookAt, multiply, sampleRoadRibbon, sceneWeights, cornerMarkers, sceneryPlacements, lampGeometry, roadsideLamps, cornerMarkerGeometry, CAR_CLEARANCE_HEIGHT } from '../renderer.js';
 
 const project = (matrix, p) => {
   const v = [...p, 1], out = [0, 0, 0, 0];
@@ -39,7 +39,7 @@ test('camera follows shortest rotation across the angle wrap and snaps after res
 });
 
 test('boost widens field of view smoothly without moving camera above the car', () => {
-  const car = { x: 500, y: 500, angle: 0, speed: 330, boosting: false };
+  const car = { x: 500, y: 500, angle: 0, speed: 363, boosting: false };
   const regular = updateChaseCamera(car, null);
   const boost = updateChaseCamera({ ...car, boosting: true }, regular, 1 / 60);
   assert.ok(boost.fov > regular.fov && boost.fov < 68 * Math.PI / 180);
@@ -96,6 +96,41 @@ test('enlarged left and right bends receive real corner markers outside the road
   }
 });
 
+test('lamp arms reach inward from the roadside and warm lenses face down over asphalt', () => {
+  const installed=roadsideLamps();
+  assert.ok(installed.length>60);
+  for(const lamp of [...installed,...installed.map(lamp=>lampGeometry(lamp.s,-1))]) {
+    const right=[-Math.sin(lamp.angle),Math.cos(lamp.angle)];
+    const reach=(lamp.head.position[0]-lamp.mast.position[0])*right[0]+(lamp.head.position[2]-lamp.mast.position[2])*right[1];
+    assert.ok(reach*lamp.side<-40,'head points into the carriageway on either roadside');
+    assert.ok(projectTrack(lamp.mast.position[0],lamp.mast.position[2]).distance>TRACK.roadWidth/2+20);
+    assert.ok(projectTrack(lamp.head.position[0],lamp.head.position[2]).distance<TRACK.roadWidth/2-10);
+    assert.ok(lamp.lens.position[1]+lamp.lens.size[1]/2<lamp.head.position[1]-lamp.head.size[1]/2,'light is on the underside of the housing');
+    assert.ok(lamp.arm.position[1]-lamp.arm.size[1]/2>60,'arm leaves ample driving clearance');
+  }
+});
+
+test('chevron paint is on the incoming face and projects toward the actual bend', () => {
+  for(const marker of cornerMarkers()) {
+    const geometry=cornerMarkerGeometry(marker),forward=[Math.cos(marker.angle),Math.sin(marker.angle)];
+    const car={...trackPoint(marker.s-130),speed:363};
+    const camera=updateChaseCamera(car,null),vp=multiply(perspective(camera.fov,.9),lookAt(camera.eye,camera.target));
+    const visible=(camera.eye[0]-marker.x)*geometry.normal[0]+(camera.eye[2]-marker.y)*geometry.normal[2];
+    assert.ok(visible>100,'paint faces the approaching chase camera');
+    for(const chevron of geometry.chevrons) {
+      const tip=project(vp,chevron.tip),tails=chevron.tails.map(tail=>project(vp,tail));
+      const direction=tip[0]-(tails[0][0]+tails[1][0])/2;
+      assert.ok(direction*Math.sign(marker.turn)>0.001,'visible arrow tip points right for a right bend and left for a left bend');
+      for(const vertex of chevron.strokes.flat()) {
+        const longitudinal=(vertex[0]-marker.x)*forward[0]+(vertex[2]-marker.y)*forward[1];
+        const lateral=-(vertex[0]-marker.x)*forward[1]+(vertex[2]-marker.y)*forward[0];
+        assert.ok(longitudinal<-1.1,'actual paint vertices sit in front of the incoming board face, not behind it');
+        assert.ok(vertex[1]>30.5&&vertex[1]<49.5&&Math.abs(lateral)<11.5,'every painted corner fits inside the raised board');
+      }
+    }
+  }
+});
+
 test('actual trees, palm crowns, roofs and rocks leave a continuous clear racing corridor', () => {
   const placements=sceneryPlacements();
   assert.ok(placements.length>500,'the longer route still has dense physical scenery');
@@ -142,6 +177,23 @@ test('WebGL rendering uses separate complete viewports and finite bounded static
     if(Math.abs(p2[offset]-1)<1e-6&&Math.abs(p2[offset+1]-152/255)<1e-6&&Math.abs(p2[offset+2]-112/255)<1e-6)orangeVertices++;
   }
   assert.ok(orangeVertices>100,'P2 actual uploaded car paint matches the orange HUD');
+  const props=gl.buffers.get(renderer.meshes.props.buffer),markers=cornerMarkers();
+  let arrowVertices=0,lensVertices=0;
+  for(let offset=0;offset<props.length;offset+=11) {
+    const isColor=(r,g,b)=>Math.abs(props[offset+6]-r/255)<1e-6&&Math.abs(props[offset+7]-g/255)<1e-6&&Math.abs(props[offset+8]-b/255)<1e-6;
+    if(isColor(255,219,137)) {
+      arrowVertices++;
+      const nearest=markers.reduce((best,marker)=>Math.hypot(marker.x-props[offset],marker.y-props[offset+2])<Math.hypot(best.x-props[offset],best.y-props[offset+2])?marker:best);
+      const face=(props[offset]-nearest.x)*Math.cos(nearest.angle)+(props[offset+2]-nearest.y)*Math.sin(nearest.angle);
+      assert.ok(face<-1.1,'uploaded arrow triangles must be on the approaching side');
+    }
+    if(isColor(255,223,160)) {
+      lensVertices++;
+      assert.ok(projectTrack(props[offset],props[offset+2]).distance<TRACK.roadWidth/2,'actual uploaded lamp lenses overhang the road');
+    }
+  }
+  assert.equal(arrowVertices,markers.length*3*2*6,'all three two-stroke chevrons reach the real world mesh');
+  assert.equal(lensVertices,roadsideLamps().length*36,'every lamp has its downward lens in the real mesh');
   const engine = new RaceEngine(); renderer.resetCameras(engine); renderer.render(engine, 1 / 60, 1000);
   assert.deepEqual(gl.calls.filter(c => c[0] === 'viewport'), [['viewport', 0, 0, 640, 800], ['viewport', 640, 0, 641, 800]]);
   assert.deepEqual(gl.calls.filter(c => c[0] === 'scissor'), [['scissor', 0, 0, 640, 800], ['scissor', 640, 0, 641, 800]]);
@@ -156,4 +208,58 @@ test('missing WebGL reports an actionable error instead of throwing', () => {
   assert.equal(renderer.available, false);
   assert.match(renderer.error, /WebGL/);
   assert.doesNotThrow(() => renderer.render(new RaceEngine()));
+});
+
+test('physical colliders come from actual props, preserve road clearance and leave both grid slots clear', () => {
+  const gl=mockGL(),renderer=new RaceRenderer({width:1280,height:800,getContext:()=>gl,addEventListener:()=>{}});
+  assert.equal(renderer.available,true,renderer.error);
+  const obstacles=renderer.obstacles;
+  assert.ok(obstacles.length>1000,'trees, buildings, rocks, lamps and barriers all have physical bodies');
+  assert.equal(new Set(obstacles.map(o=>o.id)).size,obstacles.length);
+  const near=(a,b)=>Math.abs(a-b)<1e-7;
+  const at=(x,y)=>obstacles.filter(o=>near(o.x,x)&&near(o.y,y));
+  for(const item of sceneryPlacements()) {
+    const bodies=at(item.x,item.z);
+    if(item.kind==='pine') {
+      assert.ok(bodies.some(o=>o.type==='box'&&near(o.halfWidth,2.5*item.size)&&near(o.halfDepth,2.5*item.size)),'pine trunk exactly matches its rendered box');
+      const branches=[[9,22],[26,17],[42,11]].filter(([base])=>base*item.size<CAR_CLEARANCE_HEIGHT);
+      const actual=bodies.filter(o=>o.type==='circle').map(o=>o.radius).sort((a,b)=>a-b);
+      const expected=branches.map(([,radius])=>radius*item.size).sort((a,b)=>a-b);
+      assert.equal(actual.length,expected.length,'every branch within the vehicle height band is solid, and higher crowns are excluded');
+      for(let i=0;i<expected.length;i++)assert.ok(near(actual[i],expected[i]),'low foliage collider uses its largest intersecting section');
+    } else if(item.kind==='palm') {
+      assert.ok(bodies.some(o=>o.type==='circle'&&near(o.radius,3.7*item.size)),'palm trunk exactly matches its tapered ground section');
+    } else if(item.kind==='rock') {
+      assert.ok(bodies.some(o=>o.type==='circle'&&near(o.radius,item.radius)),'boulder uses its real ground radius');
+    } else {
+      assert.ok(bodies.some(o=>o.type==='box'&&near(o.halfWidth,item.width/2)&&near(o.halfDepth,item.depth/2)),'building walls use their actual width and depth');
+    }
+  }
+  for(const lamp of roadsideLamps()) {
+    assert.ok(at(lamp.mast.position[0],lamp.mast.position[2]).some(o=>o.type==='box'&&o.halfWidth===1.5&&o.halfDepth===1.5));
+    assert.equal(at(lamp.head.position[0],lamp.head.position[2]).length,0,'overhead lamp head does not block the roadway');
+  }
+  for(const marker of cornerMarkers()) {
+    const bodies=at(marker.x,marker.y);
+    assert.ok(bodies.some(o=>o.type==='box'&&o.halfWidth===2.5&&o.halfDepth===1.5),'sign support is solid');
+    assert.equal(bodies.some(o=>o.type==='box'&&o.halfDepth===11.5),false,'raised sign face stays above the car collider');
+  }
+  const cars=new RaceEngine().cars;
+  for(const obstacle of obstacles) {
+    if(obstacle.type==='circle') {
+      assert.ok(projectTrack(obstacle.x,obstacle.y).distance-obstacle.radius>TRACK.roadWidth/2,'circular props do not occupy asphalt');
+      for(const car of cars)assert.ok(Math.hypot(car.x-obstacle.x,car.y-obstacle.y)>21+obstacle.radius,'spawn clears every circular collider');
+    } else {
+      const c=Math.cos(obstacle.angle),s=Math.sin(obstacle.angle);
+      for(const u of [-1,0,1])for(const v of [-1,0,1]) {
+        const x=obstacle.x+c*u*obstacle.halfWidth-s*v*obstacle.halfDepth,y=obstacle.y+s*u*obstacle.halfWidth+c*v*obstacle.halfDepth;
+        assert.ok(projectTrack(x,y).distance>TRACK.roadWidth/2,'box corners and edge centers remain outside asphalt');
+      }
+      for(const car of cars) {
+        const dx=car.x-obstacle.x,dy=car.y-obstacle.y;
+        const closestX=Math.max(0,Math.abs(dx*c+dy*s)-obstacle.halfWidth),closestY=Math.max(0,Math.abs(-dx*s+dy*c)-obstacle.halfDepth);
+        assert.ok(Math.hypot(closestX,closestY)>21,'spawn clears every oriented box');
+      }
+    }
+  }
 });

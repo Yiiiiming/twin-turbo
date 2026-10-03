@@ -1,8 +1,10 @@
+import { ObstacleWorld } from './collisions.js';
+
 /** Pure, deterministic arcade simulation. Distances are pixels; time is seconds. */
 const TAU = Math.PI * 2;
 const CHECKPOINTS = 32;
-// At the normal 330 px/s cruise speed, the 15,522 pixel route takes
-// approximately 47 seconds. Extend the geography, not the car's response.
+// At the normal 363 px/s cruise speed, the 15,522 pixel route takes
+// approximately 43 seconds. The long route preserves a full-length lap.
 const CIRCUIT_SCALE = 2.6;
 
 // One continuous technical circuit. The two opposite S bends and the infield
@@ -45,6 +47,7 @@ const LENGTH = circuitLength;
 
 export const TRACK = Object.freeze({
   width: 2500 * CIRCUIT_SCALE, height: 1650 * CIRCUIT_SCALE, roadWidth: 120,
+  checkpointMargin: 40,
   length: LENGTH, startDistance: 0, checkpoints: CHECKPOINTS,
   segments: Object.freeze(segments),
 });
@@ -125,15 +128,25 @@ function createCar(id) {
     finished: false, finishTime: null, missedCheckpoint: false, rescueCooldown: 0,
     _lane: lane, _started: false, _nextCheckpoint: 0,
     _lastTrackS: p.s, _lastX: p.x, _lastY: p.y,
-    _lastCheckpointS: TRACK.startDistance - 30, _lastOnRoad: true,
+    _lastCheckpointS: TRACK.startDistance - 30, _lastCheckpointEligible: true,
     _lapStartTime: 0,
   };
 }
 
 export class RaceEngine {
-  constructor({ laps = 3 } = {}) {
+  constructor({ laps = 3, obstacles = [] } = {}) {
     this.laps = clamp(Math.round(laps) || 3, 1, 9);
+    this.obstacleWorld = new ObstacleWorld(obstacles);
     this.reset();
+  }
+
+  setObstacles(obstacles = []) {
+    this.obstacleWorld = new ObstacleWorld(obstacles);
+    for (const car of this.cars) {
+      this.obstacleWorld.resolveCar(car);
+      this._contain(car);
+    }
+    return this;
   }
 
   reset() {
@@ -179,7 +192,7 @@ export class RaceEngine {
     car.rescueCooldown = 2;
     car.offroad = false; car.lastSkid = false; car.impact = 0;
     car._lastTrackS = p.s; car._lastX = p.x; car._lastY = p.y;
-    car._lastOnRoad = true; car.missedCheckpoint = false;
+    car._lastCheckpointEligible = true; car.missedCheckpoint = false;
     this._updateProgress(car, p.s);
   }
 
@@ -205,9 +218,19 @@ export class RaceEngine {
 
   _simulate(dt, keys) {
     this.time += dt;
-    for (const car of this.cars) this._drive(car, dt, keys);
+    for (const car of this.cars) {
+      const previous = { x: car.x, y: car.y };
+      this._drive(car, dt, keys);
+      this.obstacleWorld.resolveCar(car, previous);
+      this._contain(car);
+    }
     this._collide();
-    for (const car of this.cars) this._advance(car, dt);
+    for (const car of this.cars) {
+      // Another car must not shove this car through a building or barrier.
+      this.obstacleWorld.resolveCar(car);
+      this._contain(car);
+      this._advance(car, dt);
+    }
     const finishers = this.cars.filter(car => car.finished);
     if (finishers.length) {
       this.winner = finishers.sort((a, b) => a.finishTime - b.finishTime)[0];
@@ -233,20 +256,29 @@ export class RaceEngine {
     car.boosting = boost && forward && !reverse && car.boost > 0.5
       && car.speed > 40 && !car.offroad;
     car.boost = clamp(car.boost + (car.boosting ? -32 : 12) * dt, 0, 100);
-    const maximum = car.offroad ? 145 : car.boosting ? 470 : 330;
+    const maximum = car.offroad ? 145 : car.boosting ? 517 : 363;
     if (forward && reverse) {
       car.speed = approach(car.speed, 0, 400 * dt);
     } else if (reverse) {
       car.speed = approach(car.speed, -115, (car.speed > 0 ? 375 : 150) * dt);
     } else if (forward) {
-      car.speed = approach(car.speed, maximum, (car.speed < 0 ? 350 : car.offroad ? 145 : car.boosting ? 440 : 235) * dt);
+      car.speed = approach(car.speed, maximum, (car.speed < 0 ? 350 : car.offroad ? 145 : car.boosting ? 484 : 258.5) * dt);
     } else {
       car.speed = approach(car.speed, 0, (car.offroad ? 145 : 62) * dt);
     }
     if (car.speed > maximum) car.speed = approach(car.speed, maximum, (car.offroad ? 620 : 250) * dt);
-    car.steer = approach(car.steer, Number(right) - Number(left), dt * 8);
+    const steerTarget = Number(right) - Number(left);
+    // Ease into a held key over 200 ms. Release/countersteer returns toward
+    // center faster, so corrections do not leave a long steering tail.
+    const returning = steerTarget === 0 || (car.steer !== 0 && Math.sign(steerTarget) !== Math.sign(car.steer));
+    car.steer = approach(car.steer, steerTarget, dt * (returning ? 7 : 5));
     const grip = Math.min(Math.abs(car.speed) / 180, 1);
-    const turn = car.steer * 2.18 * (0.23 + grip * 0.77)
+    // Retain easy low-speed turns, soften normal cruise by 16.5%, and reduce
+    // steering a further 8% progressively across the boost speed range.
+    const speed = Math.abs(car.speed);
+    const turnLimit = (2.18 - .36 * clamp(speed / 363, 0, 1))
+      * (1 - .08 * clamp((speed - 363) / (517 - 363), 0, 1));
+    const turn = car.steer * turnLimit * (0.23 + grip * 0.77)
       * Math.min(Math.abs(car.speed) / 30, 1) * Math.sign(car.speed);
     car.angle = mod(car.angle + turn * dt + Math.PI, TAU) - Math.PI;
     car.x += Math.cos(car.angle) * car.speed * dt;
@@ -280,8 +312,8 @@ export class RaceEngine {
     const closing = b.speed * bh - a.speed * ah;
     if (closing < 0) {
       const impulse = -closing * 0.64;
-      a.speed = clamp(a.speed - impulse * ah, -160, 470);
-      b.speed = clamp(b.speed + impulse * bh, -160, 470);
+      a.speed = clamp(a.speed - impulse * ah, -160, 517);
+      b.speed = clamp(b.speed + impulse * bh, -160, 517);
     }
     a.impact = b.impact = 1;
     this._contain(a);
@@ -291,12 +323,17 @@ export class RaceEngine {
   _advance(car, dt) {
     const p = projectTrack(car.x, car.y);
     const onRoad = p.distance <= TRACK.roadWidth / 2;
+    const checkpointLimit = TRACK.roadWidth / 2 + TRACK.checkpointMargin;
+    const checkpointEligible = p.distance <= checkpointLimit;
     const delta = signedDistance(car._lastTrackS, p.s);
     const displacement = Math.hypot(car.x - car._lastX, car.y - car._lastY);
     const midpoint = projectTrack((car.x + car._lastX) / 2, (car.y + car._lastY) / 2);
-    // Both ends and midpoint must remain on the road. Reject teleports as well
-    // as infield jumps; reversing never earns a checkpoint.
-    const valid = onRoad && car._lastOnRoad && midpoint.distance <= TRACK.roadWidth / 2
+    // Short excursions onto the shoulder still pass invisible checkpoints.
+    // Asphalt grip/slowdown stays strict, while both ends and the midpoint of
+    // checkpoint movement must stay within the road plus its narrow runoff.
+    // Ordered gates and bounded forward movement still reject shortcuts,
+    // teleports, and repeated backward/forward finish-line crossings.
+    const valid = checkpointEligible && car._lastCheckpointEligible && midpoint.distance <= checkpointLimit
       && delta > 0 && delta < 24 && displacement < 24;
     if (valid) {
       const gate = mod(TRACK.startDistance + car._nextCheckpoint * LENGTH / CHECKPOINTS, LENGTH);
@@ -325,7 +362,7 @@ export class RaceEngine {
       }
     }
     // Give the renderer a helpful recover prompt if an expected gate was
-    // crossed off the road, or if a relocation skipped it.
+    // crossed beyond the runoff, or if a relocation skipped it.
     if (!valid && delta > 0) {
       const gate = mod(TRACK.startDistance + car._nextCheckpoint * LENGTH / CHECKPOINTS, LENGTH);
       if (mod(gate - car._lastTrackS, LENGTH) <= delta) car.missedCheckpoint = true;
@@ -335,7 +372,7 @@ export class RaceEngine {
     car.offroad = !onRoad;
     this._updateProgress(car, p.s);
     car._lastTrackS = p.s; car._lastX = car.x; car._lastY = car.y;
-    car._lastOnRoad = onRoad;
+    car._lastCheckpointEligible = checkpointEligible;
   }
 
   _updateProgress(car, s) {

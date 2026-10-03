@@ -2,6 +2,7 @@
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
 
 const TAU = Math.PI * 2;
+export const CAR_CLEARANCE_HEIGHT = 25;
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const mix = (a, b, t) => a + (b - a) * t;
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -40,7 +41,7 @@ export function updateChaseCamera(car, previous, dt = 1 / 60) {
   const blend = snap ? 1 : 1 - Math.exp(-Math.max(0, Math.min(dt, 0.1)) * 7.5);
   const turnBlend = snap ? 1 : 1 - Math.exp(-Math.max(0, Math.min(dt, 0.1)) * 9);
   const angle = snap ? car.angle : previous.angle + (mod(car.angle - previous.angle + Math.PI, TAU) - Math.PI) * turnBlend;
-  const speed = clamp(Math.abs(car.speed || 0) / 470, 0, 1);
+  const speed = clamp(Math.abs(car.speed || 0) / 517, 0, 1);
   const distance = 169 + speed * 18;
   const height = 76 + speed * 8;
   const lateral = 13;
@@ -59,7 +60,7 @@ const rgba = (color, alpha = 1) => {
 };
 
 class MeshBuilder {
-  constructor() { this.data = []; }
+  constructor(colliders=null) { this.data = [];this.colliders=colliders; }
   vertex(v, normal, color, emission = 0) { this.data.push(...v, ...normal, ...rgba(color), emission); }
   triangle(a, b, c, color, emission = 0, normal) {
     normal ||= normalize(cross(b.map((n, i) => n - a[i]), c.map((n, i) => n - a[i])));
@@ -69,6 +70,10 @@ class MeshBuilder {
     this.triangle(a, b, c, color, emission, normal); this.triangle(a, c, d, color, emission, normal);
   }
   box(x, y, z, sx, sy, sz, color, angle = 0, emission = 0) {
+    // Only the scene builder opts in. Roads, paint, vehicles and shadows do not.
+    if(this.colliders&&y-sy/2<CAR_CLEARANCE_HEIGHT&&y+sy/2>0)this.colliders.push({
+      id:`prop-${this.colliders.length}`,type:'box',x,y:z,halfWidth:sx/2,halfDepth:sz/2,angle,
+    });
     const c = Math.cos(angle), s = Math.sin(angle);
     const p = (a, b, d) => [x + c * a - s * d, y + b, z + s * a + c * d];
     const hx = sx / 2, hy = sy / 2, hz = sz / 2;
@@ -76,6 +81,14 @@ class MeshBuilder {
     for (const [a,b,d,e] of [[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]]) this.quad(v[a],v[b],v[d],v[e],color,emission);
   }
   cone(x, y, z, radius, height, color, sides = 7, topRadius = 0, phase = 0) {
+    // Use the largest real cross-section inside the vehicle's height band.
+    // Low foliage is solid; crowns wholly above the roof remain passable below.
+    if(this.colliders&&y<CAR_CLEARANCE_HEIGHT&&y+height>0) {
+      const sectionAt=heightY=>mix(radius,topRadius,clamp((heightY-y)/height,0,1));
+      this.colliders.push({id:`prop-${this.colliders.length}`,type:'circle',x,y:z,
+        radius:Math.max(sectionAt(Math.max(y,0)),sectionAt(Math.min(y+height,CAR_CLEARANCE_HEIGHT))),
+      });
+    }
     for (let i = 0; i < sides; i++) {
       const a = phase + i / sides * TAU, b = phase + (i + 1) / sides * TAU;
       const p = [x + Math.cos(a) * radius, y, z + Math.sin(a) * radius];
@@ -314,8 +327,48 @@ export function cornerMarkers() {
   return markers;
 }
 
+/** Local +Z is the driver's right: an outer mast's arm must extend toward -side. */
+export function lampGeometry(distance,side=1) {
+  const q=trackPoint(distance,side*(TRACK.roadWidth/2+27));
+  const right=[-Math.sin(q.angle),Math.cos(q.angle)];
+  const inward=(reach,height)=>[q.x-right[0]*side*reach,height,q.y-right[1]*side*reach];
+  return {s:distance,side,angle:q.angle,
+    mast:{position:[q.x,37,q.y],size:[3,74,3]},
+    arm:{position:inward(22,73),size:[3,3,46]},
+    head:{position:inward(43,71),size:[9,4,12]},
+    lens:{position:inward(43,68.6),size:[8,.7,10]},
+  };
+}
+
+export function roadsideLamps() {
+  const lamps=[];
+  for(let s=0,i=0;s<TRACK.length;s+=47,i++) {
+    const p=trackPoint(s),coastal=p.y>TRACK.height*.63,city=p.x>TRACK.width*.56&&p.y<TRACK.height*.63;
+    if((coastal||city)&&i%3===0)lamps.push(lampGeometry(s));
+  }
+  return lamps;
+}
+
+/** Paint sits on the upstream face, with three actual > or < shaped chevrons. */
+export function cornerMarkerGeometry(marker) {
+  const forward=[Math.cos(marker.angle),Math.sin(marker.angle)],right=[-forward[1],forward[0]];
+  const normal=[-forward[0],0,-forward[1]],direction=Math.sign(marker.turn);
+  const point=(horizontal,height)=>[marker.x-forward[0]*1.2+right[0]*horizontal,height,marker.y-forward[1]*1.2+right[1]*horizontal];
+  const stroke=(a,b)=>{
+    const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    const dx=-(b[1]-a[1])/length*.85,dy=(b[0]-a[0])/length*.85;
+    return [point(a[0]+dx,a[1]+dy),point(b[0]+dx,b[1]+dy),point(b[0]-dx,b[1]-dy),point(a[0]-dx,a[1]-dy)];
+  };
+  const chevrons=[];
+  for(const center of [-7,0,7]) {
+    const upper=[center-direction*2.5,45],tip=[center+direction*2.5,40],lower=[center-direction*2.5,35];
+    chevrons.push({tip:point(...tip),tails:[point(...upper),point(...lower)],strokes:[stroke(upper,tip),stroke(tip,lower)]});
+  }
+  return {normal,chevrons};
+}
+
 function buildWorld() {
-  const terrain=new MeshBuilder(), props=new MeshBuilder(), water=new MeshBuilder();
+  const obstacles=[],terrain=new MeshBuilder(), props=new MeshBuilder(obstacles), water=new MeshBuilder();
   const rng=random(90421), w=TRACK.width, h=TRACK.height;
   const shoreZ=shoreBoundary();
   const grid=130;
@@ -358,17 +411,11 @@ function buildWorld() {
   }
   // Lamp posts and reflective barriers support road reading, including hairpins.
   for(let s=0,i=0;s<TRACK.length;s+=47,i++) {
-    const p=trackPoint(s), coastal=p.y>h*.63, city=p.x>w*.56&&p.y<h*.63;
+    const p=trackPoint(s), coastal=p.y>h*.63;
     if(i%3===0) {
       const side=i%2?1:-1, q=trackPoint(s,side*(TRACK.roadWidth/2+25));
       props.box(q.x,5,q.y,3,10,3,'#c7d3c3');
       props.box(q.x,9.5,q.y,4,2,4,i%2?'#ffbc7d':'#9ceaff',0,.65);
-    }
-    if((coastal||city)&&i%3===0) {
-      const q=trackPoint(s,TRACK.roadWidth/2+27),angle=q.angle;
-      props.box(q.x,37,q.y,3,74,3,'#516976');
-      props.box(q.x-Math.sin(angle)*8,73,q.y+Math.cos(angle)*8,3,3,20,'#77969e',angle);
-      props.box(q.x-Math.sin(angle)*16,71,q.y+Math.cos(angle)*16,7,2,10,'#ffdfa0',angle,.9);
     }
     if(coastal && i%2===0) {
       const side=p.y>h*.81?1:-1;
@@ -377,15 +424,18 @@ function buildWorld() {
       props.box((q.x+r.x)/2,14,(q.y+r.y)/2,Math.hypot(r.x-q.x,r.y-q.y),5,2,'#b8c9cb',Math.atan2(r.y-q.y,r.x-q.x));
     }
   }
+  for(const lamp of roadsideLamps()) {
+    props.box(...lamp.mast.position,...lamp.mast.size,'#516976',lamp.angle);
+    props.box(...lamp.arm.position,...lamp.arm.size,'#77969e',lamp.angle);
+    props.box(...lamp.head.position,...lamp.head.size,'#5c7580',lamp.angle);
+    props.box(...lamp.lens.position,...lamp.lens.size,'#ffdfa0',lamp.angle,.95);
+  }
   // Road-side chevrons anticipate the technical corners instead of blind bends.
   for(const q of cornerMarkers()) {
-    const {side}=q;
+    const geometry=cornerMarkerGeometry(q);
     props.box(q.x,19,q.y,5,38,3,'#536d77');
-    props.box(q.x,34,q.y,2,19,23,'#142a39',q.angle);
-    for(let k=0;k<3;k++) {
-      const xx=q.x+Math.cos(q.angle)*1.3-Math.sin(q.angle)*(k*6-6),zz=q.y+Math.sin(q.angle)*1.3+Math.cos(q.angle)*(k*6-6);
-      props.box(xx,34,zz,1.5,11,2.3,'#ffdb89',q.angle+side*.5,.75);
-    }
+    props.box(q.x,40,q.y,2,19,23,'#142a39',q.angle);
+    for(const chevron of geometry.chevrons)for(const vertices of chevron.strokes)props.quad(...vertices,'#ffdb89',.75,geometry.normal);
   }
   const start=trackPoint(TRACK.startDistance),half=TRACK.roadWidth/2+15;
   for(const side of [-1,1]) {
@@ -400,8 +450,11 @@ function buildWorld() {
     const p=trackPoint(TRACK.startDistance,-half+k*half*2/14+5);
     props.box(p.x,90,p.y,16,5,8,k%2?'#f0efe4':'#273b49',start.angle);
   }
-  return { terrain, props, water };
+  return { terrain, props, water, obstacles };
 }
+
+/** Headless physics verification uses the exact production mesh-building path. */
+export function sceneObstacles() {return buildWorld().obstacles;}
 
 function carMesh(color) {
   const m=new MeshBuilder();
@@ -477,7 +530,7 @@ export function sceneWeights(x,y) {
 
 export class RaceRenderer {
   constructor(canvas,{sceneUrls={}}={}) {
-    this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};
+    this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};this.obstacles=[];
     this.sceneUrls={coast:'./assets/coast.png',alpine:'./assets/alpine.png',city:'./assets/city.png',...sceneUrls};
     try {
       const gl=canvas.getContext('webgl',{alpha:false,antialias:true,depth:true,powerPreference:'high-performance'})||canvas.getContext('experimental-webgl',{alpha:false,antialias:true,depth:true});
@@ -497,6 +550,7 @@ export class RaceRenderer {
     for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
     this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
     const world=buildWorld();
+    this.obstacles=world.obstacles;
     this.meshes={terrain:upload(gl,world.terrain),road:upload(gl,buildRoad()),water:upload(gl,world.water),props:upload(gl,world.props),cars:[upload(gl,carMesh('#57dbe6')),upload(gl,carMesh('#ff9870'))],flames:upload(gl,flameMesh()),shadow:upload(gl,shadowMesh())};
     this.worldMatrix=identity();
     this.textures={};
@@ -570,7 +624,7 @@ export class RaceRenderer {
       for(const vehicle of engine.cars)this._mesh(this.meshes.shadow,modelMatrix(vehicle.x,1.3,vehicle.y,vehicle.angle));
       gl.depthMask(true);gl.disable(gl.BLEND);
       for(let j=0;j<engine.cars.length;j++) {
-        const vehicle=engine.cars[j],roll=-clamp(vehicle.steer||0,-1,1)*Math.min(Math.abs(vehicle.speed)/330,1)*.035;
+        const vehicle=engine.cars[j],roll=-clamp(vehicle.steer||0,-1,1)*Math.min(Math.abs(vehicle.speed)/363,1)*.035;
         const bounce=vehicle.offroad?Math.sin(now*.041+vehicle.id)*Math.min(Math.abs(vehicle.speed)/100,1)*.7:0;
         const model=modelMatrix(vehicle.x,1.5+bounce,vehicle.y,vehicle.angle,roll);
         this._mesh(this.meshes.cars[j%2],model);

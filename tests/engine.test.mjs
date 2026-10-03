@@ -142,6 +142,64 @@ test('controls accelerate, brake into reverse, steer, and use rechargeable boost
   assert.ok(second.speed > 70); assert.ok(second.boost < 100);
 });
 
+test('normal and boost speeds and acceleration are exactly ten percent above the published baseline', () => {
+  const engine = running();
+  const car = engine.cars[0];
+  engine.step(.1, new Set(['KeyW']));
+  near(car.speed, 235 * 1.1 * .1);
+  for (let i = 0; i < 14; i++) engine.step(.1, new Set(['KeyW']));
+  near(car.speed, 330 * 1.1);
+  engine.step(.1, new Set(['KeyW', 'ShiftLeft']));
+  near(car.speed, 330 * 1.1 + 440 * 1.1 * .1);
+  for (let i = 0; i < 3; i++) engine.step(.1, new Set(['KeyW', 'ShiftLeft']));
+  near(car.speed, 470 * 1.1);
+});
+
+for (const fps of [30, 60, 120]) {
+  test(`held steering eases in and released steering recenters without a tail at ${fps} FPS`, () => {
+    const engine = running();
+    const car = engine.cars[0];
+    const start = trackPoint(TRACK.startDistance + 100, 0);
+    car.x = start.x; car.y = start.y; car.angle = start.angle; car.speed = 363;
+    const startAngle = car.angle;
+    for (let frame = 0; frame < fps * .1; frame++) engine.step(1 / fps, new Set(['KeyW', 'KeyD']));
+    near(car.steer, .5);
+    assert.ok(angleDifference(car.angle, startAngle) > .03 && angleDifference(car.angle, startAngle) < .065);
+    for (let frame = 0; frame < fps * .1; frame++) engine.step(1 / fps, new Set(['KeyW', 'KeyD']));
+    near(car.steer, 1);
+    const heldAngle = car.angle;
+    for (let frame = 0; frame < fps * .1; frame++) engine.step(1 / fps, new Set(['KeyW', 'KeyD']));
+    near(angleDifference(car.angle, heldAngle), 1.82 * .1);
+    const releaseAngle = car.angle;
+    for (let frame = 0; frame < Math.ceil(fps * .15); frame++) engine.step(1 / fps, new Set(['KeyW']));
+    near(car.steer, 0);
+    assert.ok(angleDifference(car.angle, releaseAngle) < .14);
+    const centeredAngle = car.angle;
+    engine.step(.1, new Set(['KeyW']));
+    near(angleDifference(car.angle, centeredAngle), 0);
+    assert.equal(car.offroad, false);
+  });
+}
+
+test('countersteering passes smoothly through neutral and high-speed turning is gentler', () => {
+  const engine = running();
+  const car = engine.cars[0]; car.speed = 363; car.steer = 1;
+  engine.step(.1, new Set(['KeyW', 'KeyA']));
+  near(car.steer, .3);
+  engine.step(.05, new Set(['KeyW', 'KeyA']));
+  assert.ok(car.steer < 0 && car.steer > -.1);
+  engine.step(.1, new Set(['KeyW', 'KeyA']));
+  engine.step(.1, new Set(['KeyW', 'KeyA']));
+  near(car.steer, -1);
+
+  const boosted = running();
+  const fast = boosted.cars[0]; fast.speed = 517; fast.steer = 1;
+  const angle = fast.angle;
+  boosted.step(.05, new Set(['KeyW', 'KeyD', 'ShiftLeft']));
+  near(angleDifference(fast.angle, angle) / .05, 1.82 * .92);
+  near(fast.speed, 517);
+});
+
 test('start crossing is not a lap, ordered full circuits complete the race', () => {
   const engine = running(3);
   const car = engine.cars[0];
@@ -189,15 +247,16 @@ test('teleporting across an expected checkpoint does not award it', () => {
   assert.equal(car.lap, 0); assert.equal(car._nextCheckpoint, 1);
 });
 
-test('crossing a checkpoint offroad is rejected; rescue restores earned progress', () => {
+test('crossing a checkpoint far beyond the runoff is rejected; rescue restores earned progress', () => {
   const engine = running();
   const car = engine.cars[0];
   const start = TRACK.startDistance;
   path(engine, car, start - 30, start + 5);
   const gate = start + TRACK.length / TRACK.checkpoints;
   path(engine, car, start + 5, gate - 20);
-  sample(engine, car, gate - 15, 85);
-  path(engine, car, gate - 15, gate + 20, 85);
+  const outsideRunoff = TRACK.roadWidth / 2 + TRACK.checkpointMargin + 35;
+  sample(engine, car, gate - 15, outsideRunoff);
+  path(engine, car, gate - 15, gate + 20, outsideRunoff);
   assert.equal(car.offroad, true);
   assert.equal(car._nextCheckpoint, 1);
   assert.equal(car.missedCheckpoint, true);
@@ -207,6 +266,85 @@ test('crossing a checkpoint offroad is rejected; rescue restores earned progress
   near(projectTrack(car.x, car.y).s, mod(start + 18, TRACK.length));
   path(engine, car, start + 18, gate + 5);
   assert.equal(car._nextCheckpoint, 2);
+});
+
+for (const player of [1, 2]) {
+  test(`player ${player} earns a gate after briefly touching grass and returning to the road`, () => {
+    const engine = running();
+    const car = engine.cars[player - 1];
+    const sign = player === 1 ? 1 : -1;
+    const lane = player === 1 ? 22 : -18;
+    const start = TRACK.startDistance;
+    const gate = start + TRACK.length / TRACK.checkpoints;
+    path(engine, car, start - 30, gate - 40, lane);
+    sample(engine, car, gate - 30, sign * 40);
+    sample(engine, car, gate - 20, sign * 58);
+    sample(engine, car, gate - 10, sign * 62);
+    assert.equal(car.offroad, true);
+    assert.equal(car._nextCheckpoint, 1);
+    sample(engine, car, gate + 5, sign * 59);
+    assert.equal(car.offroad, false);
+    assert.equal(car._nextCheckpoint, 2);
+    assert.equal(car.missedCheckpoint, false);
+  });
+}
+
+test('checkpoint runoff admits a near-road line but rejects movement outside its explicit margin', () => {
+  for (const extra of [-1, 1]) {
+    const engine = running();
+    const car = engine.cars[0];
+    const gate = TRACK.startDistance + TRACK.length / TRACK.checkpoints;
+    const lane = TRACK.roadWidth / 2 + TRACK.checkpointMargin + extra;
+    path(engine, car, TRACK.startDistance - 30, gate - 100);
+    for (let s = gate - 95; s < gate + 11; s += 5) {
+      sample(engine, car, s, 22 + Math.min(1, (s - gate + 100) / 70) * (lane - 22));
+    }
+    assert.equal(car.offroad, true, 'grass slowdown remains active even inside the checkpoint margin');
+    assert.equal(car._nextCheckpoint, extra < 0 ? 2 : 1);
+    assert.equal(car.missedCheckpoint, extra > 0);
+  }
+});
+
+test('brief shoulder crossings preserve both players consecutive full laps', () => {
+  const engine = running();
+  const start = TRACK.startDistance;
+  const gate = start + TRACK.length / TRACK.checkpoints;
+  const grassFrames = [0, 0];
+  let verifiedLaps = 0;
+  for (let s = start - 25; s < start + TRACK.length * 2 + 10; s += 5) {
+    const withinLap = start + mod(s - start, TRACK.length);
+    for (const [index, car] of engine.cars.entries()) {
+      const lane = index === 0 ? 22 : -18;
+      const bump = Math.max(0, 1 - Math.abs(withinLap - gate) / 100) * (62 - Math.abs(lane));
+      const p = trackPoint(s, lane + Math.sign(lane) * bump);
+      car.x = p.x; car.y = p.y; car.angle = p.angle; car.speed = 0;
+    }
+    engine.step(1 / 120);
+    for (const [index, car] of engine.cars.entries()) if (car.offroad) grassFrames[index]++;
+    const expected = Math.max(0, Math.floor((s - start) / TRACK.length));
+    if (expected > verifiedLaps) {
+      for (const car of engine.cars) {
+        assert.equal(car.lap, expected);
+        assert.equal(car.missedCheckpoint, false);
+      }
+      verifiedLaps = expected;
+    }
+  }
+  assert.equal(verifiedLaps, 2);
+  assert.ok(grassFrames.every(count => count > 0));
+});
+
+test('oscillating backward and forward across the finish never earns a lap', () => {
+  const engine = running();
+  const car = engine.cars[0];
+  const start = TRACK.startDistance;
+  path(engine, car, start - 30, start + 20);
+  for (let repeat = 0; repeat < 10; repeat++) {
+    path(engine, car, start + 20, start - 20);
+    path(engine, car, start - 20, start + 20);
+  }
+  assert.equal(car.lap, 0);
+  assert.equal(car._nextCheckpoint, 1);
 });
 
 test('cutting through the hairpin infield skips no checkpoints and rescue restores the approach', () => {
@@ -252,12 +390,12 @@ test('exact car overlap resolves finitely and world boundaries contain cars', ()
 test('offroad driving slows a fast car and a long racing frame advances at most 100ms', () => {
   const engine = running();
   const car = engine.cars[0];
-  car.x = 550; car.y = 350; car.angle = 0; car.speed = 330;
+  car.x = 550; car.y = 350; car.angle = 0; car.speed = 363;
   const before = engine.time;
   engine.step(5, new Set(['KeyW', 'ShiftLeft']));
   near(engine.time - before, 0.1);
   assert.equal(car.offroad, true); assert.equal(car.boosting, false);
-  assert.ok(car.speed < 280);
+  assert.ok(car.speed < 315);
 });
 
 test('rescue has a real two-second immobilization penalty without lap or time credit', () => {
@@ -304,7 +442,7 @@ for (const fps of [30, 60, 120]) {
         const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, lane);
         const targetAngle = Math.atan2(target.y - car.y, target.x - car.x);
         const error = mod(targetAngle - car.angle + Math.PI, Math.PI * 2) - Math.PI;
-        let safeSpeed = 470, straightAhead = true;
+        let safeSpeed = 517, straightAhead = true;
         for (let ahead = 0; ahead <= 320; ahead += 40) {
           const curvature = trackPoint(projection.s + ahead).curvature;
           if (!curvature) continue;
@@ -329,14 +467,14 @@ for (const fps of [30, 60, 120]) {
       assert.equal(offroadFrames, 0);
       assert.equal(usedBoost, true);
       assert.deepEqual([...usedSteering].sort(), ['left', 'right']);
-      assert.ok(engine.time > 115 && engine.time < 165);
-      assert.ok(engine.cars[player - 1].bestLap > 40 && engine.cars[player - 1].bestLap < 60);
+      assert.ok(engine.time > 110 && engine.time < 150);
+      assert.ok(engine.cars[player - 1].bestLap > 38 && engine.cars[player - 1].bestLap < 50);
     });
   }
 }
 
 for (const player of [1, 2]) {
-  test(`player ${player} completes a normal unboosted lap in 45–55 seconds`, () => {
+  test(`player ${player} completes a normal unboosted lap in 40–50 seconds`, () => {
     const engine = new RaceEngine({ laps: 1 }).start();
     const car = engine.cars[player - 1];
     let offroadFrames = 0;
@@ -354,6 +492,6 @@ for (const player of [1, 2]) {
     assert.equal(engine.winner.id, player);
     assert.equal(offroadFrames, 0);
     near(car.boost, 100);
-    assert.ok(car.lastLap >= 45 && car.lastLap <= 55, `Measured normal lap: ${car.lastLap}s`);
+    assert.ok(car.lastLap >= 40 && car.lastLap <= 50, `Measured normal lap: ${car.lastLap}s`);
   });
 }
