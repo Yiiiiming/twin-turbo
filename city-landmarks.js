@@ -302,18 +302,59 @@ function chinatown(g){
   g.userData.groundSolids=[-9,-4.7,4.7,9].map(x=>({x,z:0,width:1.4,depth:1.4,height:8.6}));
   g.userData.passages=[{x:0,z:0,width:8,depth:1.4,height:6.1},{x:-6.85,z:0,width:2.9,depth:1.4,height:6.1},{x:6.85,z:0,width:2.9,depth:1.4,height:6.1}];
 }
-function theatreBase(g,w,d,h,body=M.stone){
+function theatreBase(g,w,d,h,body=M.stone,{canopy='solid'}={}){
   box(g,0,.22,0,w+.7,.44,d+.8,M.shadow);box(g,0,h/2,0,w,h,d,body);
   g.userData.bodyBounds={minX:-w/2,maxX:w/2,minZ:-d/2,maxZ:d/2,minY:0,maxY:h};
   g.userData.groundSolids=[{x:0,z:0,width:w,depth:d,height:h}];
-  cornice(g,w,h-.8,0,d);box(g,0,4.25,d/2+1.15,w+.9,.45,2.8,M.iron);
+  cornice(g,w,h-.8,0,d);
+  if(canopy==='glass'){
+    const depth=2.8,width=w+.9,cz=d/2+1.15;
+    const glass=surface('theatre-canopy-glass','#607b7e',.19,.45);
+    // The original canopy envelope stays unchanged; close views can now read
+    // individual glazed panels held by the iron perimeter and transverse ribs.
+    for(const sign of [-1,1]){
+      box(g,0,4.25,cz+sign*(depth/2-.075),width,.45,.15,M.iron);
+      box(g,sign*(width/2-.075),4.25,cz,.15,.45,depth,M.iron);
+    }
+    const panels=18,pitch=(width-.3)/panels;
+    for(let i=0;i<panels;i++){
+      const x=-width/2+.15+(i+.5)*pitch;
+      box(g,x,4.37,cz,pitch-.09,.055,depth-.3,glass);
+      if(i<panels-1)box(g,x+pitch/2,4.25,cz,.075,.18,depth-.18,M.iron);
+    }
+    for(const x of [-12.8,-6.4,0,6.4,12.8]){
+      tube(g,[[x,3.56,d/2+.26],[x,3.77,d/2+.56],[x,4.03,d/2+1.23],[x,4.04,d/2+2.36]],.035,M.iron);
+    }
+  }else box(g,0,4.25,d/2+1.15,w+.9,.45,2.8,M.iron);
   for(let x=-w/2+.4;x<w/2;x+=.8)sphere(g,x,4.08,d/2+2.55,.08,.055,.08,M.bulb);
 }
-function theatreEntrances(g,w,z,count,{arched=false,fanlight=false}={}){
+function theatreEntrances(g,w,z,count,{arched=false,fanlight=false,doors=false,finish=M.iron}={}){
   for(let i=0;i<count;i++){
     const x=(i-(count-1)/2)*w/count,ww=Math.min(2.5,w/count*.68);
-    windowFrame(g,x,1.95,z,ww,3.3,{arched,lit:true,m:M.iron});
-    if(fanlight){const cy=3.6-ww/2;for(let n=1;n<6;n++){const a=n*PI/6;beam(g,[x,cy,z+.2],[x+Math.cos(a)*ww*.47,cy+Math.sin(a)*ww*.47,z+.2],.025,M.iron);}box(g,x,cy,z+.2,ww,.05,.06,M.iron);}
+    windowFrame(g,x,1.95,z,ww,3.3,{arched,lit:true,m:finish,mullions:!doors});
+    if(doors){
+      const transom=arched?3.6-ww/2:2.48;
+      const brass=surface('theatre-door-brass','#aa8d53',.3,.7);
+      box(g,x,transom,z+.15,ww,.11,.14,finish);
+      box(g,x,(transom+.31)/2,z+.15,.075,transom-.31,.14,finish);
+      box(g,x,.34,z+.15,ww,.09,.14,finish);
+      for(const sign of [-1,1]){
+        const leafX=x+sign*ww*.25,leafWidth=ww*.5-.13;
+        // A glazed upper door over a solid lower panel, with a narrow pull and
+        // kick plate. All additions sit within the existing arch/window reveal.
+        box(g,leafX,.72,z+.10,leafWidth,.65,.07,finish);
+        box(g,leafX,.47,z+.15,leafWidth-.08,.14,.045,brass);
+        box(g,leafX,1.075,z+.15,leafWidth,.065,.10,finish);
+        box(g,x+sign*.13,1.34,z+.23,.027,.37,.045,brass);
+        for(const y of [1.19,1.49])box(g,x+sign*.13,y,z+.195,.04,.035,.095,brass);
+      }
+    }
+    if(fanlight){
+      const cy=3.6-ww/2;
+      for(let n=1;n<6;n++){const a=n*PI/6;beam(g,[x,cy,z+.2],[x+Math.cos(a)*ww*.47,cy+Math.sin(a)*ww*.47,z+.2],.025,M.iron);}
+      const arc=[];for(let n=0;n<=12;n++){const a=n*PI/12;arc.push([x+Math.cos(a)*ww*.23,cy+Math.sin(a)*ww*.23,z+.205]);}tube(g,arc,.022,M.iron);
+      box(g,x,cy,z+.2,ww,.05,.06,M.iron);
+    }
   }
 }
 function squareDome(g,x,y,z,w,h){
@@ -334,7 +375,7 @@ function mansardRoof(g,x,y,z,w,d,h){
   const flat=geo.toNonIndexed();flat.computeVertexNormals();mesh(g,flat,M.roof,x,y,z);
 }
 function hisMajestys(g){
-  const w=32,d=29,z=d/2;theatreBase(g,w,d,23.3);theatreEntrances(g,29,z+.05,9);
+  const w=32,d=29,z=d/2;theatreBase(g,w,d,23.3,M.stone,{canopy:'glass'});theatreEntrances(g,29,z+.05,9,{doors:true});
   for(let i=0;i<9;i++){const x=(i-4)*3.28;for(const [y,h]of [[7.8,3.5],[13.1,3.7],[19.2,2.5]])windowFrame(g,x,y,z+.07,1.8,h);}
   for(let i=0;i<6;i++)column(g,(i-2.5)*3.28,5.05,z+1.15,.36,11.1);
   for(const x of [-14.9,-11.5,11.5,14.9])box(g,x,10.6,z+.3,.45,11.1,.42,M.light);
@@ -381,7 +422,7 @@ function sondheim(g){
   for(let i=0;i<24;i++)sphere(g,-13.2+i*.94,3.95,z+1.95,.055,.055,.055,M.bulb);
 }
 function princeEdward(g){
-  const w=32,d=30,z=d/2;theatreBase(g,w,d,23,surface('prince-edward-brick','#70574b'));theatreEntrances(g,30,z+.03,7,{arched:true,fanlight:true});
+  const w=32,d=30,z=d/2;theatreBase(g,w,d,23,surface('prince-edward-brick','#70574b'));theatreEntrances(g,30,z+.03,7,{arched:true,fanlight:true,doors:true,finish:surface('prince-edward-door-metal','#323b35',.45,.45)});
   for(let i=-3;i<=3;i++){
     const x=i*4.2;box(g,x,12.7,z+.06,2.8,14.9,.35,M.shadow);
     for(const y of [7.4,11.9,17])windowFrame(g,x,y,z+.31,2.3,3.25,{m:M.iron});
@@ -396,7 +437,7 @@ function princeEdward(g){
   plaque(g,'PRINCE EDWARD THEATRE',0,13.0,z+.91,11,7.5,{bg:'#182c38',fg:'#e9dcc0',size:72});
 }
 function lyceum(g){
-  const w=31,d=35,z=d/2;theatreBase(g,w,d,22.5);theatreEntrances(g,23,z+.03,3,{arched:true});
+  const w=31,d=35,z=d/2;theatreBase(g,w,d,22.5);theatreEntrances(g,23,z+.03,3,{arched:true,doors:true,finish:surface('lyceum-door-paint','#233b38',.5,.1)});
   for(const x of [-12,-9,-3.2,3.2,9,12]){
     column(g,x,1.3,z+3.5,.66,14.8);
     // The plinth radius, rather than just the narrower shaft, sets the drivable
@@ -405,6 +446,10 @@ function lyceum(g){
   }
   g.userData.bodyBounds.maxZ=z+3.5+.66*1.34;
   cornice(g,29,16.4,z+1.85,5.7);triangularPediment(g,0,17.1,z+3.15,30,3.2,1.4);box(g,0,21.3,z+1,28,2.25,2.1,M.light);
+  // Beazley's portico has a dentilled and modillioned entablature. These small
+  // projected units sit beneath its existing cornice, not beyond its footprint.
+  for(let x=-14.1;x<=14.1;x+=.52)box(g,x,16.14,z+4.48,.24,.27,.32,M.light);
+  for(let x=-13.6;x<=13.6;x+=1.6){box(g,x,15.94,z+4.34,.30,.17,.52,M.light);box(g,x,16.07,z+4.23,.30,.19,.73,M.light);}
   plaque(g,'LYCEUM THEATRE',0,16.25,z+4.75,25,1.0,{bg:'#b8af9d',fg:'#353a39',size:76});
   plaque(g,'THE LION KING',0,5.15,z+4.32,26,1.58,{bg:'#d6a52c',fg:'#32291d',size:100});
   for(const x of [-7,7])plaque(g,'THE LION KING',x,10,z+.4,4,7.2,{bg:'#d6a52c',fg:'#32291d',size:90});

@@ -5,14 +5,14 @@ import { mergeGeometries } from './vendor/BufferGeometryUtils.js';
 import { RoomEnvironment } from './vendor/RoomEnvironment.js';
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
 import { geographicToWorld } from './tracks.js';
-import polygonClipping from 'polygon-clipping';
 import { buildCityGeometry } from './city-geometry.js';
 import { createLandmark, LANDMARK_IDS } from './city-landmarks.js';
 import { placeLandmark, landmarkSolidObstacles } from './city-placement.js';
 import { CityFrontages } from './city-frontages.js';
 import { TunnelLighting } from './city-tunnel-lighting.js';
 import buildingProfiles from './assets/london-building-profiles.json' with { type: 'json' };
-import { createRoadStudy, createCourseRoadStudy, courseGuideHalfWidth, createTunnelStudy, subtractGroundFootprints } from './city-roads.js';
+import { courseGuideHalfWidth } from './city-roads.js';
+import londonRoadCache from './assets/london-road-cache.json' with { type: 'json' };
 import map from './assets/london-map.json' with { type: 'json' };
 
 const M = 6, TAU = Math.PI * 2;
@@ -112,6 +112,14 @@ export class CityRenderer {
   constructor(canvas) {
     this.canvas=canvas;this.available=false;this.error=null;this.obstacles=[];this.cameras=[];this.follow=[];this.busMeshes=new Map();
     try {
+      const cachedTrack=londonRoadCache.track;
+      const sectionsMatch=TRACK.sections.length===cachedTrack.sections.length&&TRACK.sections.every((section,i)=>{
+        const cached=cachedTrack.sections[i];return section.id===cached.id&&['start','end','peak','ramp'].every(key=>Math.abs((section[key]||0)-(cached[key]||0))<1e-5);
+      });
+      // Tiny Math-library differences between browser engines must not make an
+      // otherwise identical surveyed route fail its generated-cache guard.
+      if(londonRoadCache.schemaVersion!==1||TRACK.id!==cachedTrack.id||Math.abs(TRACK.length-cachedTrack.length)>1e-5||TRACK.roadWidth!==cachedTrack.roadWidth||!sectionsMatch)throw new Error('London geometry cache is out of date; rebuild the game.');
+      this.roadStudy=londonRoadCache.roadStudy;this.courseRoadStudy=londonRoadCache.courseRoadStudy;this.tunnelStudy=londonRoadCache.tunnelStudy;
       this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
       this.gl.setPixelRatio(1);this.gl.outputColorSpace=THREE.SRGBColorSpace;this.gl.toneMapping=THREE.ACESFilmicToneMapping;this.gl.toneMappingExposure=.98;
       this.gl.shadowMap.enabled=true;this.gl.shadowMap.type=THREE.PCFShadowMap;
@@ -140,13 +148,10 @@ export class CityRenderer {
   }
   coordinates(item){return (item.coordinates||item.footprint||[]).map(geo);}
   makeLandscape(){
-    const margin=4500,outer=[{x:-margin,y:-margin},{x:TRACK.width+margin,y:-margin},{x:TRACK.width+margin,y:TRACK.height+margin},{x:-margin,y:TRACK.height+margin}];
-    this.tunnelStudy=createTunnelStudy(TRACK);
-    const cuts=[...this.tunnelStudy.openings];
-    for(const water of map.water||[]){const points=this.coordinates(water);if(points.length<3)continue;cuts.push({outer:points,holes:[]});this.static.add(flatPolygon(points,this.material.water,-15));}
-    for(const surface of subtractGroundFootprints(outer,cuts))this.static.add(flatPolygon(surface.outer,this.material.pavement,-.5,surface.holes));
-    for(const park of map.parks||[]){const points=this.coordinates(park);if(points.length<3)continue;
-      for(const surface of subtractGroundFootprints(points,cuts))this.static.add(flatPolygon(surface.outer,this.material.grass,.03,surface.holes));}
+    const landscape=londonRoadCache.landscape;
+    for(const surface of landscape.waterSurfaces)this.static.add(flatPolygon(surface.outer,this.material.water,-15,surface.holes));
+    for(const surface of landscape.groundSurfaces)this.static.add(flatPolygon(surface.outer,this.material.pavement,-.5,surface.holes));
+    for(const surface of landscape.parkSurfaces)this.static.add(flatPolygon(surface.outer,this.material.grass,.03,surface.holes));
     // Soft high clouds, without painting landmarks into the sky.
     const skyTexture=canvasTexture(1024,512,(ctx,w,h)=>{
       const gradient=ctx.createLinearGradient(0,0,0,h);gradient.addColorStop(0,'#587f9e');gradient.addColorStop(.55,'#adc9d5');gradient.addColorStop(.9,'#e8e3d1');gradient.addColorStop(1,'#c9ceca');ctx.fillStyle=gradient;ctx.fillRect(0,0,w,h);
@@ -154,10 +159,8 @@ export class CityRenderer {
     },false);skyTexture.mapping=THREE.EquirectangularReflectionMapping;this.scene.background=skyTexture;
   }
   makeRoads(){
-    this.roadStudy=createRoadStudy(map,TRACK);
     for(const surface of this.roadStudy.sidewalkSurfaces)this.static.add(flatPolygon(surface.outer,this.material.pavement,surface.height,surface.holes));
     for(const surface of this.roadStudy.backgroundRoadSurfaces)this.static.add(flatPolygon(surface.outer,this.material.street,surface.height,surface.holes));
-    this.courseRoadStudy=createCourseRoadStudy(TRACK);
     const addSurfaces=(surfaces,material)=>{for(const surface of surfaces)this.static.add(flatPolygon(surface.outer,material,surface.height,surface.holes));};
     addSurfaces(this.courseRoadStudy.flatPavementSurfaces,this.material.pavement);
     addSurfaces(this.courseRoadStudy.flatAsphaltSurfaces,this.material.asphalt);
