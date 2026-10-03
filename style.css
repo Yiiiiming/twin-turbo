@@ -11,3 +11,21 @@
 .lap:after{content:'已完成';position:absolute;left:0;bottom:-5px;color:#7c897d;font-size:8px;letter-spacing:1px}
 @media(max-width:1100px){.key-row{gap:5px}.rescue-key{margin-left:2px}.race-tip{display:none}}
 @media(max-width:780px){.arena-meta{left:calc(50% + 13px);right:13px}.speed-readout.orange{left:calc(50% + 13px);right:auto}.arena-meta .orange-dot{display:block}.lap:after{font-size:7px}.lap{padding-bottom:5px}.rescue-key{margin-left:0}}
+
+/* The track is now a real 3D scene; the transparent HUD stays above it. */
+.arena{background:#243344}
+#game{position:relative;z-index:0}
+#hud{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+.arena-tag,.arena-meta,.speed-readout{z-index:2;color:#e0e7ed;text-shadow:0 1px 5px #000a}
+.arena-tag b,.arena-meta b{font-size:10px;font-weight:500;color:#e3d9c8;margin-left:12px;letter-spacing:1px}
+.center-overlay,.countdown{z-index:3}
+.center-overlay{background:#162536ed;box-shadow:0 12px 65px 8px #07132188;border:1px solid #80919d33;backdrop-filter:blur(14px);padding:23px 23px;width:350px}
+.center-overlay .eyebrow{color:#a0b6c3}.menu-description{color:#bcc9d0}.menu-hint{color:#8ea2af}.lap-select{border-color:#59748255}.lap-select button.selected{background:#38515b;color:#edf5ec}
+.route-stages{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:-3px 0 17px}
+.route-stages span{height:55px;border-radius:5px;display:flex;align-items:flex-end;justify-content:center;padding:7px 0;font-size:9px;color:#fff;text-shadow:0 1px 4px #000;background-size:cover;background-position:50% 60%;box-shadow:inset 0 -24px 18px -13px #020a17cc;border:1px solid #ffffff18}
+.coast-stage{background-image:url('./assets/coast.png')}.alpine-stage{background-image:url('./assets/alpine.png')}.city-stage{background-image:url('./assets/city.png')}
+.graphics-note{position:absolute;z-index:5;bottom:22%;left:15%;right:15%;padding:20px;color:#ffe6af;text-align:center;line-height:1.6;background:#172b3bea;border:1px solid #ccac7566;border-radius:8px;font-size:14px}
+.tiny-track{border:0;transform:rotate(-8deg);height:35px;width:65px;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60'%3E%3Cpath d='M30 48H17C2 48 2 27 17 27H30Q38 27 38 19Q38 12 46 12H82Q95 12 95 27V39Q95 49 82 49H75Q65 49 65 39V31Q65 20 55 20Q45 20 45 31V39Q45 48 37 48Z' fill='none' stroke='%23a9c49b' stroke-width='3'/%3E%3C/svg%3E")}.tiny-track:after{display:none}
+.fullscreen-exit{display:none}.race-stage:fullscreen{display:grid;grid-template-rows:auto minmax(0,1fr);width:100vw;height:100vh;background:#101921;padding:12px;gap:10px}.race-stage:fullscreen .scoreboard{margin:0}.race-stage:fullscreen .arena{height:100%;min-height:0}.race-stage:fullscreen #game,.race-stage:fullscreen #hud{width:100%;height:100%;aspect-ratio:auto;min-height:0}.race-stage:fullscreen .fullscreen-exit{display:block}
+.speed-readout{background:#122431bb;padding:8px 12px;border-radius:7px;bottom:20px}.speed-readout b{bottom:53px;text-shadow:0 2px 4px #000}.speed-readout strong{font-size:30px}.speed-readout span{color:#b8c7ce}
+@media(max-width:780px){.header-actions{gap:12px}.icon-button{font-size:10px}.arena-tag b,.arena-meta b{font-size:8px;margin-left:2px}.speed-readout{padding:5px 8px;bottom:14px}.speed-readout strong{font-size:20px}.center-overlay{width:340px}.route-stages span{height:43px}.graphics-note{font-size:11px}}

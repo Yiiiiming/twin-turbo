@@ -1,16 +1,52 @@
 /** Pure, deterministic arcade simulation. Distances are pixels; time is seconds. */
 const TAU = Math.PI * 2;
-const STRAIGHT = 480;
-const ARC = Math.PI * 200;
-const LENGTH = STRAIGHT * 2 + ARC * 2;
-const CHECKPOINTS = 12;
+const CHECKPOINTS = 32;
+// At the normal 330 px/s cruise speed, the 15,522 pixel route takes
+// approximately 47 seconds. Extend the geography, not the car's response.
+const CIRCUIT_SCALE = 2.6;
+
+// One continuous technical circuit. The two opposite S bends and the infield
+// hairpin are analytic arcs, so drawing, driving and checkpoint projection use
+// the same exact geometry. Every corner has a radius of at least 520 pixels.
+const segments = [];
+let circuitLength = 0;
+function addLine(x1, y1, x2, y2) {
+  x1 *= CIRCUIT_SCALE; y1 *= CIRCUIT_SCALE;
+  x2 *= CIRCUIT_SCALE; y2 *= CIRCUIT_SCALE;
+  const length = Math.hypot(x2 - x1, y2 - y1);
+  segments.push(Object.freeze({ kind: 'line', x1, y1, x2, y2, length,
+    angle: Math.atan2(y2 - y1, x2 - x1), s: circuitLength }));
+  circuitLength += length;
+}
+function addArc(cx, cy, radius, startAngle, sweep) {
+  cx *= CIRCUIT_SCALE; cy *= CIRCUIT_SCALE; radius *= CIRCUIT_SCALE;
+  const length = radius * Math.abs(sweep);
+  segments.push(Object.freeze({ kind: 'arc', cx, cy, radius, startAngle,
+    sweep, direction: Math.sign(sweep), length, s: circuitLength }));
+  circuitLength += length;
+}
+addLine(700, 1430, 430, 1430);
+addArc(430, 1200, 230, Math.PI / 2, Math.PI);
+addLine(430, 970, 660, 970);
+addArc(660, 750, 220, Math.PI / 2, -Math.PI / 2);
+addArc(1100, 750, 220, Math.PI, Math.PI / 2);
+addLine(1100, 530, 1870, 530);
+addArc(1870, 860, 330, -Math.PI / 2, Math.PI / 2);
+addLine(2200, 860, 2200, 1100);
+addArc(1870, 1100, 330, 0, Math.PI / 2);
+addLine(1870, 1430, 1760, 1430);
+addArc(1760, 1210, 220, Math.PI / 2, Math.PI / 2);
+addLine(1540, 1210, 1540, 1030);
+addArc(1340, 1030, 200, 0, -Math.PI);
+addLine(1140, 1030, 1140, 1210);
+addArc(920, 1210, 220, 0, Math.PI / 2);
+addLine(920, 1430, 700, 1430);
+const LENGTH = circuitLength;
 
 export const TRACK = Object.freeze({
-  width: 1200, height: 700, roadWidth: 120,
-  left: 360, right: 840, cy: 350, radius: 200,
-  top: 150, bottom: 550, length: LENGTH,
-  startDistance: STRAIGHT + ARC + 240,
-  checkpoints: CHECKPOINTS,
+  width: 2500 * CIRCUIT_SCALE, height: 1650 * CIRCUIT_SCALE, roadWidth: 120,
+  length: LENGTH, startDistance: 0, checkpoints: CHECKPOINTS,
+  segments: Object.freeze(segments),
 });
 
 export const mod = (value, divisor) => ((value % divisor) + divisor) % divisor;
@@ -19,44 +55,62 @@ const approach = (value, target, amount) => value < target
   ? Math.min(value + amount, target) : Math.max(value - amount, target);
 const signedDistance = (from, to) => mod(to - from + LENGTH / 2, LENGTH) - LENGTH / 2;
 
-/** A point and clockwise heading on the stadium. Positive lane is inside. */
+/** A point and forward heading. Positive lane is to the driver's right. */
 export function trackPoint(distance, lane = 0) {
   const s = mod(distance, LENGTH);
-  let x, y, angle;
-  if (s < STRAIGHT) {
-    x = TRACK.left + s; y = TRACK.top; angle = 0;
-  } else if (s < STRAIGHT + ARC) {
-    const a = -Math.PI / 2 + (s - STRAIGHT) / TRACK.radius;
-    x = TRACK.right + Math.cos(a) * TRACK.radius;
-    y = TRACK.cy + Math.sin(a) * TRACK.radius;
-    angle = a + Math.PI / 2;
-  } else if (s < STRAIGHT * 2 + ARC) {
-    x = TRACK.right - (s - STRAIGHT - ARC); y = TRACK.bottom; angle = Math.PI;
+  const segment = segments.find(part => s < part.s + part.length) || segments.at(-1);
+  const along = s - segment.s;
+  let x, y, angle, curvature = 0;
+  if (segment.kind === 'line') {
+    const fraction = along / segment.length;
+    x = segment.x1 + (segment.x2 - segment.x1) * fraction;
+    y = segment.y1 + (segment.y2 - segment.y1) * fraction;
+    angle = segment.angle;
   } else {
-    const a = Math.PI / 2 + (s - STRAIGHT * 2 - ARC) / TRACK.radius;
-    x = TRACK.left + Math.cos(a) * TRACK.radius;
-    y = TRACK.cy + Math.sin(a) * TRACK.radius;
-    angle = a + Math.PI / 2;
+    const radial = segment.startAngle + segment.direction * along / segment.radius;
+    x = segment.cx + Math.cos(radial) * segment.radius;
+    y = segment.cy + Math.sin(radial) * segment.radius;
+    angle = radial + segment.direction * Math.PI / 2;
+    curvature = segment.direction / segment.radius;
   }
-  return { x: x - Math.sin(angle) * lane, y: y + Math.cos(angle) * lane, angle, s };
+  return { x: x - Math.sin(angle) * lane, y: y + Math.cos(angle) * lane,
+    angle, curvature, s };
 }
 
-/** Nearest centerline point, lateral distance, and clockwise track coordinate. */
+/** Exact nearest point on the bounded lines/arcs, including both turn signs. */
 export function projectTrack(x, y) {
-  let s;
-  if (x < TRACK.left) {
-    const a = mod(Math.atan2(y - TRACK.cy, x - TRACK.left), TAU);
-    s = STRAIGHT * 2 + ARC + (a - Math.PI / 2) * TRACK.radius;
-  } else if (x > TRACK.right) {
-    const a = Math.atan2(y - TRACK.cy, x - TRACK.right);
-    s = STRAIGHT + (a + Math.PI / 2) * TRACK.radius;
-  } else if (y < TRACK.cy) {
-    s = x - TRACK.left;
-  } else {
-    s = STRAIGHT + ARC + TRACK.right - x;
+  let nearestS = 0, nearestSquared = Infinity;
+  for (const segment of segments) {
+    let along;
+    if (segment.kind === 'line') {
+      const dx = segment.x2 - segment.x1, dy = segment.y2 - segment.y1;
+      along = clamp(((x - segment.x1) * dx + (y - segment.y1) * dy)
+        / segment.length, 0, segment.length);
+    } else {
+      const radial = Math.atan2(y - segment.cy, x - segment.cx);
+      const turn = mod(segment.direction * (radial - segment.startAngle), TAU);
+      if (turn <= Math.abs(segment.sweep)) {
+        along = turn * segment.radius;
+      } else {
+        // Outside an arc's sweep, the closest point is one of its endpoints.
+        // Clamping a wrapped angle would incorrectly choose the far endpoint.
+        const endAngle = segment.startAngle + segment.sweep;
+        const startSquared = (x - segment.cx - Math.cos(segment.startAngle) * segment.radius) ** 2
+          + (y - segment.cy - Math.sin(segment.startAngle) * segment.radius) ** 2;
+        const endSquared = (x - segment.cx - Math.cos(endAngle) * segment.radius) ** 2
+          + (y - segment.cy - Math.sin(endAngle) * segment.radius) ** 2;
+        along = startSquared <= endSquared ? 0 : segment.length;
+      }
+    }
+    const candidate = trackPoint(segment.s + along);
+    const squared = (x - candidate.x) ** 2 + (y - candidate.y) ** 2;
+    if (squared < nearestSquared) {
+      nearestSquared = squared;
+      nearestS = candidate.s;
+    }
   }
-  const p = trackPoint(s);
-  return { ...p, distance: Math.hypot(x - p.x, y - p.y),
+  const p = trackPoint(nearestS);
+  return { ...p, distance: Math.sqrt(nearestSquared),
     offset: -(x - p.x) * Math.sin(p.angle) + (y - p.y) * Math.cos(p.angle) };
 }
 

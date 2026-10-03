@@ -29,10 +29,13 @@ class MockTarget {
     this.listeners.set(name, (this.listeners.get(name) || []).filter(item => item !== handler));
   }
   dispatch(name, values = {}) {
-    const event = { type: name, target: this, repeat: false,
+    const event = { type: name, target: this, repeat: false, pending: [],
       metaKey: false, ctrlKey: false, altKey: false, defaultPrevented: false,
       preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...values };
-    for (const handler of this.listeners.get(name) || []) handler(event);
+    for (const handler of this.listeners.get(name) || []) {
+      const result = handler(event);
+      if (result?.then) event.pending.push(result);
+    }
     return event;
   }
 }
@@ -58,7 +61,11 @@ class MockNode extends MockTarget {
   hasAttribute(name) { return name in this.attributes; }
   focus() { this.ownerDocument.activeElement = this; }
   blur() { if (this.ownerDocument.activeElement === this) this.ownerDocument.activeElement = this.ownerDocument.body; }
-  click() { if (!this.disabled) this.dispatch('click'); }
+  click() { if (!this.disabled) return this.dispatch('click'); }
+  async requestFullscreen() {
+    this.fullscreenRequests = (this.fullscreenRequests || 0) + 1;
+    this.ownerDocument.fullscreenElement = this;
+  }
   showModal() { this.open = true; }
   close() { this.open = false; this.dispatch('close'); }
   getBoundingClientRect() { return { left: 200, right: 1000, top: 100, bottom: 600, width: 800, height: 500 }; }
@@ -87,7 +94,7 @@ class MockNode extends MockTarget {
 
 function canvasContext() {
   const state = { calls: [], counts: new Map(), depth: 0 };
-  const selected = new Set(['rect', 'clip', 'drawImage', 'setTransform', 'rotate', 'fillText']);
+  const selected = new Set(['rect', 'clip', 'drawImage', 'setTransform', 'translate', 'clearRect', 'fillText']);
   return new Proxy(state, {
     get(target, name) {
       if (name in target) return target[name];
@@ -105,12 +112,17 @@ function canvasContext() {
   });
 }
 
-async function loadUI(t) {
+async function loadUI(t, { graphicsAvailable = true } = {}) {
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const document = new MockTarget();
   const nodes = new Map(), lapButtons = [], lapLabels = [];
   document.body = new MockNode('body', document); document.activeElement = document.body;
   document.hidden = false;
+  document.fullscreenElement = null;
+  document.fullscreenExits = 0;
+  document.exitFullscreen = async () => {
+    document.fullscreenElement = null; document.fullscreenExits++;
+  };
   document.getElementById = id => {
     assert.ok(nodes.has(id), `main.js references an existing HTML id: ${id}`);
     return nodes.get(id);
@@ -148,22 +160,43 @@ async function loadUI(t) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor); else delete globalThis[name];
     }
   });
+  // WebGL is a renderer concern. Record its public contract while running the
+  // shipped application event handlers and real race engine unchanged.
+  const rendererModule = `export function sceneWeights() {
+    return { coast: 1, alpine: 0, city: 0 };
+  }
+  export class RaceRenderer {
+    constructor(canvas, options) {
+      this.canvas = canvas; this.options = options;
+      this.available = ${JSON.stringify(graphicsAvailable)};
+      this.resetCalls = []; this.renderCount = 0;
+    }
+    resetCameras(engine, playerId) {
+      this.resetCalls.push({ playerId,
+        cars: engine.cars.map(({id,x,y,angle}) => ({id,x,y,angle})) });
+    }
+    render(engine, dt, now) {
+      this.renderCount++; this.lastRender = { engine, dt, now };
+    }
+  }`;
+  const rendererURL = `data:text/javascript;base64,${Buffer.from(rendererModule).toString('base64')}`;
   const source = (await readFile(sourceURL, 'utf8'))
-    .replace("from './engine.js'", `from '${engineURL.href}'`);
+    .replace("from './engine.js'", `from '${engineURL.href}'`)
+    .replace("from './renderer.js'", `from '${rendererURL}'`);
   // Load shipped application source unmodified except dependency resolution and
   // read-only test exports. No duplicated event handlers or production hooks.
-  const entry = `${source}\nexport { engine, keys, cameras };\n// test instance ${++instance}`;
+  const entry = `${source}\nexport { engine, keys, renderer };\n// test instance ${++instance}`;
   const application = await import(`data:text/javascript;base64,${Buffer.from(entry).toString('base64')}`);
   const ui = {
-    ...application, nodes, document, window, lapButtons, lapLabels,
+    ...application, nodes, document, window, lapButtons, lapLabels, html,
     frame(dt = 1 / 60) {
       clock += dt * 1000;
       assert.equal(frames.length, 1, 'one animation loop is scheduled');
       frames.shift()(clock);
-      assert.equal(nodes.get('game').context.depth, 0, 'frame restores Canvas state');
+      assert.equal(nodes.get('hud').context.depth, 0, 'frame restores HUD Canvas state');
     },
     advance(seconds) { for (let i = 0; i < Math.ceil(seconds * 60); i++) this.frame(); },
-    click(id) { nodes.get(id).click(); },
+    click(id) { return nodes.get(id).click(); },
     key(code, options = {}) { return window.dispatch('keydown', { code, target: document.activeElement, ...options }); },
     keyup(code, options = {}) { return window.dispatch('keyup', { code, target: document.activeElement, ...options }); },
   };
@@ -171,18 +204,90 @@ async function loadUI(t) {
   return ui;
 }
 
-test('real main.js initializes both split-screen viewports and independent cameras', async t => {
+test('real main.js delegates scene rendering and draws two player maps on the separate HUD', async t => {
   const ui = await loadUI(t);
   assert.equal(ui.engine.state, 'menu');
   assert.equal(ui.nodes.get('race-status').textContent, '等待发车');
   assert.equal(ui.nodes.get('pause').disabled, true);
-  const calls = ui.nodes.get('game').context.calls;
-  assert.ok(calls.some(call => call[0] === 'rect' && call[1] === 0 && call[3] === 600));
-  assert.ok(calls.some(call => call[0] === 'rect' && call[1] === 600 && call[3] === 600));
-  assert.equal(ui.nodes.get('game').context.counts.get('clip'), 2);
-  assert.equal(ui.nodes.get('game').context.counts.get('drawImage'), 2);
-  assert.notEqual(ui.cameras[0], ui.cameras[1]);
-  assert.notEqual(ui.cameras[0].y, ui.cameras[1].y);
+  assert.equal(ui.renderer.canvas, ui.nodes.get('game'));
+  assert.equal(ui.renderer.renderCount, 1);
+  assert.equal(ui.renderer.lastRender.engine, ui.engine);
+  assert.equal(ui.renderer.resetCalls.length, 1);
+  assert.notEqual(ui.renderer.resetCalls[0].cars[0].y, ui.renderer.resetCalls[0].cars[1].y);
+  assert.equal(ui.renderer.resetCalls[0].playerId, undefined, 'initial setup resets both cameras');
+  assert.equal(ui.nodes.get('game').context, undefined, 'main.js must not acquire a 2D context on its WebGL canvas');
+  const hudContext = ui.nodes.get('hud').context;
+  assert.equal(hudContext.counts.get('clearRect'), 1);
+  assert.equal(hudContext.counts.get('scale'), 2);
+  assert.ok(hudContext.calls.some(call => call[0] === 'translate' && call[1] === 418 && call[2] === 577));
+  assert.ok(hudContext.calls.some(call => call[0] === 'translate' && call[1] === 1018 && call[2] === 577));
+  assert.equal(ui.nodes.get('graphics-note').classList.contains('hidden'), true);
+  assert.equal(ui.nodes.get('scene1').textContent, '海岸港湾');
+  assert.equal(ui.nodes.get('scene2').textContent, '海岸港湾');
+});
+
+test('unavailable WebGL blocks race starts and availability recovery restores controls', async t => {
+  const ui = await loadUI(t, { graphicsAvailable: false });
+  assert.equal(ui.nodes.get('graphics-note').classList.contains('hidden'), false);
+  assert.equal(ui.nodes.get('start').disabled, true);
+  assert.equal(ui.nodes.get('again').disabled, true);
+  ui.click('start'); ui.click('restart'); ui.key('Space'); ui.frame();
+  assert.equal(ui.engine.state, 'menu');
+  assert.equal(ui.renderer.resetCalls.length, 1);
+  ui.renderer.available = true; ui.frame();
+  assert.equal(ui.nodes.get('graphics-note').classList.contains('hidden'), true);
+  assert.equal(ui.nodes.get('start').disabled, false);
+  assert.equal(ui.nodes.get('again').disabled, false);
+  ui.click('start'); ui.frame();
+  assert.equal(ui.engine.state, 'countdown');
+  assert.equal(ui.renderer.resetCalls.length, 2);
+});
+
+test('losing graphics during a race freezes time and requires explicit resume after recovery', async t => {
+  const ui = await loadUI(t);
+  ui.click('start'); ui.advance(3.1);
+  ui.key('KeyW'); ui.key('ArrowUp'); ui.advance(.3);
+  const time = ui.engine.time;
+  const positions = ui.engine.cars.map(({ x, y }) => ({ x, y }));
+  ui.renderer.available = false; ui.frame();
+  assert.equal(ui.engine.state, 'paused'); assert.equal(ui.keys.size, 0);
+  assert.equal(ui.engine.time, time);
+  assert.equal(ui.nodes.get('graphics-note').classList.contains('hidden'), false);
+  assert.deepEqual(ui.engine.cars.map(({ x, y }) => ({ x, y })), positions);
+  ui.advance(.1); assert.equal(ui.engine.time, time);
+  ui.renderer.available = true; ui.advance(.1);
+  assert.equal(ui.engine.state, 'paused'); assert.equal(ui.engine.time, time);
+  assert.equal(ui.nodes.get('graphics-note').classList.contains('hidden'), true);
+  assert.equal(ui.nodes.get('pause-panel').classList.contains('hidden'), false);
+  ui.click('resume'); ui.frame();
+  assert.equal(ui.engine.state, 'racing'); assert.ok(ui.engine.time > time);
+  assert.equal(ui.keys.size, 0);
+});
+
+test('fullscreen targets the entire race stage with scoreboard and arena and has a working exit', async t => {
+  const ui = await loadUI(t);
+  const opening = /<div\b[^>]*\bid="race-stage"[^>]*>/.exec(ui.html);
+  assert.ok(opening, 'HTML provides the full race stage');
+  const contentStart = opening.index + opening[0].length;
+  let depth = 1, closing = -1;
+  for (const match of ui.html.slice(contentStart).matchAll(/<\/?div\b[^>]*>/g)) {
+    depth += match[0].startsWith('</') ? -1 : 1;
+    if (depth === 0) { closing = contentStart + match.index; break; }
+  }
+  assert.ok(closing > contentStart);
+  const contents = ui.html.slice(contentStart, closing);
+  assert.match(contents, /<section\b[^>]*class="scoreboard"/);
+  assert.match(contents, /<section\b[^>]*class="arena"/);
+  assert.match(contents, /id="game"/);
+  assert.match(contents, /id="fullscreen-exit"/);
+  await Promise.all(ui.click('fullscreen').pending);
+  assert.equal(ui.document.fullscreenElement, ui.nodes.get('race-stage'));
+  assert.equal(ui.nodes.get('race-stage').fullscreenRequests, 1);
+  assert.equal(ui.document.activeElement, ui.nodes.get('game'));
+  await Promise.all(ui.click('fullscreen-exit').pending);
+  assert.equal(ui.document.fullscreenElement, null);
+  assert.equal(ui.document.fullscreenExits, 1);
+  assert.equal(ui.document.activeElement, ui.nodes.get('game'));
 });
 
 test('lap selection, start focus, countdown HUD and both keyboard drivers use actual handlers', async t => {
@@ -208,6 +313,10 @@ test('lap selection, start focus, countdown HUD and both keyboard drivers use ac
   assert.ok(parseFloat(ui.nodes.get('boost1').style.width) < 100);
   ui.keyup('KeyW'); ui.keyup('ArrowUp');
   assert.equal(ui.keys.has('KeyW'), false); assert.equal(ui.keys.has('ArrowUp'), false);
+  const previousSpeeds = ui.engine.cars.map(car => car.speed);
+  ui.key('KeyS'); ui.key('ArrowDown'); ui.advance(.15);
+  assert.ok(ui.engine.cars.every((car, index) => car.speed < previousSpeeds[index]), 'both brake handlers reduce speed');
+  ui.keyup('KeyS'); ui.keyup('ArrowDown');
 });
 
 test('pause, resume, blur and hidden-tab handlers prevent stale acceleration', async t => {
@@ -288,32 +397,53 @@ test('modified browser shortcuts are preserved and sound toggle reports its stat
 test('rescue shortcuts update real car penalty and player HUD', async t => {
   const ui = await loadUI(t);
   ui.click('start'); ui.advance(3.1);
+  const resets = ui.renderer.resetCalls.length;
   ui.key('KeyQ'); ui.key('Slash'); ui.frame();
   assert.ok(ui.engine.cars.every(car => car.rescueCooldown > 1.9));
   assert.equal(ui.nodes.get('offroad1').textContent, '返回赛道 · 罚停中');
   assert.equal(ui.nodes.get('offroad2').textContent, '返回赛道 · 罚停中');
-  assert.equal(ui.cameras[0].x, ui.engine.cars[0].x);
-  assert.equal(ui.cameras[1].x, ui.engine.cars[1].x);
+  assert.equal(ui.renderer.resetCalls.length, resets + 2);
+  assert.deepEqual(ui.renderer.resetCalls.slice(resets).map(call => call.playerId), [1, 2],
+    'each rescue resets only the rescued player camera');
+  for (const car of ui.engine.cars) {
+    const cameraReset = ui.renderer.resetCalls.at(-1).cars[car.id - 1];
+    assert.equal(cameraReset.x, car.x); assert.equal(cameraReset.y, car.y);
+  }
 });
 
 test('a complete real-control race renders results and again/menu actions reset state', async t => {
   const ui = await loadUI(t);
   ui.click('start'); ui.advance(3.1);
-  for (let frame = 0; frame < 60 * 35 && ui.engine.state !== 'finished'; frame++) {
+  const steering = new Set();
+  for (let frame = 0; frame < 60 * 240 && ui.engine.state !== 'finished'; frame++) {
     const car = ui.engine.cars[0], projection = projectTrack(car.x, car.y);
-    const target = trackPoint(projection.s + 100, 24);
+    const lane = 24;
+    const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, lane);
     const error = mod(Math.atan2(target.y - car.y, target.x - car.x) - car.angle + Math.PI, Math.PI * 2) - Math.PI;
-    ui.key('KeyW');
-    if (error > 0.025) ui.key('KeyD'); else ui.keyup('KeyD');
-    if (error < -0.025) ui.key('KeyA'); else ui.keyup('KeyA');
-    if (Math.abs(error) < 0.2 && car.boost > 25) ui.key('ShiftLeft'); else ui.keyup('ShiftLeft');
+    let safeSpeed = 470, straightAhead = true;
+    for (let ahead = 0; ahead <= 320; ahead += 40) {
+      const curvature = trackPoint(projection.s + ahead).curvature;
+      if (!curvature) continue;
+      straightAhead = false;
+      const laneRadius = Math.abs(1 / curvature) - Math.sign(curvature) * lane;
+      safeSpeed = Math.min(safeSpeed, laneRadius * 1.6);
+    }
+    if (car.speed > safeSpeed + 8) { ui.key('KeyS'); ui.keyup('KeyW'); }
+    else { ui.key('KeyW'); ui.keyup('KeyS'); }
+    if (error > .025) { ui.key('KeyD'); steering.add('right'); } else ui.keyup('KeyD');
+    if (error < -.025) { ui.key('KeyA'); steering.add('left'); } else ui.keyup('KeyA');
+    if (straightAhead && Math.abs(error) < .12 && car.boost > 25) ui.key('ShiftLeft'); else ui.keyup('ShiftLeft');
     ui.frame();
   }
   assert.equal(ui.engine.state, 'finished');
   assert.equal(ui.engine.winner.id, 1); assert.equal(ui.engine.winner.lap, 3);
+  assert.deepEqual([...steering].sort(), ['left', 'right']);
   assert.equal(ui.nodes.get('result').classList.contains('hidden'), false);
   assert.equal(ui.nodes.get('winner-name').textContent, '青色闪电获胜！');
-  assert.match(ui.nodes.get('finish-time').textContent, /^00:[12]\d\.\d\d$/);
+  const displayedTime = ui.nodes.get('finish-time').textContent;
+  assert.match(displayedTime, /^\d{2}:\d{2}\.\d{2}$/);
+  const [minutes, seconds] = displayedTime.split(':').map(Number);
+  assert.ok(Math.abs(minutes * 60 + seconds - ui.engine.winner.finishTime) <= .0051);
   assert.notEqual(ui.nodes.get('best-lap').textContent, '—');
   assert.equal(ui.keys.size, 0);
   ui.click('again'); ui.frame();
