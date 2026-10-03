@@ -1,0 +1,11 @@
+{
+  "name": "twin-turbo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "同屏双人街机赛车游戏",
+  "scripts": {
+    "start": "python3 -m http.server 8765 --bind 127.0.0.1",
+    "test": "node --test tests/*.test.mjs"
+  }
+}
