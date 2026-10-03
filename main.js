@@ -1,5 +1,7 @@
 import { RaceEngine, TRACK, trackPoint, projectTrack, mod } from './engine.js';
 import { RaceRenderer, sceneWeights } from './renderer.js';
+import { RaceAI } from './ai.js';
+import { LeaderboardClient } from './leaderboard-client.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
@@ -9,9 +11,13 @@ const engine = new RaceEngine();
 const renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
 engine.setObstacles(renderer.obstacles || []);
 const keys = new Set();
+const ai = new RaceAI();
+const leaderboard = new LeaderboardClient({ document, onOpen: () => keys.clear() });
+void leaderboard.init();
 const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
-let selectedLaps = 3, lastTime = performance.now(), lastState = '', lastCount = 0;
+let selectedLaps = 3, selectedMode = 'local', raceMode = 'local', lastAIRescues = 0;
+let lastTime = performance.now(), lastState = '', lastCount = 0;
 let goUntil = 0, soundEnabled = false, audio = null, audioNodes = [];
 let lastLaps = [0, 0], notices = ['', ''], noticeUntil = [0, 0], toastTime = 0;
 const tau = Math.PI * 2;
@@ -122,6 +128,11 @@ function updateUI(now) {
     if(engine.state==='racing' && lastState==='countdown'){goUntil=now+1;tone(880,.2,.08);}
     if(engine.state==='finished'){
       const winner=engine.winner;$('winner-name').textContent=names[winner.id-1]+'获胜！';$('winner-name').style.color=colors[winner.id-1];$('result-subtitle').textContent=`PLAYER 0${winner.id} · 率先完成 ${engine.laps} 圈`;$('finish-time').textContent=fmt(winner.finishTime);$('best-lap').textContent=winner.bestLap===null?'—':fmt(winner.bestLap);keys.clear();tone(523,.2,.06);setTimeout(()=>tone(659,.2,.06),140);setTimeout(()=>tone(784,.35,.06),280);
+      const finisher = [winner, ...engine.cars].find(car => car?.finished === true
+        && Number.isFinite(car.finishTime) && !(raceMode === 'ai' && car.id === 2));
+      if (finisher) void leaderboard.considerResult({ finished: true, laps: engine.laps,
+        timeMs: Math.round(finisher.finishTime * 1000), playerId: finisher.id, mode: raceMode });
+      else $('record-result-status').textContent = 'AI 不参与全站排名。下一局争取率先冲线！';
     }
     lastState=engine.state;
   }
@@ -134,7 +145,7 @@ function updateUI(now) {
 function initAudio(){if(audio)return;const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;audio=new Audio();for(let i=0;i<2;i++){const oscillator=audio.createOscillator(),filter=audio.createBiquadFilter(),gain=audio.createGain();oscillator.type='sawtooth';filter.type='lowpass';filter.frequency.value=360;gain.gain.value=0;oscillator.connect(filter);filter.connect(gain);gain.connect(audio.destination);oscillator.start();audioNodes.push({oscillator,gain,filter});}}
 function tone(frequency,length,volume){if(!soundEnabled||!audio)return;const oscillator=audio.createOscillator(),gain=audio.createGain();oscillator.type='sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(volume,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+length);oscillator.connect(gain);gain.connect(audio.destination);oscillator.start();oscillator.stop(audio.currentTime+length);}
 function updateAudio(){if(!audio)return;audioNodes.forEach((node,i)=>{const car=engine.cars[i];node.oscillator.frequency.setTargetAtTime(36+Math.abs(car.speed)*.24+(car.boosting?15:0),audio.currentTime,.12);node.filter.frequency.setTargetAtTime(160+Math.abs(car.speed)*1.3,audio.currentTime,.15);node.gain.gain.setTargetAtTime(soundEnabled&&engine.state==='racing'?.012+Math.abs(car.speed)*.00005:0,audio.currentTime,.08);});}
-function begin(){if($('help-dialog').open||!renderer.available)return;engine.start(selectedLaps);keys.clear();lastLaps=[0,0];notices=['',''];lastCount=0;renderer.resetCameras(engine);goUntil=0;canvas.focus({preventScroll:true});if(soundEnabled){initAudio();audio?.resume();}}
+function begin(){if($('help-dialog').open||leaderboard.busyDialog||!renderer.available)return;leaderboard.newRace();raceMode=selectedMode;engine.start(selectedLaps);ai.reset();lastAIRescues=0;keys.clear();lastLaps=[0,0];notices=['',''];lastCount=0;renderer.resetCameras(engine);goUntil=0;canvas.focus({preventScroll:true});if(soundEnabled){initAudio();audio?.resume();}}
 function togglePause(){
   if (engine.state === 'paused') {
     engine.resume();
@@ -145,8 +156,28 @@ function togglePause(){
 function rescue(id){engine.rescue(id);renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
 $('start').addEventListener('click',begin);$('again').addEventListener('click',begin);$('restart').addEventListener('click',begin);
 $('resume').addEventListener('click',()=>{keys.clear();engine.resume();canvas.focus({preventScroll:true});});$('pause').addEventListener('click',togglePause);
-$('back-menu').addEventListener('click',()=>{engine.reset();keys.clear();renderer.resetCameras(engine);});
+$('back-menu').addEventListener('click',()=>{leaderboard.newRace();engine.reset();ai.reset();lastAIRescues=0;keys.clear();renderer.resetCameras(engine);});
 document.querySelectorAll('[data-laps]').forEach(button=>button.addEventListener('click',()=>{selectedLaps=Number(button.dataset.laps);document.querySelectorAll('[data-laps]').forEach(b=>{const selected=b===button;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});document.querySelectorAll('.total-laps').forEach(el=>el.textContent=selectedLaps);}));
+document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
+  if (engine.state !== 'menu') return;
+  selectedMode = button.dataset.mode === 'ai' ? 'ai' : 'local';
+  const solo = selectedMode === 'ai';
+  names[1] = solo ? 'AI · 橙色风暴' : '橙色风暴';
+  $('player2-name').textContent = names[1]; $('control-player2-name').textContent = names[1];
+  $('player2-label').textContent = solo ? 'AI DRIVER' : 'PLAYER 02';
+  $('control-player2-chip').textContent = solo ? 'AI' : 'P2';
+  $('mode-label').textContent = solo ? '单人挑战 AI' : '双人分屏';
+  $('mode-english').textContent = solo ? 'SINGLE PLAYER' : 'LOCAL MULTIPLAYER';
+  $('mode-description').textContent = solo ? '你驾驶青色赛车，用 WASD 挑战 AI。' : '与身边的朋友，共用一块键盘。';
+  $('player2-controls').classList.toggle('hidden', solo); $('ai-control-note').classList.toggle('hidden', !solo);
+  $('help-mode-description').textContent = solo
+    ? '你驾驶左侧青色赛车，使用 WASD、左 Shift 和 Q；右侧橙色赛车由 AI 驾驶。两车遵循相同物理和赛道规则，先完成全部圈数获胜。'
+    : '两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。沿路线箭头驾驶，先完成全部圈数的玩家获胜。';
+  document.querySelectorAll('[data-mode]').forEach(item => {
+    const selected = item.dataset.mode === selectedMode;
+    item.classList.toggle('selected', selected); item.setAttribute('aria-pressed', String(selected));
+  });
+}));
 $('sound').addEventListener('click',()=>{soundEnabled=!soundEnabled;$('sound').setAttribute('aria-pressed',String(soundEnabled));$('sound').title=soundEnabled?'关闭声音':'开启声音';$('sound').querySelector('span').textContent=soundEnabled?'声音开':'声音关';$('sound').querySelector('path').setAttribute('d',soundEnabled?'M11 5 6 9H3v6h3l5 4V5Zm5 3c2 2 2 6 0 8m3-11c4 4 4 10 0 14':'M11 5 6 9H3v6h3l5 4V5Zm5 4 5 6m0-6-5 6');if(soundEnabled){initAudio();audio?.resume();tone(600,.08,.04);}if(['racing','countdown'].includes(engine.state))canvas.focus({preventScroll:true});});
 $('help').addEventListener('click',()=>{engine.pause();keys.clear();$('help-dialog').showModal();});
 $('close-help').addEventListener('click',()=>$('help-dialog').close());$('help-done').addEventListener('click',()=>$('help-dialog').close());
@@ -162,21 +193,27 @@ async function toggleFullscreen() {
 $('fullscreen').addEventListener('click', toggleFullscreen);
 $('fullscreen-exit').addEventListener('click', toggleFullscreen);
 const controlKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Space','Escape','KeyQ','Slash']);
+const player2Keys = new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Slash']);
+function typingTarget(event) {
+  return event.isComposing || event.keyCode === 229
+    || event.target?.closest?.('input, textarea, select, [contenteditable]');
+}
 function nativeActivation(event) {
   return ['Enter', 'Space'].includes(event.code)
     && event.target?.closest?.('button, a, input, select, textarea, [contenteditable]');
 }
 window.addEventListener('keydown',event=>{
   if(event.metaKey||event.ctrlKey||event.altKey)return;
-  if($('help-dialog').open)return;
+  if($('help-dialog').open || leaderboard.busyDialog || typingTarget(event))return;
   if(nativeActivation(event))return;
   if(controlKeys.has(event.code))event.preventDefault();
+  if(raceMode==='ai' && player2Keys.has(event.code))return;
   if(event.code==='Escape'&&!event.repeat){togglePause();return;}
   if(event.code==='Space'&&!event.repeat){if(engine.state==='menu'||engine.state==='finished')begin();else togglePause();return;}
   if(event.code==='KeyQ'&&!event.repeat&&engine.state==='racing'){rescue(1);return;}if(event.code==='Slash'&&!event.repeat&&engine.state==='racing'){rescue(2);return;}
   if (['racing', 'countdown'].includes(engine.state) && controlKeys.has(event.code)) keys.add(event.code);
 });
-window.addEventListener('keyup',event=>{keys.delete(event.code);if(controlKeys.has(event.code)&&!$('help-dialog').open&&!nativeActivation(event))event.preventDefault();});
+window.addEventListener('keyup',event=>{keys.delete(event.code);if(controlKeys.has(event.code)&&!$('help-dialog').open&&!leaderboard.busyDialog&&!typingTarget(event)&&!nativeActivation(event))event.preventDefault();});
 window.addEventListener('blur',()=>{keys.clear();engine.pause();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();engine.pause();}});
 function loop(timestamp) {
@@ -185,7 +222,13 @@ function loop(timestamp) {
   const now = timestamp / 1000;
   toastTime += engine.state === 'racing' ? dt : 0;
   if (!renderer.available) { keys.clear(); engine.pause(); }
-  engine.step(dt, keys);
+  let frameKeys = keys;
+  if (raceMode === 'ai' && engine.state === 'racing') {
+    frameKeys = new Set([...keys].filter(code => !player2Keys.has(code)));
+    for (const code of ai.update(engine, dt)) if (player2Keys.has(code) && code !== 'Slash') frameKeys.add(code);
+    if (ai.rescues > lastAIRescues) { renderer.resetCameras(engine, 2); lastAIRescues = ai.rescues; }
+  }
+  engine.step(dt, frameKeys);
   updateRaceNotices();
   renderer.render(engine, dt, now);
   drawHUD(now);

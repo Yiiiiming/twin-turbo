@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { TRACK, trackPoint, projectTrack, mod } from '../engine.js';
+import { LEADERBOARD_VERSION } from '../leaderboard.js';
 
 const sourceURL = new URL('../main.js', import.meta.url);
 const engineURL = new URL('../engine.js', import.meta.url);
@@ -47,6 +48,7 @@ class MockNode extends MockTarget {
     this.classList = new MockClassList(attributes.class); this.style = {};
     this.dataset = {}; this.children = []; this.parentElement = null;
     this.textContent = ''; this.innerHTML = ''; this.disabled = 'disabled' in attributes;
+    this.value = '';
     this.open = false; this.isContentEditable = false;
     this.clientWidth = 1200; this.clientHeight = 700; this.width = 1200; this.height = 700;
     for (const [name, value] of Object.entries(attributes)) {
@@ -56,6 +58,7 @@ class MockNode extends MockTarget {
   get firstElementChild() { return this.children[0] || this.appendChild(new MockNode('strong', this.ownerDocument)); }
   get lastElementChild() { return this.children.at(-1) || this.firstElementChild; }
   appendChild(child) { child.parentElement = this; this.children.push(child); return child; }
+  replaceChildren(...children) { this.children = []; children.forEach(child => this.appendChild(child)); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] ?? null; }
   hasAttribute(name) { return name in this.attributes; }
@@ -112,10 +115,10 @@ function canvasContext() {
   });
 }
 
-async function loadUI(t, { graphicsAvailable = true } = {}) {
+async function loadUI(t, { graphicsAvailable = true, fetchImpl } = {}) {
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const document = new MockTarget();
-  const nodes = new Map(), lapButtons = [], lapLabels = [];
+  const nodes = new Map(), lapButtons = [], lapLabels = [], modeButtons = [], requests = [];
   document.body = new MockNode('body', document); document.activeElement = document.body;
   document.hidden = false;
   document.fullscreenElement = null;
@@ -131,15 +134,17 @@ async function loadUI(t, { graphicsAvailable = true } = {}) {
   document.querySelectorAll = selector => {
     if (selector === '[data-laps]') return lapButtons;
     if (selector === '.total-laps') return lapLabels;
+    if (selector === '[data-mode]') return modeButtons;
     return [];
   };
   for (const match of html.matchAll(/<([a-z][a-z\d-]*)\b([^>]*)>/gi)) {
     const attributes = {};
     for (const attr of match[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attributes[attr[1]] = attr[2] ?? '';
-    if (!attributes.id && !('data-laps' in attributes) && !attributes.class?.includes('total-laps')) continue;
+    if (!attributes.id && !('data-laps' in attributes) && !('data-mode' in attributes) && !attributes.class?.includes('total-laps')) continue;
     const node = new MockNode(match[1], document, attributes);
     if (node.id) nodes.set(node.id, node);
     if ('data-laps' in attributes) lapButtons.push(node);
+    if ('data-mode' in attributes) modeButtons.push(node);
     if (attributes.class?.includes('total-laps')) lapLabels.push(node);
   }
   nodes.get('countdown').appendChild(new MockNode('strong', document));
@@ -148,6 +153,13 @@ async function loadUI(t, { graphicsAvailable = true } = {}) {
   let clock = 0;
   const frames = [], delayed = [];
   const globals = { document, window, Element: MockNode, HTMLElement: MockNode,
+    fetch: async (url, options) => {
+      requests.push({ url, ...options });
+      if (fetchImpl) return fetchImpl(url, options);
+      return { ok: true, status: 200, json: async () => url.includes('/api/qualify')
+        ? { rank: null, entries: [] }
+        : { version: LEADERBOARD_VERSION, laps: Number(new URL(url).searchParams.get('laps')), entries: [] } };
+    },
     performance: { now: () => clock },
     ResizeObserver: class { constructor(callback) { this.callback = callback; } observe() { this.callback(); } },
     requestAnimationFrame: callback => { frames.push(callback); return frames.length; },
@@ -183,13 +195,16 @@ async function loadUI(t, { graphicsAvailable = true } = {}) {
   const rendererURL = `data:text/javascript;base64,${Buffer.from(rendererModule).toString('base64')}`;
   const source = (await readFile(sourceURL, 'utf8'))
     .replace("from './engine.js'", `from '${engineURL.href}'`)
-    .replace("from './renderer.js'", `from '${rendererURL}'`);
+    .replace("from './renderer.js'", `from '${rendererURL}'`)
+    .replace("from './ai.js'", `from '${new URL('../ai.js', import.meta.url).href}'`)
+    .replace("from './leaderboard-client.js'", `from '${new URL('../leaderboard-client.js', import.meta.url).href}'`);
   // Load shipped application source unmodified except dependency resolution and
   // read-only test exports. No duplicated event handlers or production hooks.
-  const entry = `${source}\nexport { engine, keys, renderer };\n// test instance ${++instance}`;
+  const entry = `${source}\nexport { engine, keys, renderer, ai, leaderboard };\n// test instance ${++instance}`;
   const application = await import(`data:text/javascript;base64,${Buffer.from(entry).toString('base64')}`);
   const ui = {
-    ...application, nodes, document, window, lapButtons, lapLabels, html,
+    ...application, nodes, document, window, lapButtons, lapLabels, modeButtons, html, requests,
+    async flush() { for (let pass = 0; pass < 12; pass++) await Promise.resolve(); },
     frame(dt = 1 / 60) {
       clock += dt * 1000;
       assert.equal(frames.length, 1, 'one animation loop is scheduled');
@@ -202,6 +217,7 @@ async function loadUI(t, { graphicsAvailable = true } = {}) {
     keyup(code, options = {}) { return window.dispatch('keyup', { code, target: document.activeElement, ...options }); },
   };
   ui.frame();
+  await ui.flush();
   return ui;
 }
 
@@ -284,6 +300,7 @@ test('fullscreen targets the entire race stage with scoreboard and arena and has
   assert.match(contents, /<section\b[^>]*class="arena"/);
   assert.match(contents, /id="game"/);
   assert.match(contents, /id="fullscreen-exit"/);
+  assert.match(contents, /id="record-dialog"/, 'nickname dialog is inside the fullscreen race stage');
   await Promise.all(ui.click('fullscreen').pending);
   assert.equal(ui.document.fullscreenElement, ui.nodes.get('race-stage'));
   assert.equal(ui.nodes.get('race-stage').fullscreenRequests, 1);
@@ -380,6 +397,73 @@ test('focused buttons retain native Enter and Space activation, canvas Enter rem
   const helpKey = ui.key('Enter');
   assert.equal(helpKey.defaultPrevented, false); assert.equal(ui.keys.has('Enter'), false);
   ui.click('help'); assert.equal(ui.nodes.get('help-dialog').open, true);
+});
+
+test('single-player mode drives only player 2 through AI controls and freezes the AI while paused', async t => {
+  const ui = await loadUI(t);
+  assert.equal(ui.modeButtons[0].getAttribute('aria-pressed'), 'true');
+  ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
+  assert.equal(ui.nodes.get('player2-name').textContent, 'AI · 橙色风暴');
+  assert.equal(ui.nodes.get('player2-controls').classList.contains('hidden'), true);
+  ui.click('start'); ui.advance(3.1);
+  ui.key('ArrowUp'); ui.key('ArrowLeft'); ui.key('Enter'); ui.key('Slash');
+  assert.ok(['ArrowUp', 'ArrowLeft', 'Enter', 'Slash'].every(code => !ui.keys.has(code)));
+  assert.equal(ui.engine.cars[1].rescueCooldown, 0);
+  ui.key('KeyW'); ui.advance(.4);
+  assert.ok(ui.engine.cars[0].speed > 0); assert.ok(ui.engine.cars[1].speed > 0);
+  const elapsed = ui.ai.elapsed;
+  ui.key('Escape'); ui.advance(.2);
+  assert.equal(ui.ai.elapsed, elapsed);
+  ui.click('resume'); ui.frame(); assert.ok(ui.ai.elapsed > elapsed);
+});
+
+test('a qualified human result opens safe nickname input without triggering race shortcuts', async t => {
+  const ui = await loadUI(t, { fetchImpl: async (url) => ({ ok: true, status: 200,
+    json: async () => url.includes('/api/qualify') ? { rank: 1, entries: [] }
+      : { version: LEADERBOARD_VERSION, laps: 3, entries: [] } }) });
+  ui.click('start'); ui.advance(3.1);
+  const winner = ui.engine.cars[0];
+  Object.assign(winner, { finished: true, lap: 3, finishTime: 120.125, bestLap: 39.8 });
+  ui.engine.winner = winner; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
+  assert.equal(ui.nodes.get('record-dialog').open, true);
+  assert.equal(ui.document.activeElement.id, 'record-name');
+  assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 1);
+  for (const code of ['KeyW', 'Space', 'Enter', 'ArrowUp', 'Escape']) {
+    const event = ui.key(code); assert.equal(event.defaultPrevented, false);
+  }
+  ui.nodes.get('record-name').dispatch('compositionstart');
+  const composing = ui.key('Space', { isComposing: true, keyCode: 229 });
+  assert.equal(composing.defaultPrevented, false);
+  assert.equal(ui.engine.state, 'finished'); assert.equal(ui.keys.size, 0);
+  ui.frame(); await ui.flush();
+  assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 1);
+  ui.click('record-skip'); assert.equal(ui.nodes.get('record-dialog').open, false);
+  assert.equal(ui.requests.filter(request => request.url.includes('/api/records')).length, 0);
+});
+
+test('an AI victory never qualifies or offers to save an AI record', async t => {
+  const ui = await loadUI(t);
+  ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
+  ui.click('start'); ui.advance(3.1);
+  const winner = ui.engine.cars[1];
+  Object.assign(winner, { finished: true, lap: 3, finishTime: 139, bestLap: 46 });
+  ui.engine.winner = winner; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
+  assert.equal(ui.nodes.get('record-dialog').open, false);
+  assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 0);
+  assert.match(ui.nodes.get('record-result-status').textContent, /AI 不参与/);
+});
+
+test('a player 2 winner is the submitted finisher even when player 1 crosses in the same step', async t => {
+  const ui = await loadUI(t);
+  ui.click('start'); ui.advance(3.1);
+  Object.assign(ui.engine.cars[0], { finished: true, lap: 3, finishTime: 120.2, bestLap: 40 });
+  Object.assign(ui.engine.cars[1], { finished: true, lap: 3, finishTime: 120.1, bestLap: 39.9 });
+  ui.engine.winner = ui.engine.cars[1]; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
+  const qualifies = ui.requests.filter(request => request.url.includes('/api/qualify'));
+  assert.equal(qualifies.length, 1);
+  const result = JSON.parse(qualifies[0].body);
+  assert.equal(result.playerId, 2); assert.equal(result.timeMs, 120100);
+  assert.equal(ui.nodes.get('winner-name').textContent, '橙色风暴获胜！');
 });
 
 test('modified browser shortcuts are preserved and sound toggle reports its state', async t => {

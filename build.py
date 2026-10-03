@@ -17,6 +17,7 @@ def module_source(name):
 
 
 engine_exports = 'RaceEngine, TRACK, trackPoint, projectTrack, mod'
+leaderboard_exports = 'LEADERBOARD_VERSION, LEADERBOARD_LIMIT, normalizeName, normalizeEntries, qualifyingRank, insertRecord'
 script = (
     'const Collisions = (() => {\n' + module_source('collisions.js')
     + '\nreturn {ObstacleWorld};\n})();\n'
@@ -24,8 +25,14 @@ script = (
     + '\nreturn {' + engine_exports + '};\n})(Collisions);\n'
     + 'const Rendering = (({' + engine_exports + '}) => {\n'
     + module_source('renderer.js') + '\nreturn {RaceRenderer, sceneWeights};\n})(Engine);\n'
-    + '(({' + engine_exports + '}, {RaceRenderer, sceneWeights}) => {\n'
-    + module_source('main.js') + '\n})(Engine, Rendering);\n'
+    + 'const AI = (({' + engine_exports + '}) => {\n'
+    + module_source('ai.js') + '\nreturn {RaceAI};\n})(Engine);\n'
+    + 'const Leaderboard = (() => {\n' + module_source('leaderboard.js')
+    + '\nreturn {' + leaderboard_exports + '};\n})();\n'
+    + 'const Online = (({' + leaderboard_exports + '}) => {\n'
+    + module_source('leaderboard-client.js') + '\nreturn {LeaderboardClient};\n})(Leaderboard);\n'
+    + '(({' + engine_exports + '}, {RaceRenderer, sceneWeights}, {RaceAI}, {LeaderboardClient}) => {\n'
+    + module_source('main.js') + '\n})(Engine, Rendering, AI, Online);\n'
 ).replace('</script', '<\\/script')
 
 
