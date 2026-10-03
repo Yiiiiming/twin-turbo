@@ -67,7 +67,8 @@ const deferred = () => {
 const entry = (id = 'first', name = '第一位', laps = 3, timeMs = 125000) =>
   ({ id, name, laps, timeMs, mode: 'local', playerId: 1, createdAt: 1770000000000 });
 const finish = (options = {}) => ({ finished: true, laps: 3, timeMs: 123456, playerId: 1, mode: 'local', ...options });
-const board = (entries = [], laps = 3) => ({ entries, laps, version: LEADERBOARD_VERSION });
+const board = (entries = [], laps = 3, city) => ({ entries, laps, version: LEADERBOARD_VERSION,
+  ...(city === undefined ? {} : { city }) });
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status,
   json: async () => body, text: async () => JSON.stringify(body) });
 
@@ -359,4 +360,313 @@ test('server timeouts leave the game usable and expose a retry', async () => {
   await h.client.init();
   assert.match(h.text(), /超时|失败|网络|重试|连接/);
   assert.equal(h.get('record-dialog').open, false);
+});
+
+test('the default fetch adapter preserves the browser global receiver', async () => {
+  const h = setup(), originalFetch = globalThis.fetch, requests = [];
+  try {
+    // Browser-native fetch rejects foreign receivers. An arrow-function mock
+    // cannot expose the Illegal invocation that originally broke every request.
+    globalThis.fetch = function (url, options) {
+      assert.equal(this, globalThis, 'native fetch must be called on its global object');
+      requests.push({ url, options });
+      return Promise.resolve(response(url.includes('/api/qualify')
+        ? { rank: 1, entries: [] } : board()));
+    };
+    const client = new LeaderboardClient({ document: h.document, origin: 'https://scores.example.test' });
+    await client.init();
+    await client.considerResult(finish());
+    assert.equal(requests.length, 2);
+    assert.equal(h.get('record-dialog').open, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('both human finishers are considered in finish order and prompted one at a time', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(response({ rank: 1, entries: [] }), response({ rank: 2, entries: [] }));
+  await h.client.considerResults([
+    finish({ playerId: 1, timeMs: 145000 }),
+    finish({ playerId: 2, timeMs: 140000 }),
+  ]);
+  assert.equal(h.qualifies().length, 1, 'second player waits for the first name decision');
+  assert.equal(h.qualifies()[0].body.playerId, 2);
+  assert.equal(h.get('record-dialog').showCount, 1);
+  h.get('record-name').value = '未提交的橙色车手';
+  h.client.skip(); await flush();
+  assert.equal(h.records().length, 0);
+  assert.equal(h.qualifies().length, 2);
+  assert.equal(h.qualifies()[1].body.playerId, 1);
+  assert.equal(h.get('record-dialog').showCount, 2);
+  assert.equal(h.get('record-dialog').open, true);
+  assert.equal(h.get('record-name').value, '', 'the next player receives a fresh name field');
+});
+
+test('saving the first finisher advances to the second with a distinct name and score ID', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(response({ rank: 1, entries: [] }));
+  await h.client.considerResults([
+    finish({ playerId: 1, timeMs: 130000 }),
+    finish({ playerId: 2, timeMs: 138000 }),
+  ]);
+  const firstEntry = entry('first-server', '青色车手', 3, 130000);
+  h.get('record-name').value = '青色车手';
+  h.queue.push(request => response({ saved: true, rank: 1,
+    entries: [{ ...firstEntry, id: request.body.id }] }), response(board([firstEntry])),
+    response({ rank: 2, entries: [firstEntry] }));
+  await h.client.save(); await flush();
+  assert.equal(h.qualifies().length, 2);
+  assert.equal(h.qualifies()[1].body.playerId, 2);
+  assert.equal(h.get('record-dialog').open, true);
+  assert.equal(h.get('record-name').disabled, false);
+  assert.equal(h.get('record-name').value, '');
+  h.get('record-name').value = '橙色车手';
+  const secondEntry = { ...entry('second-server', '橙色车手', 3, 138000), playerId: 2 };
+  h.queue.push(request => response({ saved: true, rank: 2,
+    entries: [firstEntry, { ...secondEntry, id: request.body.id }] }),
+    response(board([firstEntry, secondEntry])));
+  await h.client.save(); await flush();
+  assert.deepEqual(h.records().map(request => [request.body.playerId, request.body.name, request.body.timeMs]),
+    [[1, '青色车手', 130000], [2, '橙色车手', 138000]]);
+  assert.notEqual(h.records()[0].body.id, h.records()[1].body.id);
+  assert.equal(h.get('record-dialog').open, false);
+  assert.match(h.get('leaderboard-list').textContent, /青色车手/);
+  assert.match(h.get('leaderboard-list').textContent, /橙色车手/);
+});
+
+test('an unqualified first finisher advances the queue without a name prompt', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(response({ rank: null, entries: [] }), response({ rank: null, entries: [] }));
+  await h.client.considerResults([
+    finish({ playerId: 1, timeMs: 160000 }),
+    finish({ playerId: 2, timeMs: 170000 }),
+  ]);
+  await flush();
+  assert.deepEqual(h.qualifies().map(request => request.body.playerId), [1, 2]);
+  assert.equal(h.get('record-dialog').showCount, 0);
+  assert.equal(h.records().length, 0);
+});
+
+test('a qualification failure preserves the current human before considering the next one', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(new Error('temporary network failure'));
+  await h.client.considerResults([
+    finish({ playerId: 1, timeMs: 130000 }),
+    finish({ playerId: 2, timeMs: 140000 }),
+  ]);
+  await flush();
+  assert.equal(h.qualifies().length, 1);
+  assert.equal(h.get('record-dialog').open, false);
+  assert.equal(h.get('qualify-retry').classList.contains('hidden'), false);
+  h.queue.push(response({ rank: 1, entries: [] }));
+  await h.client.qualify();
+  assert.deepEqual(h.qualifies()[1].body, h.qualifies()[0].body);
+  assert.equal(h.get('record-dialog').open, true);
+  h.queue.push(response({ rank: 2, entries: [] }));
+  h.client.skip(); await flush();
+  assert.deepEqual(h.qualifies().map(request => request.body.playerId), [1, 1, 2]);
+});
+
+test('an uncertain save keeps that player and immutable submission before advancing the queue', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(response({ rank: 1, entries: [] }));
+  await h.client.considerResults([
+    finish({ playerId: 1, timeMs: 130000 }),
+    finish({ playerId: 2, timeMs: 140000 }),
+  ]);
+  h.get('record-name').value = '先到终点';
+  h.queue.push(new Error('response lost after commit'));
+  await h.client.save(); await flush();
+  assert.equal(h.qualifies().length, 1);
+  assert.equal(h.get('record-dialog').open, true);
+  const first = h.records()[0].body;
+  h.get('record-name').value = '重试不能换名';
+  const saved = entry(first.id, first.name, 3, 130000);
+  h.queue.push(response({ saved: true, rank: 1, entries: [saved] }), response(board([saved])),
+    response({ rank: 2, entries: [saved] }));
+  await h.client.save(); await flush();
+  assert.deepEqual(h.records()[1].body, first);
+  assert.equal(h.qualifies()[1].body.playerId, 2);
+  assert.equal(h.get('record-name').value, '');
+  assert.equal(h.get('record-name').disabled, false);
+});
+
+test('a new race discards every old queued finisher and ignores an in-flight qualification', async () => {
+  const h = setup(); await ready(h);
+  const waiting = deferred(); h.queue.push(() => waiting.promise);
+  const pending = h.client.considerResults([
+    finish({ playerId: 1, timeMs: 130000 }),
+    finish({ playerId: 2, timeMs: 140000 }),
+  ]);
+  await flush();
+  h.client.newRace();
+  waiting.resolve(response({ rank: 1, entries: [] }));
+  await pending; await flush();
+  assert.equal(h.qualifies().length, 1);
+  assert.equal(h.get('record-dialog').showCount, 0);
+  h.queue.push(response({ rank: 1, entries: [] }));
+  await h.client.considerResults([finish({ playerId: 1, timeMs: 135000 })]);
+  h.client.skip(); await flush();
+  assert.equal(h.qualifies().length, 2, 'old second finisher must never reappear');
+  assert.equal(h.get('record-dialog').open, false);
+});
+
+test('batch results reject unfinished cars and AI opponents', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(response({ rank: 1, entries: [] }));
+  await h.client.considerResults([
+    finish({ playerId: 2, mode: 'ai', timeMs: 100000 }),
+    finish({ playerId: 1, mode: 'ai', timeMs: 137950 }),
+    finish({ playerId: 2, finished: false, timeMs: 138000 }),
+  ]);
+  assert.equal(h.qualifies().length, 1);
+  assert.equal(h.qualifies()[0].body.playerId, 1);
+  assert.equal(h.qualifies()[0].body.mode, 'ai');
+  h.client.skip(); await flush();
+  assert.equal(h.qualifies().length, 1);
+  assert.equal(h.records().length, 0);
+});
+
+test('dialog failures remain retryable after qualification and are not reported as lost connectivity', async () => {
+  const h = setup(); await ready(h);
+  const dialog = h.get('record-dialog'), originalShowModal = dialog.showModal;
+  dialog.showModal = () => { throw new Error('dialog temporarily unavailable'); };
+  h.queue.push(response({ rank: 1, entries: [] }));
+  await h.client.considerResult(finish());
+  assert.equal(dialog.open, false);
+  assert.equal(h.get('qualify-retry').classList.contains('hidden'), false);
+  assert.doesNotMatch(h.get('record-result-status').textContent, /联网后|网络|无法连接/);
+  dialog.showModal = originalShowModal;
+  h.queue.push(response({ rank: 1, entries: [] }));
+  await h.client.qualify();
+  assert.equal(dialog.open, true, 'the qualified flag must not block dialog recovery');
+  assert.equal(h.records().length, 0);
+});
+
+test('the default coast board accepts legacy data and sends an explicit coast category', async () => {
+  const h = setup(); await ready(h, [entry('legacy', '旧海岸冠军')]);
+  assert.equal(h.client.selectedCity, 'coast');
+  assert.equal(new URL(h.requests[0].url).searchParams.get('city'), 'coast');
+  assert.match(h.get('leaderboard-list').textContent, /旧海岸冠军/);
+  assert.equal(h.client.entries[0].city, 'coast');
+  await qualifying(h);
+  assert.equal(h.qualifies()[0].body.city, 'coast');
+});
+
+test('switching cities filters mixed remote entries and updates the accessible board category', async () => {
+  const h = setup(); await ready(h, [entry('coast-old', '海岸旧名')]);
+  const london = { ...entry('london-new', '伦敦车手', 3, 400000), city: 'london' };
+  h.queue.push(response(board([entry('legacy', '不带城市'), { ...entry('coast', '海岸车手'), city: 'coast' }, london], 3, 'london')));
+  await h.client.setCity('london');
+  assert.equal(h.client.selectedCity, 'london');
+  assert.equal(new URL(h.requests[1].url).searchParams.get('city'), 'london');
+  assert.equal(h.client.entries.length, 1);
+  assert.match(h.get('leaderboard-list').textContent, /伦敦车手/);
+  assert.doesNotMatch(h.get('leaderboard-list').textContent, /海岸|不带城市/);
+  assert.match(h.get('leaderboard-list').getAttribute('aria-label'), /伦敦/);
+  assert.match(h.get('leaderboard-status').textContent, /伦敦/);
+  await h.client.setCity('unknown');
+  assert.equal(h.requests.length, 2);
+  assert.equal(h.client.selectedCity, 'london');
+});
+
+test('a city and lap switch cannot be overwritten by older responses or their errors', async () => {
+  const h = setup(); await ready(h);
+  const oldCoast = deferred(), oldLondonThree = deferred(), londonFive = deferred();
+  h.queue.push(() => oldCoast.promise, () => oldLondonThree.promise, () => londonFive.promise);
+  const coastRequest = h.client.load(3);
+  const londonRequest = h.client.setCity('london');
+  const fiveRequest = h.client.load(5);
+  const winner = { ...entry('london-five', '五圈伦敦纪录', 5, 650000), city: 'london' };
+  londonFive.resolve(response(board([winner], 5, 'london')));
+  await fiveRequest;
+  oldLondonThree.resolve(response(board([{ ...entry('three', '过期伦敦三圈'), city: 'london' }], 3, 'london')));
+  await londonRequest;
+  oldCoast.reject(new Error('obsolete coast failure'));
+  await coastRequest;
+  assert.equal(h.client.selectedCity, 'london');
+  assert.equal(h.client.laps, 5);
+  assert.equal(h.get('leaderboard-retry').classList.contains('hidden'), true);
+  assert.match(h.get('leaderboard-list').textContent, /五圈伦敦纪录/);
+  assert.doesNotMatch(h.get('leaderboard-list').textContent, /过期伦敦三圈/);
+  assert.equal(new URL(h.requests.at(-1).url).searchParams.get('city'), 'london');
+});
+
+test('an in-flight qualification keeps its race city while a different city is being viewed', async () => {
+  const h = setup(); await ready(h);
+  const waiting = deferred(); h.queue.push(() => waiting.promise);
+  const qualifyingResult = h.client.considerResult(finish({ city: 'coast' }));
+  await flush();
+  const london = { ...entry('london-view', '伦敦榜正在看'), city: 'london' };
+  h.queue.push(response(board([london], 3, 'london')));
+  await h.client.setCity('london');
+  waiting.resolve(response({ city: 'coast', rank: 2, entries: [entry('coast-remote', '海岸资格数据')] }));
+  await qualifyingResult;
+  assert.equal(h.client.selectedCity, 'london');
+  assert.match(h.get('leaderboard-list').textContent, /伦敦榜正在看/);
+  assert.doesNotMatch(h.get('leaderboard-list').textContent, /海岸资格数据/);
+  assert.match(h.get('record-title').textContent, /海岸/);
+  assert.equal(h.get('record-dialog').open, true);
+});
+
+test('a late London save does not switch or overwrite the coast board', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(response(board([], 3, 'london'))); await h.client.setCity('london');
+  h.queue.push(response({ city: 'london', rank: 1, entries: [] }));
+  await h.client.considerResult(finish({ city: 'london', timeMs: 400000 }));
+  h.get('record-name').value = '伦敦完赛者';
+  const waiting = deferred(); h.queue.push(() => waiting.promise);
+  const saving = h.client.save(); await flush();
+  h.queue.push(response(board([entry('coast-view', '当前海岸冠军')], 3, 'coast')));
+  await h.client.setCity('coast');
+  const requestCount = h.requests.length, submitted = h.records()[0].body;
+  assert.equal(submitted.city, 'london');
+  waiting.resolve(response({ city: 'london', saved: true, rank: 1,
+    entries: [{ ...entry(submitted.id, submitted.name, 3, 400000), city: 'london' }] }));
+  await saving; await flush();
+  assert.equal(h.client.selectedCity, 'coast');
+  assert.equal(h.requests.length, requestCount, 'saving an unseen category must not reload it over the chosen view');
+  assert.match(h.get('leaderboard-list').textContent, /当前海岸冠军/);
+  assert.doesNotMatch(h.get('leaderboard-list').textContent, /伦敦完赛者/);
+  assert.match(h.get('record-result-status').textContent, /伦敦/);
+  assert.equal(h.get('record-dialog').open, false);
+});
+
+test('London rejects unlabelled legacy API responses instead of treating coast as London', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(response(board([entry('legacy', '旧海岸数据')])));
+  await h.client.setCity('london');
+  assert.equal(h.client.entries.length, 0);
+  assert.match(h.get('leaderboard-status').textContent, /城市|版本/);
+  assert.doesNotMatch(h.get('leaderboard-list').textContent, /旧海岸数据/);
+  h.queue.push(response({ rank: 1, entries: [] }));
+  await h.client.considerResult(finish({ city: 'london', timeMs: 400000 }));
+  assert.equal(h.get('record-dialog').open, false);
+  assert.equal(h.get('qualify-retry').classList.contains('hidden'), false);
+  h.queue.push(response({ city: 'london', rank: 1, entries: [] }));
+  await h.client.qualify();
+  h.get('record-name').value = '伦敦成绩';
+  h.queue.push(response({ saved: true, rank: 1, entries: [] }));
+  await h.client.save();
+  assert.equal(h.get('record-dialog').open, true);
+  assert.doesNotMatch(h.get('record-result-status').textContent, /已记入/);
+  assert.match(h.get('record-message').textContent, /未能确认/);
+});
+
+test('both London candidates retain their own category when the viewed board changes', async () => {
+  const h = setup(); await ready(h);
+  h.queue.push(response({ city: 'london', rank: 1, entries: [] }));
+  await h.client.considerResults([
+    finish({ playerId: 1, city: 'london', timeMs: 390000 }),
+    finish({ playerId: 2, city: 'london', timeMs: 400000 }),
+  ]);
+  assert.equal(h.client.selectedCity, 'coast');
+  h.queue.push(response({ city: 'london', rank: 2, entries: [] }));
+  h.client.skip(); await flush();
+  assert.deepEqual(h.qualifies().map(request => [request.body.playerId, request.body.city]), [[1, 'london'], [2, 'london']]);
+  assert.match(h.get('record-title').textContent, /伦敦/);
+  h.client.newRace();
+  await h.client.considerResult(finish({ city: 'paris' }));
+  assert.equal(h.qualifies().length, 2);
 });

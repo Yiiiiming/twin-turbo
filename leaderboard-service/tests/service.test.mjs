@@ -82,7 +82,7 @@ test('migrations create an empty shared leaderboard and responses are uncached J
   for(const laps of [3,5]) {
     const result=await readBoard(env,laps);
     assert.equal(result.status,200);
-    assert.deepEqual(result.data,{entries:[],laps,version:LEADERBOARD_VERSION});
+    assert.deepEqual(result.data,{entries:[],laps,city:'coast',version:LEADERBOARD_VERSION});
     assert.match(result.response.headers.get('Content-Type'),/application\/json/);
     assert.equal(result.response.headers.get('Cache-Control'),'no-store');
     assert.equal(result.response.headers.get('Access-Control-Allow-Origin'),origin);
@@ -314,4 +314,76 @@ test('streamed UTF-8 split across chunks decodes correctly and oversized streams
   const oversized=new ReadableStream({pull(controller){controller.enqueue(new Uint8Array(2049));},cancel(){canceled=true;}});
   const tooLarge=await worker.fetch(new Request(`${base}/api/records`,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:oversized,duplex:'half'}),env);
   assert.equal(tooLarge.status,413);assert.equal(canceled,true);assert.equal(env.DB.count(),1);
+});
+
+test('legacy omitted city uses coast while London reads a different persisted category',async t=>{
+  const env=fixture(t);
+  assert.equal((await submit(env,score({id:'legacy_coast'}))).status,200);
+  const coast=await readBoard(env);
+  assert.equal(coast.data.city,'coast');
+  assert.equal(coast.data.entries[0].city,'coast');
+  const london=await call(env,`/api/leaderboard?city=london&laps=3&version=${LEADERBOARD_VERSION}`);
+  assert.equal(london.status,200);assert.equal(london.data.city,'london');
+  assert.deepEqual(london.data.entries,[]);
+});
+
+test('city and lap categories qualify and store their own fastest five',async t=>{
+  const env=fixture(t);
+  await seed(env,[90000,91000,92000,93000,94000]);
+  const london=score({id:'london_0001',city:'london',timeMs:400000});
+  const eligible=await qualify(env,london);
+  assert.equal(eligible.status,200);assert.equal(eligible.data.rank,1);assert.equal(eligible.data.city,'london');
+  const saved=await submit(env,london);
+  assert.equal(saved.status,200);assert.equal(saved.data.city,'london');
+  assert.ok(saved.data.entries.every(entry=>entry.city==='london'));
+  assert.equal((await readBoard(env)).data.entries.length,5);
+  const five=await submit(env,score({id:'london_five',city:'london',laps:5,timeMs:700000}));
+  assert.equal(five.status,200);assert.equal(five.data.rank,1);assert.equal(five.data.entries[0].laps,5);
+  const three=await call(env,`/api/leaderboard?city=london&laps=3&version=${LEADERBOARD_VERSION}`);
+  assert.deepEqual(three.data.entries.map(entry=>entry.id),['london_0001']);
+});
+
+test('simultaneous city submissions stay isolated and an ID cannot migrate cities',async t=>{
+  const env=fixture(t);
+  const submissions=await Promise.all([
+    submit(env,score({id:'parallel_coast',city:'coast',timeMs:400000})),
+    submit(env,score({id:'parallel_london',city:'london',timeMs:400000})),
+  ]);
+  assert.deepEqual(submissions.map(result=>[result.status,result.data.rank]),[[200,1],[200,1]]);
+  assert.equal(env.DB.count(),2);
+  const conflict=await submit(env,score({id:'parallel_coast',city:'london',timeMs:400000}));
+  assert.equal(conflict.status,409);assert.equal(conflict.data.error,'id_conflict');
+  assert.equal(env.DB.count(),2);
+});
+
+test('invalid explicit cities are rejected rather than being silently filed under coast',async t=>{
+  const env=fixture(t);
+  for(const city of ['','London','paris','null']) {
+    const result=await call(env,`/api/leaderboard?city=${encodeURIComponent(city)}&laps=3&version=${LEADERBOARD_VERSION}`);
+    assert.equal(result.status,400);assert.equal(result.data.error,'invalid_category');
+  }
+  for(const city of [null,'','London','paris',1,{}]) {
+    const result=await qualify(env,score({city}));
+    assert.equal(result.status,400);assert.equal(result.data.error,'invalid_score');
+  }
+  assert.equal(env.DB.count(),0);
+});
+
+test('the city migration keeps pre-existing records as coast without rewriting their score',()=>{
+  const sqlite=new DatabaseSync(':memory:');
+  let inserted=false;
+  try {
+    for(const name of readdirSync(migrationDirectory).filter(name=>name.endsWith('.sql')).sort()) {
+      const sql=readFileSync(`${migrationDirectory}/${name}`,'utf8');
+      if(/ADD(?: COLUMN)?\s+[`"]?city[`"]?\s/i.test(sql)) {
+        sqlite.prepare('INSERT INTO records (id,version,laps,time_ms,name,player_id,mode,created_at) VALUES (?,?,?,?,?,?,?,?)')
+          .run('before_city_migration',LEADERBOARD_VERSION,3,137950,'原有车手',1,'local',123456789);
+        inserted=true;
+      }
+      sqlite.exec(sql);
+    }
+    assert.equal(inserted,true,'generated city migration must be present');
+    const existing=sqlite.prepare('SELECT city,time_ms,name FROM records WHERE id=?').get('before_city_migration');
+    assert.deepEqual({...existing},{city:'coast',time_ms:137950,name:'原有车手'});
+  } finally {sqlite.close();}
 });

@@ -18,13 +18,13 @@ function running(laps = 3) {
 // Supply a physically continuous centerline path to isolate checkpoint logic
 // from the player's steering accuracy. Each position is under one frame's
 // allowed displacement; the production public step processes every sample.
-function sample(engine, car, distance, lane = 22) {
+function sample(engine, car, distance, lane = car._lane) {
   const p = trackPoint(distance, lane);
   car.x = p.x; car.y = p.y; car.angle = p.angle; car.speed = 0;
   engine.step(1 / 120);
 }
 
-function path(engine, car, from, to, lane = 22) {
+function path(engine, car, from, to, lane = car._lane) {
   const direction = Math.sign(to - from);
   for (let s = from + direction * 5; direction * (to - s) > 0; s += direction * 5) {
     sample(engine, car, s, lane);
@@ -107,6 +107,18 @@ test('countdown holds cars, clamps long frames, and tolerates invalid dt', () =>
   engine.step(0.05, new Set(['KeyW']));
   assert.ok(engine.cars[0].x < x);
   assert.ok(engine.cars[0].speed > 0);
+});
+
+test('cyan starts in the left lane and orange in the right lane, including after rescue', () => {
+  const engine = running();
+  for (const [index, car] of engine.cars.entries()) {
+    const expectedLane = index === 0 ? -18 : 22;
+    const spawn = trackPoint(TRACK.startDistance - 30, expectedLane);
+    near(car.x, spawn.x); near(car.y, spawn.y);
+    near(projectTrack(car.x, car.y).offset, expectedLane);
+    engine.rescue(car.id);
+    near(projectTrack(car.x, car.y).offset, expectedLane);
+  }
 });
 
 test('pause freezes countdown and race, resume preserves the previous phase', () => {
@@ -200,7 +212,7 @@ test('countersteering passes smoothly through neutral and high-speed turning is 
   near(fast.speed, 517);
 });
 
-test('start crossing is not a lap, ordered full circuits complete the race', () => {
+test('start crossing is not a lap and both drivers must complete their ordered circuits', () => {
   const engine = running(3);
   const car = engine.cars[0];
   const start = TRACK.startDistance;
@@ -215,14 +227,104 @@ test('start crossing is not a lap, ordered full circuits complete the race', () 
     if (lap < 3) assert.equal(engine.state, 'racing');
     from = to;
   }
-  assert.equal(engine.state, 'finished');
+  assert.equal(engine.state, 'racing');
   assert.equal(engine.winner.id, 1); assert.equal(car.finished, true);
+  const firstResult = { finishTime: car.finishTime, bestLap: car.bestLap, lastLap: car.lastLap };
+  const second = engine.cars[1];
+  path(engine, second, start - 30, start + 3 * TRACK.length + 5);
+  assert.equal(second.lap, 3); assert.equal(second.finished, true);
+  assert.equal(engine.state, 'finished'); assert.equal(engine.winner.id, 1);
+  assert.ok(second.finishTime > car.finishTime);
+  near(engine.time, second.finishTime);
+  assert.deepEqual({ finishTime: car.finishTime, bestLap: car.bestLap, lastLap: car.lastLap }, firstResult);
   const time = engine.time;
   engine.step(0.1, new Set(['KeyW'])); near(engine.time, time);
   engine.start(5);
   assert.equal(engine.laps, 5); assert.equal(engine.state, 'countdown');
   assert.equal(engine.winner, null); assert.equal(engine.cars[0].lap, 0);
   assert.equal(engine.cars[0].bestLap, null);
+});
+
+// Set up the last few metres after all checkpoints have been earned. The
+// production physics must drive each car over the line and interpolate time.
+function finalApproach(engine, car, beforeFinish, lane = car._lane) {
+  const p = trackPoint(TRACK.startDistance - beforeFinish, lane);
+  Object.assign(car, {
+    x: p.x, y: p.y, angle: p.angle, speed: 363, lap: engine.laps - 1,
+    _started: true, _nextCheckpoint: TRACK.checkpoints,
+    _lastTrackS: p.s, _lastX: p.x, _lastY: p.y,
+    _lastCheckpointS: TRACK.length - TRACK.length / TRACK.checkpoints,
+    _lastCheckpointEligible: true, _lapStartTime: engine.time - 43,
+    bestLap: 44, lastLap: 44,
+  });
+}
+
+test('first finisher freezes while the second drives through the finish without obstruction', () => {
+  const engine = running();
+  engine.time = 130;
+  const [first, second] = engine.cars;
+  finalApproach(engine, first, 1, 22);
+  finalApproach(engine, second, 80, 22);
+  const keys = new Set(['KeyW', 'KeyD', 'ShiftLeft', 'ArrowUp']);
+  // Keep the initial crossing straight, then hold the finished driver's keys.
+  engine.step(1 / 120, new Set(['KeyW', 'ArrowUp']));
+  assert.equal(first.finished, true); assert.equal(second.finished, false);
+  assert.equal(engine.state, 'racing'); assert.equal(engine.winner, first);
+  assert.equal(first.speed, 0); assert.equal(first.boosting, false);
+  const frozen = structuredClone(first), firstTime = engine.time;
+  for (let step = 0; step < 60 && !second.finished; step++) {
+    engine.step(1 / 120, keys);
+    assert.deepEqual(first, frozen, 'completed car ignores controls and cannot be pushed');
+    assert.equal(second.impact, 0, 'a stopped finisher must not block the remaining racer');
+  }
+  assert.equal(second.finished, true); assert.equal(second.speed, 0);
+  assert.equal(engine.state, 'finished'); assert.equal(engine.winner, first);
+  assert.ok(second.finishTime > firstTime + .15);
+  near(engine.time, second.finishTime);
+  const finished = structuredClone(engine.cars), finalTime = engine.time;
+  engine.step(.1, keys); engine.rescue(1); engine.rescue(2);
+  assert.deepEqual(engine.cars, finished); near(engine.time, finalTime);
+});
+
+test('pause and rescue still apply to the unfinished racer and restart clears both results', () => {
+  const engine = running();
+  engine.time = 130;
+  const [first, second] = engine.cars;
+  finalApproach(engine, first, 1);
+  finalApproach(engine, second, 80);
+  engine.step(1 / 120, new Set(['KeyW', 'ArrowUp']));
+  const firstResult = structuredClone(first), time = engine.time;
+  engine.pause(); engine.step(.1, new Set(['KeyW', 'ArrowUp']));
+  near(engine.time, time); assert.equal(engine.state, 'paused');
+  engine.resume(); assert.equal(engine.state, 'racing');
+  engine.rescue(1); assert.deepEqual(first, firstResult);
+  engine.rescue(2); assert.equal(second.rescueCooldown, 2);
+  assert.equal(second.lap, 2); assert.equal(second.finished, false);
+  const stopped = { x: second.x, y: second.y };
+  engine.step(.1, new Set(['ArrowUp']));
+  near(second.x, stopped.x); near(second.y, stopped.y);
+  assert.ok(engine.time > time); assert.deepEqual(first, firstResult);
+  engine.start(5);
+  assert.equal(engine.state, 'countdown'); assert.equal(engine.winner, null);
+  near(engine.time, 0);
+  for (const car of engine.cars) {
+    assert.equal(car.finished, false); assert.equal(car.finishTime, null);
+    assert.equal(car.bestLap, null); assert.equal(car.lap, 0);
+  }
+});
+
+test('same-tick finish order uses crossing times even when player two crosses first', () => {
+  for (const distances of [[2, 1], [1, 2], [1, 1]]) {
+    const engine = running(); engine.time = 130;
+    for (const [index, car] of engine.cars.entries()) finalApproach(engine, car, distances[index]);
+    engine.step(1 / 120, new Set(['KeyW', 'ArrowUp']));
+    assert.equal(engine.state, 'finished');
+    assert.ok(engine.cars.every(car => car.finished && car.speed === 0));
+    assert.equal(engine.winner.id, distances[0] <= distances[1] ? 1 : 2);
+    near(engine.time, Math.max(...engine.cars.map(car => car.finishTime)));
+    near(engine.cars[0].finishTime, 130 + distances[0] / 363);
+    near(engine.cars[1].finishTime, 130 + distances[1] / 363);
+  }
 });
 
 test('driving backward around the track never starts or completes a lap', () => {
@@ -272,8 +374,8 @@ for (const player of [1, 2]) {
   test(`player ${player} earns a gate after briefly touching grass and returning to the road`, () => {
     const engine = running();
     const car = engine.cars[player - 1];
-    const sign = player === 1 ? 1 : -1;
-    const lane = player === 1 ? 22 : -18;
+    const sign = Math.sign(car._lane);
+    const lane = car._lane;
     const start = TRACK.startDistance;
     const gate = start + TRACK.length / TRACK.checkpoints;
     path(engine, car, start - 30, gate - 40, lane);
@@ -297,7 +399,7 @@ test('checkpoint runoff admits a near-road line but rejects movement outside its
     const lane = TRACK.roadWidth / 2 + TRACK.checkpointMargin + extra;
     path(engine, car, TRACK.startDistance - 30, gate - 100);
     for (let s = gate - 95; s < gate + 11; s += 5) {
-      sample(engine, car, s, 22 + Math.min(1, (s - gate + 100) / 70) * (lane - 22));
+      sample(engine, car, s, car._lane + Math.min(1, (s - gate + 100) / 70) * (lane - car._lane));
     }
     assert.equal(car.offroad, true, 'grass slowdown remains active even inside the checkpoint margin');
     assert.equal(car._nextCheckpoint, extra < 0 ? 2 : 1);
@@ -314,7 +416,7 @@ test('brief shoulder crossings preserve both players consecutive full laps', () 
   for (let s = start - 25; s < start + TRACK.length * 2 + 10; s += 5) {
     const withinLap = start + mod(s - start, TRACK.length);
     for (const [index, car] of engine.cars.entries()) {
-      const lane = index === 0 ? 22 : -18;
+      const lane = car._lane;
       const bump = Math.max(0, 1 - Math.abs(withinLap - gate) / 100) * (62 - Math.abs(lane));
       const p = trackPoint(s, lane + Math.sign(lane) * bump);
       car.x = p.x; car.y = p.y; car.angle = p.angle; car.speed = 0;
@@ -435,10 +537,10 @@ for (const fps of [30, 60, 120]) {
       let offroadFrames = 0;
       let usedBoost = false;
       const usedSteering = new Set();
-      for (let frame = 0; frame < fps * 210 && engine.state !== 'finished'; frame++) {
+      for (let frame = 0; frame < fps * 210 && !engine.cars[player - 1].finished; frame++) {
         const car = engine.cars[player - 1];
         const projection = projectTrack(car.x, car.y);
-        const lane = player === 1 ? 24 : -24;
+        const lane = player === 1 ? -24 : 24;
         const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, lane);
         const targetAngle = Math.atan2(target.y - car.y, target.x - car.x);
         const error = mod(targetAngle - car.angle + Math.PI, Math.PI * 2) - Math.PI;
@@ -461,7 +563,8 @@ for (const fps of [30, 60, 120]) {
         if (car.boosting) usedBoost = true;
         engine.step(1 / fps, keys);
       }
-      assert.equal(engine.state, 'finished');
+      assert.equal(engine.state, 'racing');
+      assert.equal(engine.cars[player - 1].finished, true);
       assert.equal(engine.winner.id, player);
       assert.equal(engine.cars[player - 1].lap, 3);
       assert.equal(offroadFrames, 0);
@@ -478,9 +581,9 @@ for (const player of [1, 2]) {
     const engine = new RaceEngine({ laps: 1 }).start();
     const car = engine.cars[player - 1];
     let offroadFrames = 0;
-    for (let frame = 0; frame < 60 * 75 && engine.state !== 'finished'; frame++) {
+    for (let frame = 0; frame < 60 * 75 && !car.finished; frame++) {
       const projection = projectTrack(car.x, car.y);
-      const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, player === 1 ? 24 : -24);
+      const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, player === 1 ? -24 : 24);
       const error = angleDifference(Math.atan2(target.y - car.y, target.x - car.x), car.angle);
       const keys = new Set([player === 1 ? 'KeyW' : 'ArrowUp']);
       if (error > .025) keys.add(player === 1 ? 'KeyD' : 'ArrowRight');
@@ -488,7 +591,7 @@ for (const player of [1, 2]) {
       if (car.offroad) offroadFrames++;
       engine.step(1 / 60, keys);
     }
-    assert.equal(engine.state, 'finished');
+    assert.equal(engine.state, 'racing'); assert.equal(car.finished, true);
     assert.equal(engine.winner.id, player);
     assert.equal(offroadFrames, 0);
     near(car.boost, 100);

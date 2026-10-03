@@ -5,6 +5,7 @@ import base64
 import json
 import re
 import shutil
+import subprocess
 
 ROOT = Path(__file__).resolve().parent
 html = (ROOT / 'index.html').read_text()
@@ -16,24 +17,13 @@ def module_source(name):
     return re.sub(r'^export ', '', source, flags=re.MULTILINE)
 
 
-engine_exports = 'RaceEngine, TRACK, trackPoint, projectTrack, mod'
-leaderboard_exports = 'LEADERBOARD_VERSION, LEADERBOARD_LIMIT, normalizeName, normalizeEntries, qualifyingRank, insertRecord'
-script = (
-    'const Collisions = (() => {\n' + module_source('collisions.js')
-    + '\nreturn {ObstacleWorld};\n})();\n'
-    + 'const Engine = (({ObstacleWorld}) => {\n' + module_source('engine.js')
-    + '\nreturn {' + engine_exports + '};\n})(Collisions);\n'
-    + 'const Rendering = (({' + engine_exports + '}) => {\n'
-    + module_source('renderer.js') + '\nreturn {RaceRenderer, sceneWeights};\n})(Engine);\n'
-    + 'const AI = (({' + engine_exports + '}) => {\n'
-    + module_source('ai.js') + '\nreturn {RaceAI};\n})(Engine);\n'
-    + 'const Leaderboard = (() => {\n' + module_source('leaderboard.js')
-    + '\nreturn {' + leaderboard_exports + '};\n})();\n'
-    + 'const Online = (({' + leaderboard_exports + '}) => {\n'
-    + module_source('leaderboard-client.js') + '\nreturn {LeaderboardClient};\n})(Leaderboard);\n'
-    + '(({' + engine_exports + '}, {RaceRenderer, sceneWeights}, {RaceAI}, {LeaderboardClient}) => {\n'
-    + module_source('main.js') + '\n})(Engine, Rendering, AI, Online);\n'
-).replace('</script', '<\\/script')
+node = shutil.which('node')
+if not node:
+    bundled = Path.home() / '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node'
+    if bundled.exists(): node = str(bundled)
+if not node: raise RuntimeError('Node.js is required to bundle the game. Install dependencies with pnpm install.')
+subprocess.run([node, str(ROOT / 'scripts/build-game.mjs')], cwd=ROOT, check=True)
+script = (ROOT / '.game-build.js').read_text().replace('</script', '<\\/script')
 
 
 def edition(styles, prelude=''):
@@ -47,12 +37,16 @@ web_directory.mkdir(exist_ok=True)
 (web_directory / 'assets').mkdir(exist_ok=True)
 embedded = {}
 offline_css = css
-for name in ('coast', 'alpine', 'city'):
+for name in ('coast', 'alpine', 'city', 'london-plane-tree'):
     asset = ROOT / 'assets' / f'{name}.png'
     shutil.copy2(asset, web_directory / 'assets' / asset.name)
     embedded[name] = 'data:image/png;base64,' + base64.b64encode(asset.read_bytes()).decode('ascii')
     offline_css = offline_css.replace(f"url('./assets/{name}.png')", f'var(--scene-{name})')
 
+for name in ('THREE-LICENSE.txt', 'THIRD-PARTY-LICENSES.txt'):
+    shutil.copy2(ROOT / 'vendor' / name, web_directory / name)
+for name in ('london-map-sources.md', 'london-landmark-sources.md', 'london-building-sources.md'):
+    shutil.copy2(ROOT / 'assets' / name, web_directory / 'assets' / name)
 (web_directory / 'index.html').write_text(edition(css))
 destination = ROOT / 'Twin Turbo.html'
 prelude = 'globalThis.TWIN_SCENE_ART=' + json.dumps(embedded) + ';\n'

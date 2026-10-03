@@ -1,8 +1,8 @@
-import { LEADERBOARD_VERSION, normalizeName, qualifyingRank } from './rules.js';
+import { LEADERBOARD_VERSION, normalizeName, normalizeCity, qualifyingRank } from './rules.js';
 
-const RANK_SQL = 'SELECT id,name,time_ms AS timeMs,laps,player_id AS playerId,mode,created_at AS createdAt FROM records WHERE version=? AND laps=? ORDER BY time_ms,seq LIMIT 5';
-const INSERT_SQL = `INSERT OR IGNORE INTO records (id,version,laps,time_ms,name,player_id,mode,created_at)
- SELECT ?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM (SELECT 1 FROM records WHERE version=? AND laps=? AND time_ms<=? LIMIT 5))<5`;
+const RANK_SQL = 'SELECT id,name,time_ms AS timeMs,laps,city,player_id AS playerId,mode,created_at AS createdAt FROM records WHERE version=? AND city=? AND laps=? ORDER BY time_ms,seq LIMIT 5';
+const INSERT_SQL = `INSERT OR IGNORE INTO records (id,version,city,laps,time_ms,name,player_id,mode,created_at)
+ SELECT ?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM (SELECT 1 FROM records WHERE version=? AND city=? AND laps=? AND time_ms<=? LIMIT 5))<5`;
 const recentWrites = new Map();
 const allowedOrigins = new Set(['https://yiiiiming.github.io', 'null']);
 function cors(request) {
@@ -18,7 +18,7 @@ function scoreValid(body) {
   return body?.version===LEADERBOARD_VERSION && qualifyingRank([],body)!==null
     && body.timeMs>=body.laps*25000 && body.timeMs<=body.laps*3600000;
 }
-async function board(db,laps) { return (await db.prepare(RANK_SQL).bind(LEADERBOARD_VERSION,laps).all()).results; }
+async function board(db,laps,city='coast') { return (await db.prepare(RANK_SQL).bind(LEADERBOARD_VERSION,city,laps).all()).results; }
 async function boundedBody(request) {
   if(Number(request.headers.get('Content-Length'))>4096)return null;
   if(!request.body)return '';
@@ -59,8 +59,9 @@ export default {
       if(url.pathname==='/api/leaderboard') {
         if(request.method!=='GET')return json({error:'method_not_allowed'},405,headers);
         const laps=Number(url.searchParams.get('laps'));
-        if(![3,5].includes(laps)||url.searchParams.get('version')!==LEADERBOARD_VERSION)return json({error:'invalid_category'},400,headers);
-        return json({entries:await board(env.DB,laps),laps,version:LEADERBOARD_VERSION},200,headers);
+        const city=normalizeCity(url.searchParams.get('city')??undefined);
+        if(city===null||![3,5].includes(laps)||url.searchParams.get('version')!==LEADERBOARD_VERSION)return json({error:'invalid_category'},400,headers);
+        return json({entries:await board(env.DB,laps,city),laps,city,version:LEADERBOARD_VERSION},200,headers);
       }
       if(request.method!=='POST')return json({error:'method_not_allowed'},405,headers);
       if(!request.headers.get('Content-Type')?.includes('application/json'))return json({error:'json_required'},415,headers);
@@ -68,22 +69,23 @@ export default {
       if(text===null)return json({error:'payload_too_large'},413,headers);
       let body;try{body=JSON.parse(text);}catch{return json({error:'invalid_json'},400,headers);}
       if(!scoreValid(body))return json({error:'invalid_score'},400,headers);
+      body.city=normalizeCity(body.city);
       if(url.pathname==='/api/qualify') {
-        const entries=await board(env.DB,body.laps);
-        return json({rank:qualifyingRank(entries,body),entries},200,headers);
+        const entries=await board(env.DB,body.laps,body.city);
+        return json({rank:qualifyingRank(entries,body),entries,city:body.city,laps:body.laps,version:LEADERBOARD_VERSION},200,headers);
       }
       const name=normalizeName(body.name);
       if(!name||typeof body.id!=='string'||!/^[a-zA-Z0-9_-]{8,128}$/.test(body.id))return json({error:'invalid_name_or_id'},400,headers);
       if(limited(request))return json({error:'too_many_requests'},429,{'Retry-After':'60',...headers});
       // One atomic INSERT...SELECT checks current qualification; a racing client
       // cannot overwrite the winner of another simultaneous submission.
-      await env.DB.prepare(INSERT_SQL).bind(body.id,LEADERBOARD_VERSION,body.laps,body.timeMs,name,body.playerId,body.mode,Date.now(),LEADERBOARD_VERSION,body.laps,body.timeMs).run();
-      const stored=await env.DB.prepare('SELECT version,laps,time_ms AS timeMs,player_id AS playerId,mode,name FROM records WHERE id=?').bind(body.id).first();
-      const entries=await board(env.DB,body.laps);
-      if(!stored)return json({error:'rank_changed',entries},409,headers);
-      if(stored.version!==LEADERBOARD_VERSION||stored.laps!==body.laps||stored.timeMs!==body.timeMs||stored.playerId!==body.playerId||stored.mode!==body.mode||stored.name!==name)return json({error:'id_conflict',entries},409,headers);
+      await env.DB.prepare(INSERT_SQL).bind(body.id,LEADERBOARD_VERSION,body.city,body.laps,body.timeMs,name,body.playerId,body.mode,Date.now(),LEADERBOARD_VERSION,body.city,body.laps,body.timeMs).run();
+      const stored=await env.DB.prepare('SELECT version,city,laps,time_ms AS timeMs,player_id AS playerId,mode,name FROM records WHERE id=?').bind(body.id).first();
+      const entries=await board(env.DB,body.laps,body.city);
+      if(!stored)return json({error:'rank_changed',entries,city:body.city,laps:body.laps,version:LEADERBOARD_VERSION},409,headers);
+      if(stored.version!==LEADERBOARD_VERSION||stored.city!==body.city||stored.laps!==body.laps||stored.timeMs!==body.timeMs||stored.playerId!==body.playerId||stored.mode!==body.mode||stored.name!==name)return json({error:'id_conflict',entries},409,headers);
       const rank=entries.findIndex(entry=>entry.id===body.id)+1;
-      return json({saved:true,rank:rank||null,entries},200,headers);
+      return json({saved:true,rank:rank||null,entries,city:body.city,laps:body.laps,version:LEADERBOARD_VERSION},200,headers);
     } catch(error) {
       console.error('Leaderboard operation failed',error?.name||'Error');
       return json({error:'temporarily_unavailable'},503,headers);

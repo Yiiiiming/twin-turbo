@@ -1,0 +1,1290 @@
+{
+  "schemaVersion": 1,
+  "title": "London — individually researched facade studies",
+  "reviewedAt": "2026-10-03",
+  "units": "metres; facadeBearing clockwise degrees from geographic north",
+  "scope": "First 25 individual OSM footprints plus explicitly inferred street fallbacks. This is not a full survey or a claim of exact present-day facade reconstruction.",
+  "evidencePolicy": {
+    "verified-features": "Only listed verifiedFeatures are directly evidenced. Numeric colours and geometric simplifications are always estimates.",
+    "inferred": "Identity, footprint and some material evidence are known; detailed facade design has not been verified.",
+    "signs": "A sign field is a building/venue name at a confirmed footprint, not a reproduction of current commercial typography or a show poster."
+  },
+  "byBuildingId": {
+    "relation/5208404": {
+      "osmId": "relation/5208404",
+      "name": "Buckingham Palace",
+      "osmName": "Buckingham Palace",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1424889,
+        51.5008749
+      ],
+      "distanceToRouteMeters": 172.2,
+      "facadeBearing": 50.6,
+      "facadeBearingEvidence": "Approximate east-front normal facing Victoria Memorial, consistent with the existing landmark placement.",
+      "facade": {
+        "style": "westminster-stone",
+        "wallColor": "#e2ded3",
+        "accentColor": "#f2eee6",
+        "roofColor": "#41474b",
+        "shopColor": "#213d35",
+        "floors": 3,
+        "bays": 23,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "flat",
+        "groundFloor": "rusticated",
+        "windowShape": "sash",
+        "bayGroups": [
+          3,
+          7,
+          3,
+          7,
+          3
+        ],
+        "balcony": true
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1239087"
+      ],
+      "verifiedFeatures": [
+        "East elevation has a 3:7:3:7:3 bay rhythm.",
+        "Three main storeys, Corinthian detailing and a continuous first-floor balcony."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "landmarkModelId": "buckingham"
+    },
+    "way/4266528": {
+      "osmId": "way/4266528",
+      "name": "Carlton House Terrace — western block",
+      "osmName": "Carlton House",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1331979,
+        51.505773
+      ],
+      "distanceToRouteMeters": 65.6,
+      "facadeBearing": 146.5,
+      "facadeBearingEvidence": "Estimated normal towards nearest The Mall road segment; not survey-measured.",
+      "facade": {
+        "style": "retail-stucco",
+        "wallColor": "#e9e4d8",
+        "accentColor": "#f8f3e8",
+        "roofColor": "#41474b",
+        "shopColor": "#ddd7c9",
+        "floors": 4,
+        "bays": 31,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "hipped",
+        "groundFloor": "colonnade",
+        "windowShape": "sash",
+        "bayGroups": [
+          5,
+          8,
+          5,
+          8,
+          5
+        ]
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1209780"
+      ],
+      "verifiedFeatures": [
+        "OSM footprint is the western terrace of Nos 1–9, not the demolished Carlton House.",
+        "Stucco and slate; park elevation follows five groups of 5:8:5:8:5."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Keep the complete terrace rhythm on its long park face; do not repeat 31 bays on every short edge."
+    },
+    "way/4266524": {
+      "osmId": "way/4266524",
+      "name": "Lancaster House",
+      "osmName": "Lancaster House",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1392259,
+        51.5038926
+      ],
+      "distanceToRouteMeters": 127.9,
+      "facadeBearing": 146.1,
+      "facadeBearingEvidence": "Estimated normal towards nearest The Mall road segment; not survey-measured.",
+      "facade": {
+        "style": "westminster-stone",
+        "wallColor": "#d8cbae",
+        "accentColor": "#e9dfc8",
+        "roofColor": "#41474b",
+        "shopColor": "#213d35",
+        "floors": 3,
+        "bays": 9,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "hipped",
+        "groundFloor": "colonnade",
+        "windowShape": "sash",
+        "bayGroups": [
+          1,
+          1,
+          5,
+          1,
+          1
+        ]
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1236546"
+      ],
+      "verifiedFeatures": [
+        "Bath-stone classical mansion with Corinthian porticoes.",
+        "Nine-window north and south fronts with a five-bay centre; two main storeys and attic."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/161800467": {
+      "osmId": "way/161800467",
+      "name": "Marlborough House",
+      "osmName": "Marlborough House",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1360322,
+        51.504978
+      ],
+      "distanceToRouteMeters": 117.6,
+      "facadeBearing": 145.0,
+      "facadeBearingEvidence": "Approximate garden-front normal toward The Mall; Pall Mall entrance front is on the opposite side.",
+      "facade": {
+        "style": "georgian-brick",
+        "wallColor": "#925744",
+        "accentColor": "#d7c9ad",
+        "roofColor": "#41474b",
+        "shopColor": "#213d35",
+        "floors": 4,
+        "bays": 13,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "hipped",
+        "groundFloor": "residential",
+        "windowShape": "sash",
+        "bayGroups": [
+          3,
+          7,
+          3
+        ],
+        "quoins": true
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1331701"
+      ],
+      "verifiedFeatures": [
+        "Red brick, stone quoins and dressings.",
+        "Garden front has thirteen bays with advanced three-bay wings."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/38446590": {
+      "osmId": "way/38446590",
+      "name": "Institute of Directors — former United Service Club",
+      "osmName": "Institute of Directors",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1316875,
+        51.5071816
+      ],
+      "distanceToRouteMeters": 62.6,
+      "facadeBearing": 330.1,
+      "facadeBearingEvidence": "Estimated normal towards nearest Pall Mall road segment; not survey-measured.",
+      "facade": {
+        "style": "retail-stucco",
+        "wallColor": "#e1dacb",
+        "accentColor": "#f2eddf",
+        "roofColor": "#41474b",
+        "shopColor": "#213d35",
+        "floors": 3,
+        "bays": 13,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "rusticated",
+        "windowShape": "sash"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1225843"
+      ],
+      "verifiedFeatures": [
+        "Stucco, rusticated ground floor and dormered mansard.",
+        "Pall Mall elevation is thirteen windows wide; central entrance has a portico."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/369234481": {
+      "osmId": "way/369234481",
+      "name": "Oceanic House",
+      "osmName": "Oceanic House",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1299396,
+        51.5078414
+      ],
+      "distanceToRouteMeters": 26.1,
+      "facadeBearing": 189.1,
+      "facadeBearingEvidence": "Estimated normal towards nearest Cockspur Street road segment; not survey-measured.",
+      "facade": {
+        "style": "edwardian-stone",
+        "wallColor": "#d5cdbd",
+        "accentColor": "#eee6d8",
+        "roofColor": "#41474b",
+        "shopColor": "#213d35",
+        "floors": 6,
+        "bays": 5,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "rusticated",
+        "windowShape": "sash"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1219835"
+      ],
+      "verifiedFeatures": [
+        "Portland stone office of 1903–06 with lead roof.",
+        "Five-bay entrance and five-bay splayed returns; three main storeys and substantial attic composition."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "relation/2071332": {
+      "osmId": "relation/2071332",
+      "name": "New Zealand House podium",
+      "osmName": "High Commission of New Zealand",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1316991,
+        51.5079406
+      ],
+      "distanceToRouteMeters": 33.3,
+      "facadeBearing": 59.8,
+      "facadeBearingEvidence": "Estimated normal towards nearest Haymarket road segment; not survey-measured.",
+      "facade": {
+        "style": "modern-glass",
+        "wallColor": "#c4c3bb",
+        "accentColor": "#e3e0d6",
+        "roofColor": "#41474b",
+        "shopColor": "#213d35",
+        "floors": 4,
+        "bays": null,
+        "bayWidth": 3.3,
+        "cornice": false,
+        "roof": "flat",
+        "groundFloor": "colonnade",
+        "windowShape": "casement"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1242616"
+      ],
+      "verifiedFeatures": [
+        "Stone-banded glazed podium carried on stainless-steel pilotis.",
+        "Haymarket entrance has a projecting canopy."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "This OSM relation is the four-storey podium only. Do not stretch it to the tower height; tower building parts are separate geometry."
+    },
+    "way/302075160": {
+      "osmId": "way/302075160",
+      "name": "Royal Opera Arcade",
+      "osmName": "Royal Opera Arcade",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1321908,
+        51.5077877
+      ],
+      "distanceToRouteMeters": 60.9,
+      "facadeBearing": 151.0,
+      "facadeBearingEvidence": "Estimated normal towards nearest Pall Mall road segment; not survey-measured.",
+      "facade": {
+        "style": "retail-stucco",
+        "wallColor": "#e8dfcd",
+        "accentColor": "#f2ebdf",
+        "roofColor": "#41474b",
+        "shopColor": "#213d35",
+        "floors": 2,
+        "bays": 18,
+        "bayWidth": 3.2,
+        "cornice": true,
+        "roof": "gabled",
+        "groundFloor": "colonnade",
+        "windowShape": "arched"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1235289"
+      ],
+      "verifiedFeatures": [
+        "Stucco-faced brick arcade with slate and glazed-lantern roof.",
+        "Eighteen interior vaulted bays; arched street entrances."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "18 describes interior arcade bays, not a street facade count. Preserve the narrow OSM passage and openings."
+    },
+    "way/153661824": {
+      "osmId": "way/153661824",
+      "name": "Theatre Royal Haymarket",
+      "osmName": "Theatre Royal Haymarket",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1312746,
+        51.5086428
+      ],
+      "distanceToRouteMeters": 36.6,
+      "facadeBearing": 241.1,
+      "facadeBearingEvidence": "Estimated normal towards nearest Haymarket road segment; not survey-measured.",
+      "facade": {
+        "style": "theatre",
+        "wallColor": "#e7e3d7",
+        "accentColor": "#faf3e4",
+        "roofColor": "#41474b",
+        "shopColor": "#413d35",
+        "floors": 3,
+        "bays": 7,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "flat",
+        "groundFloor": "colonnade",
+        "windowShape": "arched",
+        "porticoColumns": 6,
+        "atticOculi": true,
+        "sign": "THEATRE ROYAL HAYMARKET"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1066641"
+      ],
+      "verifiedFeatures": [
+        "Seven-bay frontage and six-column Corinthian pedimented portico.",
+        "Five arched entry doors; high attic with round windows."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/153661807": {
+      "osmId": "way/153661807",
+      "name": "Former Carlton Theatre — Haymarket cinema",
+      "osmName": "Empire Cinemas",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1323777,
+        51.5087319
+      ],
+      "distanceToRouteMeters": 22.2,
+      "facadeBearing": 61.3,
+      "facadeBearingEvidence": "Estimated normal towards nearest Haymarket road segment; not survey-measured.",
+      "facade": {
+        "style": "edwardian-stone",
+        "wallColor": "#cec6b6",
+        "accentColor": "#ede5d7",
+        "roofColor": "#41474b",
+        "shopColor": "#252b30",
+        "floors": 4,
+        "bays": 7,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "flat",
+        "groundFloor": "shopfront",
+        "windowShape": "arched",
+        "bayGroups": [
+          1,
+          5,
+          1
+        ]
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1456493"
+      ],
+      "verifiedFeatures": [
+        "Seven-bay Portland-stone elevation; central five project.",
+        "Palazzo composition, prominent cornice, entrance canopy and central advertising panel."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "OSM calls this Empire Cinemas; venue branding may change, so no unverified current tenant sign."
+    },
+    "way/149173459": {
+      "osmId": "way/149173459",
+      "name": "Criterion Theatre",
+      "osmName": "Criterion",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1340688,
+        51.5096652
+      ],
+      "distanceToRouteMeters": 46.8,
+      "facadeBearing": 331.0,
+      "facadeBearingEvidence": "Approximate main-front normal toward Piccadilly Circus; nearest Piccadilly polyline selected a side return.",
+      "facade": {
+        "style": "theatre",
+        "wallColor": "#e0d5bf",
+        "accentColor": "#eee6d7",
+        "roofColor": "#41474b",
+        "shopColor": "#293b38",
+        "floors": 3,
+        "bays": 5,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "arched",
+        "bayGroups": [
+          1,
+          3,
+          1
+        ],
+        "sign": "CRITERION"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1265753"
+      ],
+      "verifiedFeatures": [
+        "Painted-stone frontage with dormered mansard and pavilion roof.",
+        "Three-bay recessed centre between single-bay pedimented wings."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/369245408": {
+      "osmId": "way/369245408",
+      "name": "London Pavilion",
+      "osmName": "London Pavillion",
+      "confidence": "inferred",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1339128,
+        51.5103054
+      ],
+      "distanceToRouteMeters": 20.9,
+      "facadeBearing": 221.0,
+      "facadeBearingEvidence": "Approximate main-front normal toward the Piccadilly Circus fountain; venue occupies a multi-frontage corner.",
+      "facade": {
+        "style": "edwardian-stone",
+        "wallColor": "#d7cfc0",
+        "accentColor": "#ede4d3",
+        "roofColor": "#41474b",
+        "shopColor": "#394040",
+        "floors": 4,
+        "bays": null,
+        "bayWidth": 3.4,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "arched",
+        "sign": "LONDON PAVILION"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/images-books/photos/item/BL20230",
+        "https://historicengland.org.uk/images-books/photos/item/NWC01/01/1867"
+      ],
+      "verifiedFeatures": [
+        "London Pavilion identity and Piccadilly Circus location verified in Historic England archive.",
+        "An entrance pediment carries the London Pavilion name."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Facade colour, roof layout and bay spacing remain approximations from the historical architectural type; current tenant advertising omitted."
+    },
+    "way/149173469": {
+      "osmId": "way/149173469",
+      "name": "Lyric Theatre",
+      "osmName": "Lyric Theatre",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1337883,
+        51.5113472
+      ],
+      "distanceToRouteMeters": 23.7,
+      "facadeBearing": 127.6,
+      "facadeBearingEvidence": "Estimated normal towards nearest Shaftesbury Avenue road segment; not survey-measured.",
+      "facade": {
+        "style": "theatre",
+        "wallColor": "#9b6650",
+        "accentColor": "#dacdaf",
+        "roofColor": "#41474b",
+        "shopColor": "#2a303b",
+        "floors": 4,
+        "bays": 14,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "gabled",
+        "groundFloor": "shopfront",
+        "windowShape": "arched",
+        "bayGroups": [
+          3,
+          2,
+          4,
+          2,
+          3
+        ],
+        "sign": "LYRIC"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1264706"
+      ],
+      "verifiedFeatures": [
+        "Brick and stone facade, slate roof, three storeys and attic.",
+        "Five pavilion groups have 3:2:4:2:3 windows; ground-floor arcade and canopied entrance."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/149173453": {
+      "osmId": "way/149173453",
+      "name": "Apollo Theatre",
+      "osmName": "Apollo Theatre",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1334285,
+        51.5115684
+      ],
+      "distanceToRouteMeters": 24.2,
+      "facadeBearing": 133.4,
+      "facadeBearingEvidence": "Estimated normal towards nearest Shaftesbury Avenue road segment; not survey-measured.",
+      "facade": {
+        "style": "theatre",
+        "wallColor": "#d8d1bf",
+        "accentColor": "#eee6d4",
+        "roofColor": "#41474b",
+        "shopColor": "#344a56",
+        "floors": 4,
+        "bays": 3,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "arched",
+        "sign": "APOLLO",
+        "cornerDomes": true
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1236173"
+      ],
+      "verifiedFeatures": [
+        "Stone street elevation with three principal bays.",
+        "Arcaded ground floor, glass canopy and shallow-domed end turrets."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/149173466": {
+      "osmId": "way/149173466",
+      "name": "Gielgud Theatre",
+      "osmName": "Gielgud Theatre",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1330059,
+        51.5118053
+      ],
+      "distanceToRouteMeters": 34.4,
+      "facadeBearing": 150.0,
+      "facadeBearingEvidence": "Approximate curved entrance normal toward the Shaftesbury Avenue / Rupert Street junction.",
+      "facade": {
+        "style": "theatre",
+        "wallColor": "#d9d2c0",
+        "accentColor": "#f0e7d6",
+        "roofColor": "#41474b",
+        "shopColor": "#263941",
+        "floors": 4,
+        "bays": 8,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "sash",
+        "bayGroups": [
+          2,
+          3,
+          3
+        ],
+        "sign": "GIELGUD",
+        "cornerDomes": true
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1236174"
+      ],
+      "verifiedFeatures": [
+        "Portland stone and slate in a Baroque composition.",
+        "Bowed three-window corner rises to a short circular tower and stone dome."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/149173471": {
+      "osmId": "way/149173471",
+      "name": "Palace Theatre",
+      "osmName": "Palace Theatre",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1296645,
+        51.5131275
+      ],
+      "distanceToRouteMeters": 23.7,
+      "facadeBearing": 134.9,
+      "facadeBearingEvidence": "Estimated normal towards nearest Shaftesbury Avenue road segment; not survey-measured.",
+      "facade": {
+        "style": "theatre",
+        "wallColor": "#914b36",
+        "accentColor": "#c6a47a",
+        "roofColor": "#41474b",
+        "shopColor": "#422c2b",
+        "floors": 4,
+        "bays": 3,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "gabled",
+        "groundFloor": "shopfront",
+        "windowShape": "arched",
+        "sign": "PALACE THEATRE",
+        "cornerDomes": true,
+        "banding": true
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1066339"
+      ],
+      "verifiedFeatures": [
+        "Red brick alternates with buff terracotta bands.",
+        "Concave three-part front, corbelled turrets, broad gable and glazed entrance canopy."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Four principal facade storeys are documented; OSM tags six levels including internal/roof volumes."
+    },
+    "way/993781431": {
+      "osmId": "way/993781431",
+      "name": "Wong Kei — former Clarkson premises",
+      "osmName": "旺記 Wong Kei",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1324221,
+        51.5114665
+      ],
+      "distanceToRouteMeters": 18.7,
+      "facadeBearing": 64.4,
+      "facadeBearingEvidence": "Estimated normal towards nearest Wardour Street road segment; not survey-measured.",
+      "facade": {
+        "style": "victorian-redbrick",
+        "wallColor": "#9e5945",
+        "accentColor": "#b9aa75",
+        "roofColor": "#41474b",
+        "shopColor": "#8a272c",
+        "floors": 4,
+        "bays": 3,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "casement",
+        "sign": "WONG KEI · 旺記",
+        "bayWindows": true,
+        "trimColor": "#6d8070"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1357341",
+        "https://chinatown.co.uk/en/restaurant/wong-kei/"
+      ],
+      "verifiedFeatures": [
+        "41–43 Wardour Street: red brick with green and buff stone dressings.",
+        "Three-window front, four floors and attic; upper canted bays and elaborate centre entry."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    },
+    "way/993439403": {
+      "osmId": "way/993439403",
+      "name": "De Hems Dutch Café Bar",
+      "osmName": "De Hems Cafe Bar",
+      "confidence": "inferred",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1311875,
+        51.5121249
+      ],
+      "distanceToRouteMeters": 34.5,
+      "facadeBearing": 242.9,
+      "facadeBearingEvidence": "Estimated normal towards nearest Macclesfield Street road segment; not survey-measured.",
+      "facade": {
+        "style": "victorian-redbrick",
+        "wallColor": "#9c765e",
+        "accentColor": "#d7c8ae",
+        "roofColor": "#41474b",
+        "shopColor": "#25483b",
+        "floors": 4,
+        "bays": 3,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "sash",
+        "sign": "DE HEMS"
+      },
+      "sourceUrls": [
+        "https://www.dehemspub.co.uk/",
+        "https://www.openstreetmap.org/way/993439403"
+      ],
+      "verifiedFeatures": [
+        "Venue at 11 Macclesfield Street confirmed by its operator.",
+        "OSM records brick, four levels and one roof level."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Current exact upper-bay treatment and paint shades await visual survey; brick/level/location identity is confirmed."
+    },
+    "way/993516028": {
+      "osmId": "way/993516028",
+      "name": "Viet Food",
+      "osmName": "Viet Food",
+      "confidence": "inferred",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1321208,
+        51.5116251
+      ],
+      "distanceToRouteMeters": 10.5,
+      "facadeBearing": 244.4,
+      "facadeBearingEvidence": "Estimated normal towards nearest Wardour Street road segment; not survey-measured.",
+      "facade": {
+        "style": "retail-stucco",
+        "wallColor": "#d5cbb8",
+        "accentColor": "#ece4d6",
+        "roofColor": "#41474b",
+        "shopColor": "#34454a",
+        "floors": 4,
+        "bays": 3,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "flat",
+        "groundFloor": "shopfront",
+        "windowShape": "sash",
+        "sign": "VIET FOOD"
+      },
+      "sourceUrls": [
+        "https://chinatown.co.uk/en/restaurant/viet-food/",
+        "https://www.openstreetmap.org/way/993516028"
+      ],
+      "verifiedFeatures": [
+        "Operator/district listing confirms 34–36 Wardour Street.",
+        "OSM records brick, four levels and grey roof."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Window geometry and pale finish are artistic approximations; not a measured or photo-matched facade."
+    },
+    "way/993439410": {
+      "osmId": "way/993439410",
+      "name": "Golden Gate Cake Shop",
+      "osmName": "金門餅家 Golden Gate Cake Shop",
+      "confidence": "inferred",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1311396,
+        51.511963
+      ],
+      "distanceToRouteMeters": 18.6,
+      "facadeBearing": 243.4,
+      "facadeBearingEvidence": "Estimated normal towards nearest Macclesfield Street road segment; not survey-measured.",
+      "facade": {
+        "style": "georgian-brick",
+        "wallColor": "#9e8263",
+        "accentColor": "#dfd3bd",
+        "roofColor": "#41474b",
+        "shopColor": "#922f32",
+        "floors": 4,
+        "bays": 3,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "flat",
+        "groundFloor": "shopfront",
+        "windowShape": "sash"
+      },
+      "sourceUrls": [
+        "https://www.openstreetmap.org/way/993439410"
+      ],
+      "verifiedFeatures": [
+        "OSM identifies this footprint as Golden Gate Cake Shop and records four levels."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Do not render tenant signage until a current address/photo is cross-checked. OSM identity alone is not proof of current facade."
+    },
+    "way/901384876": {
+      "osmId": "way/901384876",
+      "name": "Soho Telephone Exchange",
+      "osmName": "Soho Telephone Exchange",
+      "confidence": "inferred",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1310743,
+        51.5115628
+      ],
+      "distanceToRouteMeters": 23.4,
+      "facadeBearing": 328.6,
+      "facadeBearingEvidence": "Estimated normal towards nearest Gerrard Street road segment; not survey-measured.",
+      "facade": {
+        "style": "georgian-brick",
+        "wallColor": "#eae1c5",
+        "accentColor": "#d2b990",
+        "roofColor": "#41474b",
+        "shopColor": "#786f5d",
+        "floors": 5,
+        "bays": null,
+        "bayWidth": 2.6,
+        "cornice": true,
+        "roof": "flat",
+        "groundFloor": "residential",
+        "windowShape": "casement"
+      },
+      "sourceUrls": [
+        "https://www.openstreetmap.org/way/901384876"
+      ],
+      "verifiedFeatures": [
+        "OSM records five levels, brick material, wall colour #eae1c5 and grey roof."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Do not add Chinese restaurant storefronts to this service building. Exact opening layout still unverified."
+    },
+    "way/81459092": {
+      "osmId": "way/81459092",
+      "name": "Shaftesbury Theatre",
+      "osmName": "Shaftesbury Theatre",
+      "confidence": "inferred",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.125907,
+        51.5161397
+      ],
+      "distanceToRouteMeters": 28.0,
+      "facadeBearing": 307.6,
+      "facadeBearingEvidence": "Estimated normal towards nearest Shaftesbury Avenue road segment; not survey-measured.",
+      "facade": {
+        "style": "theatre",
+        "wallColor": "#ad6a4b",
+        "accentColor": "#d6c2a0",
+        "roofColor": "#41474b",
+        "shopColor": "#37414b",
+        "floors": 4,
+        "bays": 5,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "gabled",
+        "groundFloor": "shopfront",
+        "windowShape": "arched",
+        "sign": "SHAFTESBURY THEATRE"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1378647"
+      ],
+      "verifiedFeatures": [
+        "Listed theatre at the Shaftesbury Avenue and High Holborn corner.",
+        "OSM footprint and four levels verified."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "The profile is an architectural study; detailed corner composition should be modeled separately after photo review."
+    },
+    "way/97237916": {
+      "osmId": "way/97237916",
+      "name": "Princess Louise",
+      "osmName": "Princess Louise",
+      "confidence": "inferred",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1215583,
+        51.5172905
+      ],
+      "distanceToRouteMeters": 14.8,
+      "facadeBearing": 346.9,
+      "facadeBearingEvidence": "Estimated normal towards nearest High Holborn road segment; not survey-measured.",
+      "facade": {
+        "style": "georgian-brick",
+        "wallColor": "#b5a16f",
+        "accentColor": "#e0d2b7",
+        "roofColor": "#41474b",
+        "shopColor": "#553427",
+        "floors": 4,
+        "bays": 4,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "flat",
+        "groundFloor": "shopfront",
+        "windowShape": "sash",
+        "sign": "PRINCESS LOUISE"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1378884"
+      ],
+      "verifiedFeatures": [
+        "Historic England confirms yellow brick with stone dressings and address 208–209 High Holborn."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Ground-floor pub detailing is simplified. Upper bay count and precise sign appearance remain unverified."
+    },
+    "way/99952220": {
+      "osmId": "way/99952220",
+      "name": "One Aldwych",
+      "osmName": "One Aldwych",
+      "confidence": "inferred",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1193107,
+        51.5117584
+      ],
+      "distanceToRouteMeters": 28.9,
+      "facadeBearing": 233.1,
+      "facadeBearingEvidence": "Estimated normal towards nearest Wellington Street road segment; not survey-measured.",
+      "facade": {
+        "style": "edwardian-stone",
+        "wallColor": "#d0c6b4",
+        "accentColor": "#e7ddca",
+        "roofColor": "#41474b",
+        "shopColor": "#314345",
+        "floors": 6,
+        "bays": null,
+        "bayWidth": 3.4,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "rusticated",
+        "windowShape": "sash"
+      },
+      "sourceUrls": [
+        "https://www.onealdwych.com/inside-one-aldwych/history",
+        "https://www.onealdwych.com/article/gallery-menu"
+      ],
+      "verifiedFeatures": [
+        "Hotel owner identifies the 1905–1907 Morning Post building by Mewès & Davis.",
+        "Standalone triangular plan; original dome was removed during later alterations."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ],
+      "notes": "Do not restore the lost historic dome. Current roof and exact bay details are still approximate."
+    },
+    "way/484870412": {
+      "osmId": "way/484870412",
+      "name": "The Waldorf Hotel",
+      "osmName": "The Waldorf Hilton, London",
+      "confidence": "verified-features",
+      "coordinateSource": "assets/london-map.json",
+      "centroid": [
+        -0.1190851,
+        51.5127417
+      ],
+      "distanceToRouteMeters": 43.7,
+      "facadeBearing": 120.3,
+      "facadeBearingEvidence": "Estimated normal towards nearest Aldwych road segment; not survey-measured.",
+      "facade": {
+        "style": "edwardian-stone",
+        "wallColor": "#d8cdb9",
+        "accentColor": "#ede1cf",
+        "roofColor": "#41474b",
+        "shopColor": "#294139",
+        "floors": 7,
+        "bays": 15,
+        "bayWidth": 3.0,
+        "cornice": true,
+        "roof": "mansard",
+        "groundFloor": "rusticated",
+        "windowShape": "sash",
+        "bayGroups": [
+          3,
+          9,
+          3
+        ],
+        "sign": "THE WALDORF"
+      },
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1357167"
+      ],
+      "verifiedFeatures": [
+        "Portland-stone facade following Aldwych curve, fifteen windows wide.",
+        "Seven floors and a steep slate mansard with two tiers of dormers."
+      ],
+      "inferredFeatures": [
+        "Exact colours, heights where absent from OSM, window dimensions, secondary elevations and simplified ornamental geometry are artistic approximations."
+      ]
+    }
+  },
+  "streetProfiles": [
+    {
+      "id": "mall-ceremonial",
+      "label": "The Mall / Carlton House Terrace",
+      "bbox": [
+        -0.141,
+        51.503,
+        -0.1275,
+        51.5072
+      ],
+      "streetNames": [
+        "The Mall",
+        "Carlton House Terrace"
+      ],
+      "facade": {
+        "style": "retail-stucco",
+        "wallColor": "#dfd8c8",
+        "accentColor": "#f0e9dc",
+        "roofColor": "#515453",
+        "floors": 4,
+        "roof": "hipped",
+        "groundFloor": "residential",
+        "windowShape": "sash",
+        "bayWidth": 3.4,
+        "cornice": true
+      },
+      "palette": [
+        "#ddd7c9",
+        "#e9e3d7",
+        "#d2c9b5"
+      ],
+      "confidence": "inferred",
+      "notes": "Street-level fallback only. Not evidence for any individual building; do not attach named signs or claim exact reconstruction.",
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1209780"
+      ]
+    },
+    {
+      "id": "haymarket-piccadilly",
+      "label": "Haymarket / Piccadilly Circus",
+      "bbox": [
+        -0.1365,
+        51.5071,
+        -0.13,
+        51.5111
+      ],
+      "streetNames": [
+        "Haymarket",
+        "Cockspur Street",
+        "Piccadilly",
+        "Coventry Street"
+      ],
+      "facade": {
+        "style": "edwardian-stone",
+        "wallColor": "#d7cdbb",
+        "accentColor": "#e8dfcf",
+        "roofColor": "#464b4c",
+        "floors": 5,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "sash",
+        "bayWidth": 3.1,
+        "cornice": true
+      },
+      "palette": [
+        "#d4c7b3",
+        "#ddd4c3",
+        "#c7baa6"
+      ],
+      "confidence": "inferred",
+      "notes": "Street-level fallback only. Not evidence for any individual building; do not attach named signs or claim exact reconstruction.",
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1066641",
+        "https://historicengland.org.uk/listing/the-list/list-entry/1265753"
+      ]
+    },
+    {
+      "id": "chinatown",
+      "label": "Gerrard Street / Wardour Street / Macclesfield Street",
+      "bbox": [
+        -0.1328,
+        51.5109,
+        -0.1305,
+        51.51235
+      ],
+      "streetNames": [
+        "Gerrard Street",
+        "Wardour Street",
+        "Macclesfield Street"
+      ],
+      "facade": {
+        "style": "georgian-brick",
+        "wallColor": "#9d8060",
+        "accentColor": "#ded1b8",
+        "roofColor": "#494c4f",
+        "shopColor": "#75332d",
+        "floors": 4,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "sash",
+        "bayWidth": 2.4,
+        "cornice": true
+      },
+      "palette": [
+        "#8e6a4f",
+        "#a08968",
+        "#b39874",
+        "#c0b69b",
+        "#d5c9b1"
+      ],
+      "confidence": "inferred",
+      "notes": "Street-level fallback only. Not evidence for any individual building; do not attach named signs or claim exact reconstruction.",
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1212803",
+        "https://historicengland.org.uk/listing/the-list/list-entry/1357046",
+        "https://historicengland.org.uk/listing/the-list/list-entry/1289414"
+      ]
+    },
+    {
+      "id": "west-end-theatres",
+      "label": "Shaftesbury Avenue / Cambridge Circus",
+      "bbox": [
+        -0.135,
+        51.511,
+        -0.128,
+        51.5142
+      ],
+      "streetNames": [
+        "Shaftesbury Avenue",
+        "Charing Cross Road"
+      ],
+      "facade": {
+        "style": "victorian-redbrick",
+        "wallColor": "#9a624e",
+        "accentColor": "#d5c3a4",
+        "roofColor": "#41474b",
+        "shopColor": "#303e40",
+        "floors": 5,
+        "roof": "mansard",
+        "groundFloor": "shopfront",
+        "windowShape": "sash",
+        "bayWidth": 2.8,
+        "cornice": true
+      },
+      "palette": [
+        "#9b644e",
+        "#aa7a60",
+        "#b9a083",
+        "#c6baa1"
+      ],
+      "confidence": "inferred",
+      "notes": "Street-level fallback only. Not evidence for any individual building; do not attach named signs or claim exact reconstruction.",
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1264706",
+        "https://historicengland.org.uk/listing/the-list/list-entry/1066339"
+      ]
+    },
+    {
+      "id": "holborn-kingsway",
+      "label": "High Holborn / Kingsway",
+      "bbox": [
+        -0.129,
+        51.5136,
+        -0.1185,
+        51.5178
+      ],
+      "streetNames": [
+        "High Holborn",
+        "Kingsway"
+      ],
+      "facade": {
+        "style": "edwardian-stone",
+        "wallColor": "#bbb29f",
+        "accentColor": "#dbd0bb",
+        "roofColor": "#4b5052",
+        "shopColor": "#3d4140",
+        "floors": 6,
+        "roof": "flat",
+        "groundFloor": "shopfront",
+        "windowShape": "casement",
+        "bayWidth": 3.0,
+        "cornice": true
+      },
+      "palette": [
+        "#b9af9d",
+        "#c8bfae",
+        "#d1c7b3",
+        "#a79b8b"
+      ],
+      "confidence": "inferred",
+      "notes": "Street-level fallback only. Not evidence for any individual building; do not attach named signs or claim exact reconstruction.",
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1378884"
+      ]
+    },
+    {
+      "id": "aldwych-strand",
+      "label": "Aldwych / Strand",
+      "bbox": [
+        -0.123,
+        51.51,
+        -0.114,
+        51.514
+      ],
+      "streetNames": [
+        "Aldwych",
+        "Strand",
+        "Wellington Street"
+      ],
+      "facade": {
+        "style": "edwardian-stone",
+        "wallColor": "#d2c9b8",
+        "accentColor": "#e4daca",
+        "roofColor": "#535b5d",
+        "shopColor": "#3c4d48",
+        "floors": 6,
+        "roof": "mansard",
+        "groundFloor": "rusticated",
+        "windowShape": "sash",
+        "bayWidth": 3.3,
+        "cornice": true
+      },
+      "palette": [
+        "#cfc4af",
+        "#ded5c3",
+        "#bdb39f"
+      ],
+      "confidence": "inferred",
+      "notes": "Street-level fallback only. Not evidence for any individual building; do not attach named signs or claim exact reconstruction.",
+      "sourceUrls": [
+        "https://historicengland.org.uk/listing/the-list/list-entry/1357167"
+      ]
+    }
+  ]
+}

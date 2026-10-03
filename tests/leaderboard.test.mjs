@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LEADERBOARD_VERSION, LEADERBOARD_LIMIT, normalizeName,
+import { LEADERBOARD_VERSION, LEADERBOARD_LIMIT, LEADERBOARD_CITIES, normalizeCity, normalizeName,
   normalizeEntries, qualifyingRank, insertRecord } from '../leaderboard.js';
 
 const record = (id, timeMs, options = {}) => ({ id, timeMs, name: `车手${id}`,
-  laps: 3, playerId: 1, mode: 'local', createdAt: 1000, ...options });
+  laps: 3, city: 'coast', playerId: 1, mode: 'local', createdAt: 1000, ...options });
 const result = (timeMs, options = {}) => ({ timeMs, laps: 3, playerId: 1,
   mode: 'local', finished: true, ...options });
 const five = () => [100000, 110000, 120000, 130000, 140000].map((time, index) => record(String(index), time));
@@ -125,4 +125,48 @@ test('inserting into one lap category preserves the other category exactly', () 
   const inserted = insertRecord([...five(), ...other], record('new', 90000));
   assert.deepEqual(normalizeEntries(inserted, 5), other);
   assert.equal(normalizeEntries(inserted, 3)[0].id, 'new');
+});
+
+test('legacy records belong only to coast and city values are strictly validated', () => {
+  assert.deepEqual(LEADERBOARD_CITIES, ['coast', 'london']);
+  assert.equal(normalizeCity(undefined), 'coast');
+  assert.equal(normalizeCity('london'), 'london');
+  for (const value of [null, '', 'London', 'unknown', 1, {}, []]) {
+    assert.equal(normalizeCity(value), null);
+    assert.equal(qualifyingRank([], result(130000, { city: value })), null);
+    assert.deepEqual(normalizeEntries([record('bad', 130000, { city: value })]), []);
+  }
+  const legacy = record('legacy', 130000); delete legacy.city;
+  assert.equal(normalizeEntries([legacy], 3)[0].city, 'coast');
+  assert.deepEqual(normalizeEntries([legacy], 3, 'london'), []);
+  assert.equal('city' in legacy, false, 'normalizing old records does not mutate them');
+  assert.deepEqual(normalizeEntries([legacy], 3, 'unknown'), []);
+});
+
+test('each city and lap count gets its own top five and qualifications never compare cities', () => {
+  const entries = [];
+  for (const city of LEADERBOARD_CITIES) for (const laps of [3, 5]) {
+    for (let i = 0; i < 7; i++) entries.push(record(`${city}-${laps}-${i}`,
+      (city === 'coast' ? 100000 : 350000) + i * 1000 + laps * 1000, { city, laps }));
+  }
+  for (const city of LEADERBOARD_CITIES) for (const laps of [3, 5]) {
+    const ranked = normalizeEntries(entries, laps, city);
+    assert.equal(ranked.length, 5);
+    assert.ok(ranked.every(entry => entry.city === city && entry.laps === laps));
+  }
+  assert.equal(qualifyingRank(entries, result(352000, { city: 'london' })), 1);
+  assert.equal(qualifyingRank(entries, result(352000, { city: 'coast' })), null);
+  assert.ok(normalizeEntries(entries).every(entry => entry.city === 'coast'));
+});
+
+test('inserting in London preserves both coast boards and the other London lap board', () => {
+  const coast = [...five(), ...five().map(entry => ({ ...entry, laps: 5 }))];
+  const londonFive = five().map(entry => ({ ...entry, city: 'london', laps: 5, timeMs: entry.timeMs * 3 }));
+  const inserted = insertRecord([...coast, ...londonFive], record('london-new', 350000, { city: 'london' }));
+  assert.deepEqual(normalizeEntries(inserted), coast);
+  assert.deepEqual(normalizeEntries(inserted, 5, 'london'), londonFive);
+  assert.equal(normalizeEntries(inserted, 3, 'london')[0].id, 'london-new');
+  assert.equal(inserted.length, 16);
+  const retry = insertRecord(inserted, record('london-new', 300000, { city: 'london' }));
+  assert.deepEqual(retry, inserted, 'same city/lap/ID remains idempotent');
 });

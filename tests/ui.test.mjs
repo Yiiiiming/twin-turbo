@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { TRACK, trackPoint, projectTrack, mod } from '../engine.js';
+import { RaceAI } from '../ai.js';
 import { LEADERBOARD_VERSION } from '../leaderboard.js';
 
 const sourceURL = new URL('../main.js', import.meta.url);
@@ -152,7 +153,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl } = {}) {
   const window = new MockTarget(); window.devicePixelRatio = 1;
   let clock = 0;
   const frames = [], delayed = [];
-  const globals = { document, window, Element: MockNode, HTMLElement: MockNode,
+  const globals = { document, window, location: {search:'?city=coast'}, Element: MockNode, HTMLElement: MockNode,
     fetch: async (url, options) => {
       requests.push({ url, ...options });
       if (fetchImpl) return fetchImpl(url, options);
@@ -196,6 +197,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl } = {}) {
   const source = (await readFile(sourceURL, 'utf8'))
     .replace("from './engine.js'", `from '${engineURL.href}'`)
     .replace("from './renderer.js'", `from '${rendererURL}'`)
+    .replace("from './city-renderer.js'", `from '${new URL('../city-renderer.js', import.meta.url).href}'`)
     .replace("from './ai.js'", `from '${new URL('../ai.js', import.meta.url).href}'`)
     .replace("from './leaderboard-client.js'", `from '${new URL('../leaderboard-client.js', import.meta.url).href}'`);
   // Load shipped application source unmodified except dependency resolution and
@@ -421,9 +423,11 @@ test('a qualified human result opens safe nickname input without triggering race
   const ui = await loadUI(t, { fetchImpl: async (url) => ({ ok: true, status: 200,
     json: async () => url.includes('/api/qualify') ? { rank: 1, entries: [] }
       : { version: LEADERBOARD_VERSION, laps: 3, entries: [] } }) });
+  ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
   ui.click('start'); ui.advance(3.1);
   const winner = ui.engine.cars[0];
   Object.assign(winner, { finished: true, lap: 3, finishTime: 120.125, bestLap: 39.8 });
+  Object.assign(ui.engine.cars[1], { finished: true, lap: 3, finishTime: 130.2, bestLap: 42.1 });
   ui.engine.winner = winner; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
   assert.equal(ui.nodes.get('record-dialog').open, true);
   assert.equal(ui.document.activeElement.id, 'record-name');
@@ -441,29 +445,89 @@ test('a qualified human result opens safe nickname input without triggering race
   assert.equal(ui.requests.filter(request => request.url.includes('/api/records')).length, 0);
 });
 
-test('an AI victory never qualifies or offers to save an AI record', async t => {
+test('an AI victory lets the human finish, then only qualifies the human record', async t => {
   const ui = await loadUI(t);
   ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
   ui.click('start'); ui.advance(3.1);
   const winner = ui.engine.cars[1];
   Object.assign(winner, { finished: true, lap: 3, finishTime: 139, bestLap: 46 });
-  ui.engine.winner = winner; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
+  ui.engine.winner = winner; ui.engine.time = 139; ui.frame(); await ui.flush();
+  assert.equal(ui.engine.state, 'racing');
   assert.equal(ui.nodes.get('record-dialog').open, false);
   assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 0);
-  assert.match(ui.nodes.get('record-result-status').textContent, /AI 不参与/);
+  assert.equal(ui.nodes.get('finisher2').classList.contains('hidden'), false);
+  ui.key('KeyW'); ui.advance(.3);
+  assert.ok(ui.engine.cars[0].speed > 0);
+  Object.assign(ui.engine.cars[0], { finished: true, lap: 3, finishTime: 143.8, bestLap: 46.5 });
+  ui.engine.state = 'finished'; ui.frame(); await ui.flush();
+  const qualifies = ui.requests.filter(request => request.url.includes('/api/qualify'));
+  assert.equal(qualifies.length, 1);
+  assert.equal(JSON.parse(qualifies[0].body).playerId, 1);
+  assert.equal(ui.nodes.get('winner-name').textContent, 'AI · 橙色风暴获胜！');
+  assert.equal(ui.nodes.get('result-driver2').textContent, '青色闪电');
 });
 
-test('a player 2 winner is the submitted finisher even when player 1 crosses in the same step', async t => {
+test('both human finishers are considered in finish order even when player 2 wins', async t => {
   const ui = await loadUI(t);
   ui.click('start'); ui.advance(3.1);
   Object.assign(ui.engine.cars[0], { finished: true, lap: 3, finishTime: 120.2, bestLap: 40 });
   Object.assign(ui.engine.cars[1], { finished: true, lap: 3, finishTime: 120.1, bestLap: 39.9 });
   ui.engine.winner = ui.engine.cars[1]; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
   const qualifies = ui.requests.filter(request => request.url.includes('/api/qualify'));
-  assert.equal(qualifies.length, 1);
+  assert.equal(qualifies.length, 2);
   const result = JSON.parse(qualifies[0].body);
   assert.equal(result.playerId, 2); assert.equal(result.timeMs, 120100);
+  const second = JSON.parse(qualifies[1].body);
+  assert.equal(second.playerId, 1); assert.equal(second.timeMs, 120200);
   assert.equal(ui.nodes.get('winner-name').textContent, '橙色风暴获胜！');
+  assert.equal(ui.nodes.get('result-driver1').textContent, '橙色风暴');
+  assert.equal(ui.nodes.get('result-driver2').textContent, '青色闪电');
+  assert.equal(ui.nodes.get('finish-time').textContent, '02:00.10');
+  assert.equal(ui.nodes.get('finish-time2').textContent, '02:00.20');
+  assert.equal(ui.nodes.get('best-lap2').textContent, '00:40.00');
+  assert.equal(ui.nodes.get('finisher1').classList.contains('hidden'), true);
+  assert.equal(ui.nodes.get('finisher2').classList.contains('hidden'), true);
+  ui.frame(); await ui.flush();
+  assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 2);
+});
+
+test('the first finisher waits without interrupting the other player or opening the nickname dialog', async t => {
+  const ui = await loadUI(t, { fetchImpl: async url => ({ ok: true, status: 200,
+    json: async () => url.includes('/api/qualify') ? { rank: 1, entries: [] }
+      : { version: LEADERBOARD_VERSION, laps: 3, entries: [] } }) });
+  ui.click('start'); ui.advance(3.1);
+  const first = ui.engine.cars[0];
+  Object.assign(first, { finished: true, lap: 3, finishTime: 120.125, bestLap: 39.8, speed: 0 });
+  ui.engine.winner = first; ui.engine.time = 120.125;
+  ui.key('ArrowUp'); ui.key('Enter'); ui.advance(.3); await ui.flush();
+  assert.equal(ui.engine.state, 'racing');
+  assert.ok(ui.engine.time > first.finishTime);
+  assert.ok(ui.engine.cars[1].speed > 0);
+  assert.equal(ui.keys.has('ArrowUp'), true);
+  assert.equal(ui.nodes.get('result').classList.contains('hidden'), true);
+  assert.equal(ui.nodes.get('record-dialog').open, false);
+  assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 0);
+  assert.equal(ui.nodes.get('finisher1').classList.contains('hidden'), false);
+  assert.equal(ui.nodes.get('finisher2').classList.contains('hidden'), true);
+  assert.equal(ui.nodes.get('finisher-place1').textContent, '第 1 名 · 已完赛');
+  assert.equal(ui.nodes.get('finisher-time1').textContent, '02:00.13');
+  assert.equal(ui.nodes.get('race-status').textContent, '等待另一位完赛');
+  const resets = ui.renderer.resetCalls.length;
+  ui.key('KeyQ'); ui.frame();
+  assert.equal(ui.renderer.resetCalls.length, resets, 'a finished car cannot reset the camera or show a rescue penalty');
+  ui.key('Escape'); ui.frame();
+  const pausedAt = ui.engine.time;
+  assert.equal(ui.engine.state, 'paused');
+  ui.advance(.1); assert.equal(ui.engine.time, pausedAt);
+  ui.click('resume'); ui.key('ArrowUp'); ui.advance(.1);
+  assert.equal(ui.engine.state, 'racing');
+  assert.ok(ui.engine.time > pausedAt);
+  assert.equal(first.finishTime, 120.125);
+  assert.equal(ui.nodes.get('finisher1').classList.contains('hidden'), false);
+  ui.click('restart'); ui.frame();
+  assert.equal(ui.engine.state, 'countdown');
+  assert.equal(ui.nodes.get('finisher1').classList.contains('hidden'), true);
+  assert.equal(ui.engine.winner, null);
 });
 
 test('modified browser shortcuts are preserved and sound toggle reports its state', async t => {
@@ -537,9 +601,10 @@ test('a complete real-control race renders results and again/menu actions reset 
   const ui = await loadUI(t);
   ui.click('start'); ui.advance(3.1);
   const steering = new Set();
+  const opponent = new RaceAI();
   for (let frame = 0; frame < 60 * 240 && ui.engine.state !== 'finished'; frame++) {
     const car = ui.engine.cars[0], projection = projectTrack(car.x, car.y);
-    const lane = 24;
+    const lane = -24;
     const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, lane);
     const error = mod(Math.atan2(target.y - car.y, target.x - car.x) - car.angle + Math.PI, Math.PI * 2) - Math.PI;
     let safeSpeed = 517, straightAhead = true;
@@ -555,10 +620,15 @@ test('a complete real-control race renders results and again/menu actions reset 
     if (error > .025) { ui.key('KeyD'); steering.add('right'); } else ui.keyup('KeyD');
     if (error < -.025) { ui.key('KeyA'); steering.add('left'); } else ui.keyup('KeyA');
     if (straightAhead && Math.abs(error) < .12 && car.boost > 25) ui.key('ShiftLeft'); else ui.keyup('ShiftLeft');
+    const opponentKeys = opponent.update(ui.engine, 1 / 60);
+    for (const code of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter']) {
+      if (opponentKeys.has(code)) ui.key(code); else ui.keyup(code);
+    }
     ui.frame();
   }
   assert.equal(ui.engine.state, 'finished');
   assert.equal(ui.engine.winner.id, 1); assert.equal(ui.engine.winner.lap, 3);
+  assert.ok(ui.engine.cars.every(car => car.finished));
   assert.deepEqual([...steering].sort(), ['left', 'right']);
   assert.equal(ui.nodes.get('result').classList.contains('hidden'), false);
   assert.equal(ui.nodes.get('winner-name').textContent, '青色闪电获胜！');
@@ -567,6 +637,9 @@ test('a complete real-control race renders results and again/menu actions reset 
   const [minutes, seconds] = displayedTime.split(':').map(Number);
   assert.ok(Math.abs(minutes * 60 + seconds - ui.engine.winner.finishTime) <= .0051);
   assert.notEqual(ui.nodes.get('best-lap').textContent, '—');
+  assert.notEqual(ui.nodes.get('best-lap2').textContent, '—');
+  assert.equal(ui.nodes.get('result-driver2').textContent, '橙色风暴');
+  assert.notEqual(ui.nodes.get('finish-time').textContent, ui.nodes.get('finish-time2').textContent);
   assert.equal(ui.keys.size, 0);
   ui.click('again'); ui.frame();
   assert.equal(ui.engine.state, 'countdown'); assert.equal(ui.engine.winner, null);

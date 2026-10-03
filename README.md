@@ -2,11 +2,21 @@
 
 两个人共用一块键盘，或选择单人挑战 AI。左右各占半屏，中间固定分界线，各自使用低位斜后方 3D 跟车镜头。
 
+## 伦敦手工建模版（2026-10-03）
+
+已按用户要求采用完全免费的手工建模路线，不需要地图 API 账户或付费实景服务。伦敦使用手工建筑与开放路网，后续分批细化。
+
+使用开放地图的真实道路和建筑轮廓，逐栋查阅 Historic England 与建筑官方资料制作外观。首批建筑档案见 `assets/london-building-profiles.json`，来源与可信度见 `assets/london-building-sources.md`。已核实的开间、材料和屋顶特征与估算的颜色、尺寸明确区分；未知建筑的街区风格补全不能称为精确还原。
+
+游戏已加入双方完赛后结算、Esc 返回菜单、城市分榜和伦敦赛道。伦敦按真实路网组织，但弯角、赛道宽度和部分行驶方向按封闭比赛调整；没有实测高度的建筑和起伏仍为估计值，详见 `assets/london-map-sources.md`。
+
+`tools/london-scene-test.html` 提供逐处检查和道路碰撞扫描。比赛路线有独立青绿色边线；红白实体路障封闭非比赛支路，路口人行道按道路并集裁剪。
+
 ## 在线试玩
 
 [打开 TWIN TURBO](https://yiiiiming.github.io/mayi-shangshu/twin-turbo/)
 
-使用 GitHub Pages 发布，电脑浏览器直接打开。源码保存在独立的私有仓库 `Yiiiiming/twin-turbo`；网页发布在已有站点的 `twin-turbo/` 子目录。
+使用 GitHub Pages 发布，电脑浏览器直接打开。源码保存在独立的仓库 `Yiiiiming/twin-turbo`；网页发布在已有站点的 `twin-turbo/` 子目录。
 
 ## 赛道与风景
 
@@ -42,7 +52,7 @@ Esc 暂停 / 继续。空格可出发或暂停。离开游戏窗口会自动暂�
 
 双击 **Twin Turbo.html** 即可离线玩双人或 AI 对战，背景、逻辑和音效均包含在文件内；全站排行榜需要联网。浏览器需支持 WebGL。推荐使用有实体键盘的桌面电脑；部分键盘可能无法识别双方同时按下的全部按键。
 
-原生 JavaScript、WebGL、Canvas 2D HUD 和 Web Audio，无第三方运行依赖。
+原生 JavaScript、WebGL、Canvas 2D HUD 和 Web Audio。伦敦使用 Three.js、polygon-clipping 与整数几何库 Clipper，由 esbuild 打包。
 
 ```sh
 python3 -m http.server 8765 --bind 127.0.0.1
@@ -51,6 +61,7 @@ python3 -m http.server 8765 --bind 127.0.0.1
 访问 `http://127.0.0.1:8765`。构建网页及离线版本：
 
 ```sh
+pnpm install --frozen-lockfile
 python3 build.py
 node --test tests/*.test.mjs
 ```
@@ -68,4 +79,6 @@ node --test tests/*.test.mjs
 - `index.html` / `style.css`：中文界面和响应式布局。
 - `assets/`：生成的三组风景及提示词。
 - `tests/`：真实操控完成比赛、镜头数学与界面事件的回归验证。
-- `build.py`：网页部署版本和离线单文件的无依赖打包程序。
+- `build.py`：网页部署版本和离线单文件构建入口。
+- `city-frontages.js` / `city-landmarks.js`：街区立面及独立地标模型。
+- `city-roads.js` / `city-placement.js`：路口并集裁剪、支路封口与模型通行范围。

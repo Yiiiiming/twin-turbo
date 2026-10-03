@@ -1,5 +1,6 @@
 import { RaceEngine, TRACK, trackPoint, projectTrack, mod } from './engine.js';
 import { RaceRenderer, sceneWeights } from './renderer.js';
+import { CityRenderer } from './city-renderer.js';
 import { RaceAI } from './ai.js';
 import { LeaderboardClient } from './leaderboard-client.js';
 
@@ -8,12 +9,13 @@ const canvas = $('game');
 const hud = $('hud');
 const ctx = hud.getContext('2d');
 const engine = new RaceEngine();
-const renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
-engine.setObstacles(renderer.obstacles || []);
+let renderer;
+const renderers = {};
+let selectedCity = new URLSearchParams(globalThis.location?.search || '').get('city') === 'coast' ? 'coast' : 'london';
 const keys = new Set();
 const ai = new RaceAI();
 const leaderboard = new LeaderboardClient({ document, onOpen: () => keys.clear() });
-void leaderboard.init();
+
 const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
 let selectedLaps = 3, selectedMode = 'local', raceMode = 'local', lastAIRescues = 0;
@@ -41,15 +43,16 @@ function drawMiniMap(c, x, y, playerId) {
   c.save(); c.translate(x, y);
   rounded(c, -8, -9, 162, 108, 8, '#101b25d9');
   const scale = Math.min(144 / TRACK.width, 87 / TRACK.height);
+  const cityScale = TRACK.id === 'london' ? 2.7 : 1;
   c.translate((146 - TRACK.width * scale) / 2, 0);
   c.scale(scale, scale);
   trackPath(c); c.strokeStyle = '#aec0cd33'; c.lineWidth = TRACK.roadWidth; c.stroke();
-  trackPath(c); c.strokeStyle = '#c1d4de99'; c.lineWidth = 22; c.stroke();
+  trackPath(c); c.strokeStyle = '#c1d4de99'; c.lineWidth = 22 * cityScale; c.stroke();
   const a = trackPoint(TRACK.startDistance, -60), b = trackPoint(TRACK.startDistance, 60);
-  c.strokeStyle = '#f5ecc8'; c.lineWidth = 36;
+  c.strokeStyle = '#f5ecc8'; c.lineWidth = 36 * cityScale;
   c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
   for (const car of engine.cars) {
-    c.beginPath(); c.arc(car.x, car.y, car.id === playerId ? 48 : 35, 0, tau);
+    c.beginPath(); c.arc(car.x, car.y, (car.id === playerId ? 48 : 35) * cityScale, 0, tau);
     c.fillStyle = colors[car.id - 1]; c.fill();
     if (car.id === playerId) { c.lineWidth = 15; c.strokeStyle = '#ffffff'; c.stroke(); }
   }
@@ -68,22 +71,24 @@ function drawHUD(now) {
     }
     const p = projectTrack(car.x, car.y);
     const headingError = Math.abs(mod(car.angle - p.angle + Math.PI, tau) - Math.PI);
-    if (engine.state === 'racing' && !car.offroad && Math.abs(car.speed) > 50 && headingError > Math.PI * .65) {
+    if (engine.state === 'racing' && !car.finished && !car.offroad && Math.abs(car.speed) > 50 && headingError > Math.PI * .65) {
       rounded(ctx, x + 231, 76, 138, 29, 6, '#302715d9');
       ctx.fillStyle = '#ffd08b'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('↶  逆向行驶', x + 300, 95);
     }
-    if (engine.state === 'racing') {
+    if (engine.state === 'racing' && !car.finished) {
       const ahead = trackPoint(p.s + Math.max(110, Math.abs(car.speed) * .58));
       const curve = ahead.curvature || 0;
       let cue = '↑  直道 · 氮气时机';
       if (Math.abs(curve) > .0001) cue = curve > 0 ? '↱  前方右弯 · 松油减速' : '↰  前方左弯 · 松油减速';
+      if ((TRACK.sections || []).some(section => section.passage && p.s >= section.start - 280 && p.s <= section.end + 70)) cue = '⇥  窄拱门 · 居中减速通过';
       rounded(ctx, x + 20, 61, 178, 29, 5, '#14212abb');
       ctx.font = '10px sans-serif'; ctx.fillStyle = '#e4e8dc'; ctx.textAlign = 'left';
       ctx.fillText(cue, x + 30, 80);
     }
     const region = Object.entries(sceneWeights(car.x, car.y)).sort((a, b) => b[1] - a[1])[0][0];
-    const sceneName = {coast:'海岸港湾', alpine:'松林山谷', city:'霓虹城区'}[region];
+    const street = TRACK.streets?.find(street => p.s >= street.start && p.s < street.end);
+    const sceneName = TRACK.id === 'london' ? (street?.name || 'London') : {coast:'海岸港湾', alpine:'松林山谷', city:'霓虹城区'}[region];
     $('scene' + car.id).textContent = sceneName;
   }
   ctx.fillStyle = '#101921'; ctx.fillRect(597, 0, 6, 700);
@@ -108,31 +113,74 @@ function resize() {
   if (hud.width !== width || hud.height !== height) { hud.width = width; hud.height = height; }
 }
 new ResizeObserver(resize).observe(canvas);
-renderer.resetCameras(engine);
+function selectCity(city, initial = false) {
+  if (!initial && engine.state !== 'menu') return;
+  selectedCity = city === 'coast' ? 'coast' : 'london';
+  engine.selectTrack(selectedCity);
+  if (!renderers[selectedCity]) renderers[selectedCity] = selectedCity === 'london'
+    ? new CityRenderer($('city-game')) : new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
+  renderer = renderers[selectedCity]; engine.setObstacles(renderer.obstacles || []); renderer.resetCameras(engine);
+  ai.reset(); keys.clear(); const london = selectedCity === 'london';
+  canvas.classList.toggle('city-active', london); $('city-game').classList.toggle('hidden', !london);
+  document.body.classList.toggle('london-route', london);
+  $('track-english').textContent = london ? '01 / LONDON GRAND PRIX' : '02 / COASTLINE GRAND PRIX';
+  $('track-title').textContent = london ? '伦敦 · 王宫与泰晤士' : '海岸技术环线';
+  $('route-eyebrow').textContent = london ? 'A ROYAL START. A WEST END ENCORE.' : 'COAST. MOUNTAINS. NEON.';
+  $('route-title').textContent = london ? '下一站，伦敦。' : '沿着风景，一路较量。';
+  $('route-description').textContent = london ? '沿青绿色路沿，从白金汉宫穿过中国城与西区，经大本钟返回。一圈约 3 分钟。' : '一圈约 40–60 秒。长直道、连续 S 弯和发夹弯，穿越三种风景。';
+  $('city-detail').textContent = london ? '6.96 公里真实路网 · 从白金汉宫，跑进伦敦。' : '海岸技术环线 · 港湾、松林与城市';
+  $('london-guide').classList.toggle('hidden', !london); $('board-city').value = selectedCity;
+  document.querySelectorAll('[data-city]').forEach(button=>{const chosen=button.dataset.city===selectedCity;button.classList.toggle('selected',chosen);button.setAttribute('aria-pressed',String(chosen));});
+  if (leaderboard.setCity) void leaderboard.setCity(selectedCity);
+}
+selectCity(selectedCity, true);
+void leaderboard.init();
+document.querySelectorAll('[data-city]').forEach(button=>button.addEventListener('click',()=>selectCity(button.dataset.city)));
+$('board-city').addEventListener('change',()=>{if(leaderboard.setCity)void leaderboard.setCity($('board-city').value);});
 
 function updateUI(now) {
   $('timer').textContent=fmt(engine.time);
   const statuses={menu:'等待发车',countdown:'准备出发',racing:'比赛进行中',paused:'比赛已暂停',finished:'比赛结束'};
-  $('race-status').textContent=statuses[engine.state];
+  const finishers = engine.cars.filter(car => car.finished).sort((a, b) => a.finishTime - b.finishTime
+    || (a === engine.winner ? -1 : b === engine.winner ? 1 : a.id - b.id));
+  $('race-status').textContent=engine.state==='racing' && finishers.length ? '等待另一位完赛' : statuses[engine.state];
   for(const [i,car] of engine.cars.entries()) {
+    const place = finishers.indexOf(car) + 1;
     $('lap'+car.id).textContent=car.lap;
     $('boost'+car.id).style.width=car.boost+'%';$('boost-label'+car.id).textContent=Math.round(car.boost)+'%';
-    $('speed'+car.id).textContent=Math.round(Math.abs(car.speed)*.66);
-    $('offroad'+car.id).textContent=car.rescueCooldown>0?'返回赛道 · 罚停中':car.missedCheckpoint?`漏过检查点 · 按 ${i===0?'Q':'/'} 回赛道`:car.impact>.15?'碰撞 · 减速':car.offroad?'草地减速':car.boosting?'NITRO ON':'';
+    $('speed'+car.id).textContent=Math.round(Math.abs(car.speed)*(TRACK.unitsPerMeter ? 3.6/TRACK.unitsPerMeter : .66));
+    $('offroad'+car.id).textContent=car.finished?`第 ${place} 名 · 已完赛`:car.rescueCooldown>0?'返回赛道 · 罚停中':car.missedCheckpoint?`漏过检查点 · 按 ${i===0?'Q':'/'} 回赛道`:car.impact>.15?'碰撞 · 减速':car.offroad?'草地减速':car.boosting?'NITRO ON':'';
+    $('finisher'+car.id).classList.toggle('hidden', !car.finished || engine.state !== 'racing');
+    if (car.finished) {
+      $('finisher-place'+car.id).textContent=`第 ${place} 名 · 已完赛`;
+      $('finisher-time'+car.id).textContent=fmt(car.finishTime);
+    }
   }
   if(engine.state!==lastState){
+    document.querySelectorAll('[data-city]').forEach(button=>button.disabled=engine.state!=='menu');
     $('menu').classList.toggle('hidden',engine.state!=='menu');$('pause-panel').classList.toggle('hidden',engine.state!=='paused');$('result').classList.toggle('hidden',engine.state!=='finished');
     $('pause').disabled=!['racing','countdown','paused'].includes(engine.state);$('pause').innerHTML=engine.state==='paused'?'继续 <kbd>Esc</kbd>':'暂停 <kbd>Esc</kbd>';
     document.body.classList.toggle('racing',engine.state==='racing');
     $('arena-tag-text').textContent=engine.state==='racing'?'LIVE / CHASE CAM':'CHASE CAM / P1';
     if(engine.state==='racing' && lastState==='countdown'){goUntil=now+1;tone(880,.2,.08);}
     if(engine.state==='finished'){
-      const winner=engine.winner;$('winner-name').textContent=names[winner.id-1]+'获胜！';$('winner-name').style.color=colors[winner.id-1];$('result-subtitle').textContent=`PLAYER 0${winner.id} · 率先完成 ${engine.laps} 圈`;$('finish-time').textContent=fmt(winner.finishTime);$('best-lap').textContent=winner.bestLap===null?'—':fmt(winner.bestLap);keys.clear();tone(523,.2,.06);setTimeout(()=>tone(659,.2,.06),140);setTimeout(()=>tone(784,.35,.06),280);
-      const finisher = [winner, ...engine.cars].find(car => car?.finished === true
-        && Number.isFinite(car.finishTime) && !(raceMode === 'ai' && car.id === 2));
-      if (finisher) void leaderboard.considerResult({ finished: true, laps: engine.laps,
-        timeMs: Math.round(finisher.finishTime * 1000), playerId: finisher.id, mode: raceMode });
-      else $('record-result-status').textContent = 'AI 不参与全站排名。下一局争取率先冲线！';
+      const winner=engine.winner;
+      $('winner-name').textContent=names[winner.id-1]+'获胜！';
+      $('winner-name').style.color=colors[winner.id-1];
+      $('result-subtitle').textContent=`两位车手均已完成 ${engine.laps} 圈`;
+      finishers.forEach((car, index) => {
+        const suffix = index === 0 ? '' : '2';
+        $('result-driver'+(index+1)).textContent=names[car.id-1];
+        $('result-driver'+(index+1)).style.color=colors[car.id-1];
+        $('finish-time'+suffix).textContent=fmt(car.finishTime);
+        $('best-lap'+suffix).textContent=car.bestLap===null?'—':fmt(car.bestLap);
+      });
+      keys.clear();tone(523,.2,.06);setTimeout(()=>tone(659,.2,.06),140);setTimeout(()=>tone(784,.35,.06),280);
+      if (finishers.length === engine.cars.length) {
+        const results = finishers.filter(car => Number.isFinite(car.finishTime) && !(raceMode === 'ai' && car.id === 2))
+          .map(car => ({ finished: true, laps: engine.laps, timeMs: Math.round(car.finishTime * 1000), playerId: car.id, mode: raceMode, city: TRACK.id }));
+        void leaderboard.considerResults(results);
+      }
     }
     lastState=engine.state;
   }
@@ -153,10 +201,12 @@ function togglePause(){
   } else engine.pause();
   keys.clear();
 }
-function rescue(id){engine.rescue(id);renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
+function rescue(id){if(engine.cars[id-1].finished)return;engine.rescue(id);renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
 $('start').addEventListener('click',begin);$('again').addEventListener('click',begin);$('restart').addEventListener('click',begin);
 $('resume').addEventListener('click',()=>{keys.clear();engine.resume();canvas.focus({preventScroll:true});});$('pause').addEventListener('click',togglePause);
-$('back-menu').addEventListener('click',()=>{leaderboard.newRace();engine.reset();ai.reset();lastAIRescues=0;keys.clear();renderer.resetCameras(engine);});
+function returnToMenu(){leaderboard.newRace();engine.reset();ai.reset();lastAIRescues=0;keys.clear();renderer.resetCameras(engine);}
+$('back-menu').addEventListener('click',returnToMenu);
+$('pause-menu').addEventListener('click',returnToMenu);
 document.querySelectorAll('[data-laps]').forEach(button=>button.addEventListener('click',()=>{selectedLaps=Number(button.dataset.laps);document.querySelectorAll('[data-laps]').forEach(b=>{const selected=b===button;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});document.querySelectorAll('.total-laps').forEach(el=>el.textContent=selectedLaps);}));
 document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
   if (engine.state !== 'menu') return;
@@ -171,8 +221,8 @@ document.querySelectorAll('[data-mode]').forEach(button => button.addEventListen
   $('mode-description').textContent = solo ? '你驾驶青色赛车，用 WASD 挑战 AI。' : '与身边的朋友，共用一块键盘。';
   $('player2-controls').classList.toggle('hidden', solo); $('ai-control-note').classList.toggle('hidden', !solo);
   $('help-mode-description').textContent = solo
-    ? '你驾驶左侧青色赛车，使用 WASD、左 Shift 和 Q；右侧橙色赛车由 AI 驾驶。两车遵循相同物理和赛道规则，先完成全部圈数获胜。'
-    : '两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。沿路线箭头驾驶，先完成全部圈数的玩家获胜。';
+    ? '你驾驶左侧青色赛车，使用 WASD、左 Shift 和 Q；右侧橙色赛车由 AI 驾驶。两车遵循相同物理和赛道规则，先完成全部圈数获胜，双方完赛后结算。'
+    : '两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
   document.querySelectorAll('[data-mode]').forEach(item => {
     const selected = item.dataset.mode === selectedMode;
     item.classList.toggle('selected', selected); item.setAttribute('aria-pressed', String(selected));

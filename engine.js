@@ -1,4 +1,6 @@
 import { ObstacleWorld } from './collisions.js';
+import { roadSurface, createLondonTrack } from './tracks.js';
+import londonMap from './assets/london-map.json' with { type: 'json' };
 
 /** Pure, deterministic arcade simulation. Distances are pixels; time is seconds. */
 const TAU = Math.PI * 2;
@@ -45,24 +47,49 @@ addArc(920, 1210, 220, 0, Math.PI / 2);
 addLine(920, 1430, 700, 1430);
 const LENGTH = circuitLength;
 
-export const TRACK = Object.freeze({
+const COAST_TRACK = Object.freeze({
+  id: 'coast', name: '海岸技术环线', city: 'coast',
   width: 2500 * CIRCUIT_SCALE, height: 1650 * CIRCUIT_SCALE, roadWidth: 120,
   checkpointMargin: 40,
   length: LENGTH, startDistance: 0, checkpoints: CHECKPOINTS,
-  segments: Object.freeze(segments),
+  segments: Object.freeze(segments), sections: Object.freeze([]),
+  carRadius: 21, carCollisionDistance: 37, carHeight: 25,
 });
+
+export const TRACKS = { coast: COAST_TRACK, london: createLondonTrack(londonMap) };
+export let TRACK = COAST_TRACK;
+export function registerTrack(track) {
+  if (!track?.id || !(track.length > 0) || !Array.isArray(track.segments)) throw new TypeError('Invalid track.');
+  TRACKS[track.id] = track;
+  return track;
+}
+export function setTrack(cityId) {
+  if (!Object.hasOwn(TRACKS, cityId)) throw new RangeError(`Unknown circuit: ${cityId}`);
+  TRACK = TRACKS[cityId];
+  return TRACK;
+}
 
 export const mod = (value, divisor) => ((value % divisor) + divisor) % divisor;
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 const approach = (value, target, amount) => value < target
   ? Math.min(value + amount, target) : Math.max(value - amount, target);
-const signedDistance = (from, to) => mod(to - from + LENGTH / 2, LENGTH) - LENGTH / 2;
+const signedDistance = (from, to) => mod(to - from + TRACK.length / 2, TRACK.length) - TRACK.length / 2;
 
 /** A point and forward heading. Positive lane is to the driver's right. */
 export function trackPoint(distance, lane = 0) {
+  const { length: LENGTH, segments } = TRACK;
   const s = mod(distance, LENGTH);
-  const segment = segments.find(part => s < part.s + part.length) || segments.at(-1);
-  const along = s - segment.s;
+  let low = 0, high = segments.length - 1;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (s < segments[middle].s + segments[middle].length) high = middle;
+    else low = middle + 1;
+  }
+  const segment = segments[low];
+  return { ...segmentPoint(segment, s - segment.s, lane), s, ...roadSurface(TRACK, s) };
+}
+
+function segmentPoint(segment, along, lane = 0) {
   let x, y, angle, curvature = 0;
   if (segment.kind === 'line') {
     const fraction = along / segment.length;
@@ -77,11 +104,12 @@ export function trackPoint(distance, lane = 0) {
     curvature = segment.direction / segment.radius;
   }
   return { x: x - Math.sin(angle) * lane, y: y + Math.cos(angle) * lane,
-    angle, curvature, s };
+    angle, curvature };
 }
 
 /** Exact nearest point on the bounded lines/arcs, including both turn signs. */
-export function projectTrack(x, y) {
+export function projectTrack(x, y, referenceS = null) {
+  const { segments } = TRACK;
   let nearestS = 0, nearestSquared = Infinity;
   for (const segment of segments) {
     let along;
@@ -105,23 +133,30 @@ export function projectTrack(x, y) {
         along = startSquared <= endSquared ? 0 : segment.length;
       }
     }
-    const candidate = trackPoint(segment.s + along);
+    const candidate = segmentPoint(segment, along);
+    candidate.s = mod(segment.s + along, TRACK.length);
     const squared = (x - candidate.x) ** 2 + (y - candidate.y) ** 2;
-    if (squared < nearestSquared) {
-      nearestSquared = squared;
+    // Near a crossing or parallel street, retain the locally continuous road
+    // whenever both projections are plausible for the vehicle's own position.
+    const continuityPenalty = referenceS === null ? 0
+      : Math.abs(signedDistance(referenceS, candidate.s)) > Math.max(250, TRACK.roadWidth * 3)
+        ? TRACK.roadWidth ** 2 : 0;
+    if (squared + continuityPenalty < nearestSquared) {
+      nearestSquared = squared + continuityPenalty;
       nearestS = candidate.s;
     }
   }
   const p = trackPoint(nearestS);
-  return { ...p, distance: Math.sqrt(nearestSquared),
+  return { ...p, distance: Math.hypot(x - p.x, y - p.y),
     offset: -(x - p.x) * Math.sin(p.angle) + (y - p.y) * Math.cos(p.angle) };
 }
 
 function createCar(id) {
-  const lane = id === 1 ? 22 : -18;
+  const lane = id === 1 ? -18 : 22;
   const p = trackPoint(TRACK.startDistance - 30, lane);
   return {
     id, x: p.x, y: p.y, angle: p.angle, speed: 0,
+    elevation: p.elevation, slope: p.slope, height: TRACK.carHeight,
     boost: 100, boosting: false, lap: 0, progress: 0,
     lapTime: 0, bestLap: null, lastLap: null,
     offroad: false, steer: 0, lastSkid: false, impact: 0,
@@ -136,17 +171,23 @@ function createCar(id) {
 export class RaceEngine {
   constructor({ laps = 3, obstacles = [] } = {}) {
     this.laps = clamp(Math.round(laps) || 3, 1, 9);
-    this.obstacleWorld = new ObstacleWorld(obstacles);
+    this.obstacleWorld = new ObstacleWorld(obstacles, { carRadius: TRACK.carRadius });
     this.reset();
   }
 
   setObstacles(obstacles = []) {
-    this.obstacleWorld = new ObstacleWorld(obstacles);
+    this.obstacleWorld = new ObstacleWorld(obstacles, { carRadius: TRACK.carRadius });
     for (const car of this.cars) {
       this.obstacleWorld.resolveCar(car);
       this._contain(car);
     }
     return this;
+  }
+
+  selectTrack(cityId) {
+    setTrack(cityId);
+    this.obstacleWorld = new ObstacleWorld([], { carRadius: TRACK.carRadius });
+    return this.reset();
   }
 
   reset() {
@@ -156,7 +197,60 @@ export class RaceEngine {
     this.time = 0;
     this.winner = null;
     this._resumeState = null;
+    this.traffic = this._createTraffic();
+    this.trafficWorld = new ObstacleWorld([], { carRadius: TRACK.carRadius });
     return this;
+  }
+
+  _createTraffic() {
+    return (TRACK.trafficSections || []).map((section, index) => {
+      const span = mod(section.end - section.start, TRACK.length);
+      const s = mod(section.start + span * (.28 + index % 3 * .2), TRACK.length);
+      const lane = section.lane ?? TRACK.roadWidth * .3;
+      const p = trackPoint(s, lane);
+      return { id: `london-bus-${index + 1}`, x: p.x, y: p.y,
+        angle: p.angle + Math.PI, speed: 64, cruiseSpeed: 64,
+        elevation: p.elevation, slope: -p.slope, length: 66, width: 15, height: 25,
+        s, lane, routeStart: section.start, routeEnd: section.end, active: true, wait: 0 };
+    });
+  }
+
+  _moveTraffic(dt) {
+    for (const bus of this.traffic) {
+      if (!bus.active) {
+        bus.wait = Math.max(0, bus.wait - dt);
+        const spawn = trackPoint(bus.routeEnd, bus.lane);
+        if (bus.wait || this.cars.some(car => !car.finished && Math.hypot(car.x - spawn.x, car.y - spawn.y) < 450)) continue;
+        bus.s = mod(bus.routeEnd, TRACK.length); bus.active = true;
+      }
+      const current = trackPoint(bus.s, bus.lane), angle = current.angle + Math.PI;
+      let target = Math.min(bus.cruiseSpeed, Math.abs(current.curvature) > 1e-6 ? .9 / Math.abs(current.curvature) : Infinity);
+      let clearance = Infinity;
+      for (const car of this.cars) {
+        if (car.finished || car.elevation + car.height <= bus.elevation || bus.elevation + bus.height <= car.elevation) continue;
+        const dx = car.x - bus.x, dy = car.y - bus.y;
+        const ahead = dx * Math.cos(angle) + dy * Math.sin(angle);
+        const side = -dx * Math.sin(angle) + dy * Math.cos(angle);
+        if (ahead < 0 || Math.abs(side) > bus.width / 2 + TRACK.carRadius + 4) continue;
+        clearance = Math.min(clearance, ahead - bus.length / 2 - TRACK.carRadius - 2);
+      }
+      if (clearance < 90) target = Math.min(target, Math.max(0, clearance) * .8);
+      bus.speed = approach(bus.speed, target, dt * (target < bus.speed ? 190 : 35));
+      const movement = Math.max(0, Math.min(bus.speed * dt, clearance));
+      if (mod(bus.s - bus.routeStart, TRACK.length) <= movement) {
+        bus.active = false; bus.speed = 0; bus.wait = 5;
+        continue;
+      }
+      bus.s = mod(bus.s - movement, TRACK.length);
+      const p = trackPoint(bus.s, bus.lane);
+      bus.x = p.x; bus.y = p.y; bus.angle = p.angle + Math.PI;
+      bus.elevation = p.elevation; bus.slope = -p.slope;
+    }
+    this.trafficWorld = new ObstacleWorld(this.traffic.filter(bus => bus.active).map(bus => ({
+      id: bus.id, type: 'box', x: bus.x, y: bus.y,
+      halfWidth: bus.length / 2, halfDepth: bus.width / 2, angle: bus.angle,
+      minHeight: bus.elevation, maxHeight: bus.elevation + bus.height,
+    })), { carRadius: TRACK.carRadius });
   }
 
   start(laps = this.laps) {
@@ -188,6 +282,7 @@ export class RaceEngine {
     const s = car._started ? car._lastCheckpointS + 18 : TRACK.startDistance - 30;
     const p = trackPoint(s, car._lane);
     car.x = p.x; car.y = p.y; car.angle = p.angle;
+    car.elevation = p.elevation; car.slope = p.slope;
     car.speed = 0; car.boosting = false; car.steer = 0;
     car.rescueCooldown = 2;
     car.offroad = false; car.lastSkid = false; car.impact = 0;
@@ -218,25 +313,35 @@ export class RaceEngine {
 
   _simulate(dt, keys) {
     this.time += dt;
+    if (this.traffic.length) this._moveTraffic(dt);
     for (const car of this.cars) {
-      const previous = { x: car.x, y: car.y };
+      if (car.finished) continue;
+      const previous = { x: car.x, y: car.y, elevation: car.elevation };
       this._drive(car, dt, keys);
+      const surface = projectTrack(car.x, car.y, car._lastTrackS);
+      car.elevation = surface.elevation; car.slope = surface.slope;
       this.obstacleWorld.resolveCar(car, previous);
+      if (this.traffic.length) this.trafficWorld.resolveCar(car, previous);
       this._contain(car);
     }
     this._collide();
     for (const car of this.cars) {
+      if (car.finished) continue;
       // Another car must not shove this car through a building or barrier.
       this.obstacleWorld.resolveCar(car);
+      if (this.traffic.length) this.trafficWorld.resolveCar(car);
       this._contain(car);
       this._advance(car, dt);
     }
     const finishers = this.cars.filter(car => car.finished);
-    if (finishers.length) {
-      this.winner = finishers.sort((a, b) => a.finishTime - b.finishTime)[0];
-      this.time = this.winner.finishTime;
+    if (!this.winner && finishers.length) {
+      // Both cars can cross during one physics tick. Use their interpolated
+      // crossing times, not the order in which the cars were simulated.
+      this.winner = finishers.sort((a, b) => a.finishTime - b.finishTime || a.id - b.id)[0];
+    }
+    if (finishers.length === this.cars.length) {
+      this.time = Math.max(...finishers.map(car => car.finishTime));
       this.state = 'finished';
-      this.cars.forEach(car => { car.boosting = false; });
     }
   }
 
@@ -252,7 +357,8 @@ export class RaceEngine {
     const left = keys.has(p1 ? 'KeyA' : 'ArrowLeft');
     const right = keys.has(p1 ? 'KeyD' : 'ArrowRight');
     const boost = keys.has(p1 ? 'ShiftLeft' : 'Enter');
-    car.offroad = projectTrack(car.x, car.y).distance > TRACK.roadWidth / 2;
+    const surface = projectTrack(car.x, car.y, car._lastTrackS);
+    car.offroad = surface.distance > TRACK.roadWidth / 2;
     car.boosting = boost && forward && !reverse && car.boost > 0.5
       && car.speed > 40 && !car.offroad;
     car.boost = clamp(car.boost + (car.boosting ? -32 : 12) * dt, 0, 100);
@@ -267,6 +373,9 @@ export class RaceEngine {
       car.speed = approach(car.speed, 0, (car.offroad ? 145 : 62) * dt);
     }
     if (car.speed > maximum) car.speed = approach(car.speed, maximum, (car.offroad ? 620 : 250) * dt);
+    if (surface.slope && Math.abs(car.speed) > 1) {
+      car.speed -= surface.slope * Math.cos(car.angle - surface.angle) * 90 * dt;
+    }
     const steerTarget = Number(right) - Number(left);
     // Ease into a held key over 200 ms. Release/countersteer returns toward
     // center faster, so corrections do not leave a long steering tail.
@@ -278,7 +387,8 @@ export class RaceEngine {
     const speed = Math.abs(car.speed);
     const turnLimit = (2.18 - .36 * clamp(speed / 363, 0, 1))
       * (1 - .08 * clamp((speed - 363) / (517 - 363), 0, 1));
-    const turn = car.steer * turnLimit * (0.23 + grip * 0.77)
+    const steeringGrip = TRACK.id === 'coast' ? 0.23 + grip * 0.77 : 0.8 + grip * 0.2;
+    const turn = car.steer * turnLimit * steeringGrip
       * Math.min(Math.abs(car.speed) / 30, 1) * Math.sign(car.speed);
     car.angle = mod(car.angle + turn * dt + Math.PI, TAU) - Math.PI;
     car.x += Math.cos(car.angle) * car.speed * dt;
@@ -289,8 +399,9 @@ export class RaceEngine {
   }
 
   _contain(car) {
-    const clampedX = clamp(car.x, 23, TRACK.width - 23);
-    const clampedY = clamp(car.y, 23, TRACK.height - 23);
+    const margin = TRACK.carRadius + 2;
+    const clampedX = clamp(car.x, margin, TRACK.width - margin);
+    const clampedY = clamp(car.y, margin, TRACK.height - margin);
     if (clampedX !== car.x || clampedY !== car.y) {
       car.x = clampedX; car.y = clampedY;
       car.speed *= -0.18; car.impact = 1;
@@ -299,12 +410,16 @@ export class RaceEngine {
 
   _collide() {
     const [a, b] = this.cars;
+    // A completed car is no longer an active obstacle at the finish line.
+    if (a.finished || b.finished) return;
+    if (a.elevation + a.height <= b.elevation || b.elevation + b.height <= a.elevation) return;
     let dx = b.x - a.x, dy = b.y - a.y;
     const distance = Math.hypot(dx, dy);
-    if (distance >= 37) return;
+    const minimumDistance = TRACK.carCollisionDistance;
+    if (distance >= minimumDistance) return;
     if (distance < 1e-8) { dx = 1; dy = 0; }
     else { dx /= distance; dy /= distance; }
-    const shift = (37 - distance) * 0.5 + 0.001;
+    const shift = (minimumDistance - distance) * 0.5 + 0.001;
     a.x -= dx * shift; a.y -= dy * shift;
     b.x += dx * shift; b.y += dy * shift;
     const ah = Math.cos(a.angle) * dx + Math.sin(a.angle) * dy;
@@ -321,13 +436,15 @@ export class RaceEngine {
   }
 
   _advance(car, dt) {
-    const p = projectTrack(car.x, car.y);
+    const { length: LENGTH, checkpoints: CHECKPOINTS } = TRACK;
+    const p = projectTrack(car.x, car.y, car._lastTrackS);
+    car.elevation = p.elevation; car.slope = p.slope;
     const onRoad = p.distance <= TRACK.roadWidth / 2;
     const checkpointLimit = TRACK.roadWidth / 2 + TRACK.checkpointMargin;
     const checkpointEligible = p.distance <= checkpointLimit;
     const delta = signedDistance(car._lastTrackS, p.s);
     const displacement = Math.hypot(car.x - car._lastX, car.y - car._lastY);
-    const midpoint = projectTrack((car.x + car._lastX) / 2, (car.y + car._lastY) / 2);
+    const midpoint = projectTrack((car.x + car._lastX) / 2, (car.y + car._lastY) / 2, car._lastTrackS);
     // Short excursions onto the shoulder still pass invisible checkpoints.
     // Asphalt grip/slowdown stays strict, while both ends and the midpoint of
     // checkpoint movement must stay within the road plus its narrow runoff.
@@ -355,6 +472,8 @@ export class RaceEngine {
           if (car.lap >= this.laps) {
             car.finished = true;
             car.finishTime = crossingTime;
+            car.speed = 0; car.boosting = false; car.steer = 0;
+            car.lastSkid = false; car.impact = 0;
           }
         } else {
           car._nextCheckpoint += 1;
@@ -376,6 +495,7 @@ export class RaceEngine {
   }
 
   _updateProgress(car, s) {
+    const { length: LENGTH, checkpoints: CHECKPOINTS } = TRACK;
     if (!car._started) { car.progress = 0; return; }
     if (car.finished) { car.progress = 1; return; }
     const section = LENGTH / CHECKPOINTS;

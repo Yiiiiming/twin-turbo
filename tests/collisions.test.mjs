@@ -29,6 +29,23 @@ test('circle impacts stop penetration and slow an incoming car', () => {
   assert.equal(car.impact, 1);
 });
 
+test('height bounds permit travel under bridge decks and collide only with overlapping levels', () => {
+  const raised = { ...box(100, 100, 50, 20), minHeight: 40, maxHeight: 70 };
+  const world = new ObstacleWorld([raised]);
+  for (const elevation of [0, 70, 100]) {
+    const car = { ...carAt(100, 100), elevation, height: 9 };
+    assert.equal(world.resolveCar(car), 0); near(car.x, 100); near(car.y, 100);
+  }
+  for (const elevation of [32, 40, 65]) {
+    const car = { ...carAt(100, 100), elevation, height: 9 };
+    assert.equal(world.resolveCar(car), 1); assert.ok(isClear(car, raised));
+  }
+  const legacyWorld = new ObstacleWorld([box(100, 100, 50, 20)]);
+  assert.equal(legacyWorld.resolveCar({ ...carAt(100, 100), elevation: 500, height: 9 }), 1,
+    'old obstacles without vertical bounds keep their previous solid behavior');
+  assert.throws(() => new ObstacleWorld([{ ...raised, maxHeight: 40 }]), TypeError);
+});
+
 test('coincident centers are separated finitely, even without a previous position', () => {
   for (const obstacle of [circle(100, 100, 12), box(100, 100, 40, 10), box(100, 100, 40, 10, .7)]) {
     const world = new ObstacleWorld([obstacle]), car = carAt(100, 100, 0, 0);
@@ -188,7 +205,7 @@ test('actual scene obstacles resist a moving car at their physical ground footpr
 });
 
 test('RaceEngine injection survives restart and fixed substeps stop a real driven car', () => {
-  const spawn = trackPoint(TRACK.startDistance - 30, 22);
+  const spawn = trackPoint(TRACK.startDistance - 30, -18);
   const obstacle = box(spawn.x - 150, spawn.y, 3, 15);
   const engine = new RaceEngine({ laps: 1 }).setObstacles([obstacle]);
   const world = engine.obstacleWorld;
@@ -217,9 +234,9 @@ for (const player of [1, 2]) {
     for (const car of engine.cars) assert.ok(actualObstacles.every(obstacle => isClear(car, obstacle)));
     let impacts = 0, offroad = 0;
     const car = engine.cars[player - 1];
-    for (let frame = 0; frame < 60 * 180 && engine.state !== 'finished'; frame++) {
+    for (let frame = 0; frame < 60 * 180 && !car.finished; frame++) {
       const projection = projectTrack(car.x, car.y);
-      const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, player === 1 ? 24 : -24);
+      const target = trackPoint(projection.s + 75 + Math.abs(car.speed) * .14, player === 1 ? -24 : 24);
       const error = mod(Math.atan2(target.y - car.y, target.x - car.x) - car.angle + Math.PI, Math.PI * 2) - Math.PI;
       const keys = new Set([player === 1 ? 'KeyW' : 'ArrowUp']);
       if (error > .025) keys.add(player === 1 ? 'KeyD' : 'ArrowRight');
@@ -228,7 +245,7 @@ for (const player of [1, 2]) {
       if (car.offroad) offroad++;
       engine.step(1 / 60, keys);
     }
-    assert.equal(engine.state, 'finished');
+    assert.equal(engine.state, 'racing'); assert.equal(car.finished, true);
     assert.equal(engine.winner.id, player);
     assert.equal(car.lap, 3);
     assert.equal(impacts, 0, 'real generated scenery must not cause invisible road collisions');

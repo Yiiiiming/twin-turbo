@@ -16,6 +16,14 @@
       "theme": "city",
       "prompt": "Use case: stylized-concept.\nAsset type: production distant scenery panorama for a real 3D third-person arcade racing game. This is ONLY a scenic background bitmap, not a screenshot or mockup.\nPrimary request: a modern waterfront city at blue hour, elegant varied skyline across a broad bay with tasteful cyan and warm amber illuminated windows and architectural accents, calm water reflecting restrained ribbons of city light, a few distant low waterfront structures.\nStyle/medium: premium painterly 3D environment concept art, polished softly faceted architectural forms with rich atmospheric depth, sophisticated believable scenery, crisp silhouettes softened with distance.\nComposition/framing: ultra-wide 3:1 panoramic landscape, ideally 3072x1024 or 1536x512. Waterfront horizon around the lower third of the frame; the top half is spacious open sky with delicate horizontal cloud wisps. Long-distance city vista, modest buildings in the lower half, broad details useful across horizontal moving crops. Keep bottom quarter calm dark water and no close foreground.\nLighting/mood: quiet cinematic blue hour with a trace of peach glow on the horizon, inviting lights, no dystopian grit.\nColor palette: muted navy blue and dusty lavender sky with subtle peach at horizon, slate-blue water, restrained luminous cyan and amber accents.\nConstraints: no cars, no race track, no foreground roads, no people, no text, no logos, no watermark, no frame, no UI; full-bleed single continuous panorama, no panels.",
       "file": "city.png"
+    },
+    {
+      "theme": "london",
+      "file": "london-plane-tree.png",
+      "size": "1024x1536",
+      "transparent_background": true,
+      "prompt": "A single photorealistic mature London plane tree, entire trunk and canopy visible, isolated on transparent background. Natural irregular leafy canopy and realistic mottled bark, soft diffuse London daylight. No scenery, no other objects, no text. Production foliage cutout for a London racing scene.",
+      "note": "Generated asset; not an exact scan of a specific London tree."
     }
   ]
 }

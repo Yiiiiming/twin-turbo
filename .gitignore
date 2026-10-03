@@ -3,3 +3,7 @@ __pycache__/
 node_modules/
 dist/
 .sites-runtime/
+.game-build.js
+tools/real-city-preview.bundle.js
+tools/draco/
+tools/london-scene-test.bundle.js

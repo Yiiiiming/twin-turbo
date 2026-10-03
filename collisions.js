@@ -7,6 +7,11 @@ function obstacleShape(source) {
   if (!source || !Number.isFinite(source.x) || !Number.isFinite(source.y)) {
     throw new TypeError('Obstacle positions must be finite.');
   }
+  if ((source.minHeight !== undefined && !Number.isFinite(source.minHeight))
+    || (source.maxHeight !== undefined && !Number.isFinite(source.maxHeight))
+    || (source.minHeight !== undefined && source.maxHeight !== undefined && source.minHeight >= source.maxHeight)) {
+    throw new TypeError('Obstacle height intervals must be finite and have positive clearance.');
+  }
   if (source.type === 'circle') {
     if (!(source.radius > 0) || !Number.isFinite(source.radius)) {
       throw new TypeError('Circle obstacles need a positive finite radius.');
@@ -113,8 +118,11 @@ export class ObstacleWorld {
     for (let iteration = 0; iteration < 8; iteration++) {
       let corrected = false;
       for (const index of this._candidates(car.x, car.y)) {
+        const obstacle = this.obstacles[index];
+        const floor = car.elevation ?? 0, roof = floor + (car.height ?? 25);
+        if (roof <= (obstacle.minHeight ?? -Infinity) || floor >= (obstacle.maxHeight ?? Infinity)) continue;
         this.lastCandidateChecks++;
-        const hit = contact(car, this.obstacles[index], this.carRadius);
+        const hit = contact(car, obstacle, this.carRadius);
         if (!hit) continue;
         corrected = true; touched.add(index);
         car.x += hit.nx * (hit.depth + SEPARATION);
@@ -144,10 +152,13 @@ export class ObstacleWorld {
     const touched = new Set();
     if (previousPosition && Number.isFinite(previousPosition.x + previousPosition.y)) {
       const dx = car.x - previousPosition.x, dy = car.y - previousPosition.y;
+      const elevation = car.elevation ?? 0;
+      const previousElevation = previousPosition.elevation ?? elevation;
       const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (this.carRadius / 2)));
       car.x = previousPosition.x; car.y = previousPosition.y;
       for (let step = 0; step < steps; step++) {
         car.x += dx / steps; car.y += dy / steps;
+        if (car.elevation !== undefined) car.elevation = previousElevation + (elevation - previousElevation) * (step + 1) / steps;
         this._separate(car, touched);
       }
     } else this._separate(car, touched);

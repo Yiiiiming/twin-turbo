@@ -7,7 +7,7 @@ import { sceneObstacles } from '../renderer.js';
 const obstacles=sceneObstacles();
 const allowed=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter']);
 const humanKeys=(car)=>{
-  const p=projectTrack(car.x,car.y),target=trackPoint(p.s+75+Math.abs(car.speed)*.14,24);
+  const p=projectTrack(car.x,car.y),target=trackPoint(p.s+75+Math.abs(car.speed)*.14,-24);
   const error=mod(Math.atan2(target.y-car.y,target.x-car.x)-car.angle+Math.PI,Math.PI*2)-Math.PI;
   const keys=new Set(['KeyW']);
   if(error>.025)keys.add('KeyD');
@@ -20,7 +20,7 @@ function runComputer({laps=3,hz=60}={}) {
   const humanBefore=structuredClone(engine.cars[0]);
   let offroad=0,impacts=0,boostFrames=0,lastLap=0;
   const lapTimes=[];
-  for(let frame=0;frame<hz*60*laps+hz*15&&engine.state!=='finished';frame++) {
+  for(let frame=0;frame<hz*60*laps+hz*15&&!engine.cars[1].finished;frame++) {
     const keys=ai.update(engine,1/hz);
     assert.ok(keys instanceof Set);
     assert.ok([...keys].every(key=>allowed.has(key)),'AI only issues player-two controls');
@@ -34,11 +34,20 @@ function runComputer({laps=3,hz=60}={}) {
     offroad+=car.offroad?1:0;impacts+=car.impact>0?1:0;
     if(car.lap>lastLap){lapTimes.push(car.lastLap);lastLap=car.lap;}
   }
-  assert.equal(engine.state,'finished');assert.equal(engine.winner.id,2);
+  assert.equal(engine.state,'racing');assert.equal(engine.winner.id,2);
+  assert.equal(engine.cars[1].finished,true);
   assert.equal(engine.cars[1].lap,laps);assert.equal(ai.rescues,0);
   assert.equal(offroad,0);assert.equal(impacts,0);
   assert.equal(engine.cars[0].x,humanBefore.x);assert.equal(engine.cars[0].y,humanBefore.y);
   assert.ok(lapTimes.every(time=>time>=44&&time<=48),`human-beatable lap times: ${lapTimes}`);
+  const finishedDriver={...ai},finishedCar=structuredClone(engine.cars[1]);
+  for(let frame=0;frame<hz;frame++) {
+    const keys=ai.update(engine,1/hz);
+    assert.equal(keys.size,0,'finished AI leaves the unfinished human in control');
+    engine.step(1/hz,keys);
+  }
+  assert.deepEqual({...ai},finishedDriver);
+  assert.deepEqual(engine.cars[1],finishedCar);
   return {engine,ai,lapTimes,boostFrames};
 }
 
@@ -111,22 +120,30 @@ test('a blocked computer calls the normal rescue and serves the full two-second 
 
 test('computer and a human driver share the real engine and the faster human can win',()=>{
   const engine=new RaceEngine({obstacles,laps:3}).start(),ai=new RaceAI();
-  let impacts=0,offroad=0;
+  let impacts=0,offroad=0,firstResult=null;
   for(let frame=0;frame<60*165&&engine.state!=='finished';frame++) {
     const keys=new Set([...humanKeys(engine.cars[0]),...ai.update(engine,1/60)]);
     engine.step(1/60,keys);
     impacts+=engine.cars.some(car=>car.impact>0)?1:0;
     offroad+=engine.cars.some(car=>car.offroad)?1:0;
+    if(engine.cars[0].finished&&!firstResult) {
+      assert.equal(engine.state,'racing');assert.equal(engine.cars[1].finished,false);
+      firstResult=structuredClone(engine.cars[0]);
+    }
   }
   assert.equal(engine.state,'finished');assert.equal(engine.winner.id,1);
-  assert.equal(engine.cars[0].lap,3);assert.ok(engine.cars[1].lap>=2);
+  assert.equal(engine.cars[0].lap,3);assert.equal(engine.cars[1].lap,3);
+  assert.ok(engine.cars.every(car=>car.finished));
+  assert.ok(engine.cars[1].finishTime>engine.cars[0].finishTime);
+  assert.equal(engine.time,engine.cars[1].finishTime);
+  assert.deepEqual(engine.cars[0],firstResult,'human result stays fixed while the AI finishes');
   assert.ok(engine.cars[1].bestLap>=44&&engine.cars[1].bestLap<=48);
   assert.equal(impacts,0);assert.equal(offroad,0);assert.equal(ai.rescues,0);
 });
 
 test('a persistently skipped checkpoint triggers ordinary recovery without giving lap credit',()=>{
   const engine=new RaceEngine({obstacles}).start(),ai=new RaceAI();engine.state='racing';
-  const car=engine.cars[1],p=trackPoint(TRACK.length/TRACK.checkpoints+160,-24);
+  const car=engine.cars[1],p=trackPoint(TRACK.length/TRACK.checkpoints+160,24);
   Object.assign(car,{x:p.x,y:p.y,angle:p.angle,speed:330,_started:true,_nextCheckpoint:1,
     _lastCheckpointS:TRACK.startDistance,_lastTrackS:p.s,_lastX:p.x,_lastY:p.y,missedCheckpoint:true});
   for(let frame=0;frame<60*4&&ai.rescues===0;frame++) {
@@ -147,5 +164,5 @@ test('reset clears recovery and boost state, and invalid frame times have no sid
   for(const dt of [0,-1,NaN,Infinity])assert.equal(ai.update(engine,dt).size,0);
   assert.deepEqual({...ai},before);
   ai.reset();assert.equal(ai.elapsed,0);assert.equal(ai.rescues,0);
-  assert.equal(ai._boostRemaining,0);assert.equal(ai._stuckFor,0);assert.equal(ai._lane,-24);
+  assert.equal(ai._boostRemaining,0);assert.equal(ai._stuckFor,0);assert.equal(ai._lane,24);
 });
