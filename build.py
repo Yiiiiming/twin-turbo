@@ -14,4 +14,8 @@ html = html.replace('<script type="module" src="./main.js"></script>', '<script 
 html = html.replace('href="./" aria-label="Twin Turbo 首页"', 'href="#" aria-label="Twin Turbo 首页"')
 destination = ROOT / 'Twin Turbo.html'
 destination.write_text(html)
+web_directory = ROOT / 'dist'
+web_directory.mkdir(exist_ok=True)
+(web_directory / 'index.html').write_text(html)
 print(f'Built: {destination.name} ({destination.stat().st_size:,} bytes)')
+print('Built: dist/index.html (web edition)')

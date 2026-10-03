@@ -2,6 +2,12 @@
 
 一个独立的本地赛车游戏项目。两个人共用一块键盘，左右各占半屏，中间固定分界线，各自的镜头跟随自己的赛车。
 
+## 在线试玩
+
+[打开 TWIN TURBO](https://twin-turbo-yiiiiming.heym0701.chatgpt.site)
+
+已部署为网页，可直接使用电脑键盘游玩。当前访问权限为仅站点所有者。
+
 ## 直接玩
 
 双击 **Twin Turbo.html**，用桌面浏览器打开即可。所有画面、逻辑和音效都在文件中，不需要安装依赖、连接网络或注册账号。
@@ -35,6 +41,8 @@ python3 -m http.server 8765 --bind 127.0.0.1
 ```sh
 python3 build.py
 ```
+
+这个命令也会生成网页部署文件 `dist/index.html`。网站托管配置保存在 `.openai/hosting.json`。
 
 运行自动化测试（需要 Node.js）：
 
