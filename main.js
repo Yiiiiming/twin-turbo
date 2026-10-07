@@ -87,20 +87,21 @@ function drawMiniMap(c, x, y, playerId) {
 function drawHUD(now) {
   ctx.setTransform(hud.width / 1200, 0, 0, hud.height / 700, 0, 0);
   ctx.clearRect(0, 0, 1200, 700);
-  for (const [i, car] of engine.cars.entries()) {
-    const x = i * 600;
-    drawMiniMap(ctx, x + 418, 577, car.id);
+  const solo=selectedMode==='ai', viewWidth=solo?1200:600;
+  for (const [i, car] of engine.cars.slice(0,solo?1:2).entries()) {
+    const x = i * 600, center=x+viewWidth/2;
+    drawMiniMap(ctx, x + viewWidth - 182, 577, car.id);
     if (notices[i] && toastTime < noticeUntil[i] && engine.state === 'racing') {
-      rounded(ctx, x + 163, 120, 274, 38, 7, '#10222ddd');
+      rounded(ctx, center - 137, 120, 274, 38, 7, '#10222ddd');
       ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = colors[i];
-      ctx.fillText(i18n.t(notices[i]), x + 300, 144);
+      ctx.fillText(i18n.t(notices[i]), center, 144);
     }
     const p = projectTrack(car.x, car.y, car._lastTrackS, car.elevation);
     const headingError = Math.abs(mod(car.angle - p.angle + Math.PI, tau) - Math.PI);
     if (engine.state === 'racing' && !car.finished && !car.offroad && Math.abs(car.speed) > 50 && headingError > Math.PI * .65) {
-      rounded(ctx, x + 231, 76, 138, 29, 6, '#302715d9');
+      rounded(ctx, center - 69, 76, 138, 29, 6, '#302715d9');
       ctx.fillStyle = '#ffd08b'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(i18n.t('↶  逆向行驶'), x + 300, 95);
+      ctx.fillText(i18n.t('↶  逆向行驶'), center, 95);
     }
     if (engine.state === 'racing' && !car.finished) {
       const ahead = trackPoint(p.s + Math.max(110, Math.abs(car.speed) * .58));
@@ -117,10 +118,12 @@ function drawHUD(now) {
     const sceneName = {coast:'海岸港湾', alpine:'松林山谷', city:'霓虹城区'}[region];
     $('scene' + car.id).textContent = i18n.t(TRACK.themeName || sceneName);
   }
+  if(!solo){
   ctx.fillStyle = '#101921'; ctx.fillRect(597, 0, 6, 700);
   ctx.fillStyle = '#b2c6d250'; ctx.fillRect(599, 0, 2, 700);
   rounded(ctx, 585, 20, 30, 30, 15, '#172632');
   ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#bacada'; ctx.fillText('VS', 600, 38);
+  }
   $('graphics-note').classList.toggle('hidden', renderer.available);
   $('start').disabled = !renderer.available; $('again').disabled = !renderer.available;
 }
@@ -139,14 +142,15 @@ function resize() {
   if (hud.width !== width || hud.height !== height) { hud.width = width; hud.height = height; }
 }
 new ResizeObserver(resize).observe(canvas);
-// Harbor tracks are explicit choices; parked London links never select a map.
-engine.selectTrack('coast');
+// Start on compact London; retired prototype links do not change the selection.
+engine.selectTrack('coast-london');
+ghostClient.setTrack(TRACK.id);
 renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
 engine.setObstacles(renderer.obstacles || []);
 renderer.resetCameras(engine);
 ai.reset();
 keys.clear();
-void leaderboard.init();
+void leaderboard.init(TRACK.id);
 
 function trackName(track = TRACK) {
   return i18n.language === 'en' ? (track.nameEn || 'Coastline Grand Prix') : track.name;
@@ -259,6 +263,8 @@ function updateUI(now) {
     for(const {button}of trackCards.values())button.disabled=engine.state!=='menu';
     document.querySelectorAll('[data-city]').forEach(button=>button.disabled=engine.state!=='menu');
     $('menu').classList.toggle('hidden',engine.state!=='menu');$('pause-panel').classList.toggle('hidden',engine.state!=='paused');$('result').classList.toggle('hidden',engine.state!=='finished');
+    // Reuse the same forms: finished races save here; abandoned laps remain accessible below.
+    $(engine.state==='finished'?'result-save-host':'records-pending-host').appendChild($('records-results'));
     $('pause').disabled=!['racing','countdown','paused'].includes(engine.state);$('pause').innerHTML=engine.state==='paused'?'继续 <kbd>Esc</kbd>':'暂停 <kbd>Esc</kbd>';
     document.body.classList.toggle('racing',engine.state==='racing');
     $('arena-tag-text').textContent=engine.state==='racing'?'LIVE / CHASE CAM':'CHASE CAM / P1';
@@ -278,6 +284,7 @@ function updateUI(now) {
         $('finish-time'+suffix).textContent=fmt(car.finishTime);
         $('best-lap'+suffix).textContent=car.bestLap===null?'—':fmt(car.bestLap);
       });
+      leaderboard.cards.find(card=>!card.done)?.input.focus({preventScroll:true});
       keys.clear();tone(523,.2,.06);setTimeout(()=>tone(659,.2,.06),140);setTimeout(()=>tone(784,.35,.06),280);
 
     }
@@ -299,7 +306,7 @@ function begin(skipGhosts = false) {
   leaderboard.newRace(); leaderboard.setRaceActive(true);
   activeGhosts = ghostClient.startRace(); ghostRecorder.reset(); splitTiming.reset(activeGhosts);
   $('ghost-race-label').textContent = activeGhosts.map(ghost=>`${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」 · ${fmt(ghost.entry.timeMs/1000)}`).join('  /  ');
-  raceMode=selectedMode; engine.start(selectedLaps); applyPlayerColors(); ai.reset(); lastAIRescues=0;
+  raceMode=selectedMode; renderer.setSinglePlayer(raceMode==='ai'); engine.start(selectedLaps); applyPlayerColors(); ai.reset(); lastAIRescues=0;
   keys.clear(); lastLaps=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine); goUntil=0;
   canvas.focus({preventScroll:true}); if(soundEnabled){initAudio();audio?.resume();}
 }
@@ -345,9 +352,7 @@ async function openRecords(event) {
   event?.preventDefault(); keys.clear();
   if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch {} }
   $('records-center').scrollIntoView?.({behavior:'smooth',block:'start'});
-  const saveEntry = (event?.currentTarget?.id || event?.target?.id) === 'show-records';
-  const focusTarget = saveEntry && leaderboard.cards?.find(card=>!card.done)?.input;
-  (focusTarget || $('records-center')).focus({preventScroll:true});
+  $('records-center').focus({preventScroll:true});
 }
 function showRaceStart(event) {
   event?.preventDefault();
@@ -355,7 +360,6 @@ function showRaceStart(event) {
   $('race-stage').scrollIntoView?.({behavior:'smooth',block:'start'});
   (engine.state === 'menu' ? $('start') : engine.state === 'paused' ? $('resume') : canvas).focus({preventScroll:true});
 }
-$('show-records').addEventListener('click',openRecords);
 $('menu-records').addEventListener('click',openRecords);
 $('records-start').addEventListener('click',showRaceStart);
 
@@ -394,19 +398,21 @@ function refreshBindings() {
     button.setAttribute('aria-label',`P${player} ${ACTION_LABELS[action]}：${button.textContent}`);
   });
   document.querySelectorAll('[data-control-player]').forEach(node=>node.textContent=bindings.label(Number(node.dataset.controlPlayer),node.dataset.controlAction));
-  canvas.setAttribute('aria-label','左右分屏斜后方赛车。自定义按键见下方操作说明。');
+  canvas.setAttribute('aria-label',selectedMode==='ai'?'单人完整视野斜后方赛车。自定义按键见下方操作说明。':'左右分屏斜后方赛车。自定义按键见下方操作说明。');
   $('ai-control-note').textContent='AI 自动驾驶 · 遵循相同物理规则';
 }
 function updateMode() {
   const solo=selectedMode==='ai'; applyPlayerColors();
+  renderer.setSinglePlayer(solo); document.body.classList.toggle('solo-mode',solo);
+  $('race-arena').setAttribute('aria-label',solo?'单人赛道，镜头跟随你的赛车':'左右分屏赛道，左侧玩家一，右侧玩家二');
   $('player2-label').textContent=solo?'AI DRIVER':'PLAYER 02'; $('control-player2-chip').textContent=solo?'AI':'P2';
   $('mode-label').textContent=solo?'单人挑战 AI':'双人分屏'; $('mode-english').textContent=solo?'SINGLE PLAYER':'LOCAL MULTIPLAYER';
   $('mode-description').textContent=solo?`你驾驶${selectedColor==='orange'?'橙色':'青色'}赛车，与 AI 较量。WASD 或方向键均可驾驶。`:'与身边的朋友，共用一块键盘。';
   $('player-color-select').classList.toggle('hidden',!solo);
-  $('player-color-description').textContent=`你在左侧驾驶${selectedColor==='orange'?'橙色':'青色'}赛车，AI 使用另一种颜色。`;
+  $('player-color-description').textContent=`你驾驶${selectedColor==='orange'?'橙色':'青色'}赛车，AI 使用另一种颜色。`;
   $('player1-alternate-controls').classList.toggle('hidden',!solo);
   $('player2-controls').classList.toggle('hidden',solo); $('ai-control-note').classList.toggle('hidden',!solo);
-  $('help-mode-description').textContent=solo?'你在左侧驾驶自己选择的赛车，右侧由 AI 驾驶。两套键位均控制你的赛车：WASD / 左 Shift / Q，或方向键 / Enter / 斜杠；也可在「自定义按键」中修改。两车遵循相同物理和赛道规则，双方完赛后结算。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
+  $('help-mode-description').textContent=solo?'镜头全屏跟随你的赛车，与 AI 在同一赛道较量。两套键位均控制你的赛车：WASD / 左 Shift / Q，或方向键 / Enter / 斜杠；也可在「自定义按键」中修改。两车遵循相同物理和赛道规则，双方完赛后结算。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
   document.querySelectorAll('[data-mode]').forEach(button=>{const active=button.dataset.mode===selectedMode;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   document.querySelectorAll('[data-player-color]').forEach(button=>{const active=button.dataset.playerColor===selectedColor;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   refreshBindings();
@@ -437,7 +443,7 @@ async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen();
     else await $('race-stage').requestFullscreen();
     resize();
-    canvas.focus({preventScroll: true});
+    (engine.state==='finished' ? leaderboard.cards.find(card=>!card.done)?.input || canvas : canvas).focus({preventScroll: true});
   } catch { $('fullscreen').title = '请使用浏览器的全屏功能'; }
 }
 $('fullscreen').addEventListener('click', toggleFullscreen);

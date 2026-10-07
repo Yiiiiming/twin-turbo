@@ -60,7 +60,7 @@ class MockNode extends MockTarget {
   }
   get firstElementChild() { return this.children[0] || this.appendChild(new MockNode('strong', this.ownerDocument)); }
   get lastElementChild() { return this.children.at(-1) || this.firstElementChild; }
-  appendChild(child) { child.parentElement = this; this.children.push(child); return child; }
+  appendChild(child) { if(child.parentElement)child.parentElement.children=child.parentElement.children.filter(item=>item!==child); child.parentElement = this; this.children.push(child); return child; }
   append(...children) { children.forEach(child => this.appendChild(child)); }
   replaceChildren(...children) { this.children = []; children.forEach(child => this.appendChild(child)); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
@@ -108,7 +108,7 @@ class MockNode extends MockTarget {
 
 function canvasContext() {
   const state = { calls: [], counts: new Map(), depth: 0 };
-  const selected = new Set(['rect', 'clip', 'drawImage', 'setTransform', 'translate', 'clearRect', 'fillText']);
+  const selected = new Set(['rect', 'clip', 'drawImage', 'setTransform', 'translate', 'clearRect', 'fillRect', 'fillText']);
   return new Proxy(state, {
     get(target, name) {
       if (name in target) return target[name];
@@ -161,6 +161,10 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     if ('data-mode' in attributes) modeButtons.push(node);
     if (attributes.class?.includes('total-laps')) lapLabels.push(node);
   }
+  nodes.get('result').appendChild(nodes.get('result-save-host'));
+  nodes.get('result-save-host').appendChild(nodes.get('records-results'));
+  nodes.get('records-results').appendChild(nodes.get('records-result-list'));
+  nodes.get('records-center').appendChild(nodes.get('records-pending-host'));
   nodes.get('countdown').appendChild(new MockNode('strong', document));
   nodes.get('countdown').appendChild(new MockNode('span', document));
   const window = new MockTarget(); window.devicePixelRatio = 1;
@@ -201,6 +205,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
       this.resetCalls = []; this.rebuildCalls = []; this.renderCount = 0;
     }
     setGhostPoses(poses) { this.ghostPoses = poses; }
+    setSinglePlayer(enabled) { this.singlePlayer=Boolean(enabled);return this; }
     rebuild(engine) { this.rebuildCalls.push(engine); engine.setObstacles(this.obstacles);this.resetCameras(engine);return this; }
     resetCameras(engine, playerId) {
       this.resetCalls.push({ playerId,
@@ -246,6 +251,10 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
   // Physics scenarios choose their intended configuration through real controls;
   // the dedicated defaults test leaves the product's initial choices untouched.
   if(configureRace){
+    application.trackCards.get('coast').button.click();
+    // Coast-based physics scenarios begin after the explicit map selection.
+    application.renderer.rebuildCalls.length = 0;
+    application.renderer.resetCalls.splice(0, application.renderer.resetCalls.length - 1);
     modeButtons.find(button=>button.dataset.mode==='local').click();
     lapButtons.find(button=>button.dataset.laps==='3').click();
     nodes.get('records-tab-3').click();
@@ -334,7 +343,7 @@ test('fullscreen targets the entire race stage with scoreboard and arena and has
   assert.match(contents, /<section\b[^>]*class="arena"/);
   assert.match(contents, /id="game"/);
   assert.match(contents, /id="fullscreen-exit"/);
-  assert.match(contents, /id="show-records"/, 'fullscreen results provide a route to the shared record center');
+  assert.match(contents, /id="records-results"/, 'fullscreen results contain the actual nickname save forms');
   assert.doesNotMatch(ui.html, /id="(?:record-dialog|ghost-results|lap-list|board-list)"/, 'old duplicate boards and nickname dialog are absent');
   await Promise.all(ui.click('fullscreen').pending);
   assert.equal(ui.document.fullscreenElement, ui.nodes.get('race-stage'));
@@ -535,7 +544,7 @@ test('single-player mode drives only player 2 through AI controls and freezes th
   ui.click('resume'); ui.frame(); assert.ok(ui.ai.elapsed > elapsed);
 });
 
-test('finished racers reach one record center without changing the race or stealing input shortcuts', async t => {
+test('finish overlay directly offers the sole nickname form without leaving fullscreen or stealing input shortcuts', async t => {
   const ui = await loadUI(t);
   ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
   ui.launch(); ui.advance(3.1);
@@ -549,15 +558,13 @@ test('finished racers reach one record center without changing the race or steal
   assert.equal(ui.requests.filter(request => request.method === 'POST').length, 0, 'results wait for an explicit save');
   await Promise.all(ui.click('fullscreen').pending);
   const positions = ui.engine.cars.map(({x,y}) => ({x,y}));
-  ui.nodes.get('show-records').focus();
-  for (const code of ['Space', 'Enter']) {
-    assert.equal(ui.key(code).defaultPrevented, false, 'record button keeps native activation');
-    assert.equal(ui.engine.state, 'finished');
-  }
-  await Promise.all(ui.click('show-records').pending); await ui.flush();
-  assert.equal(ui.document.fullscreenElement, null);
-  assert.ok(ui.nodes.get('records-center').scrollCalls?.length, 'record center is brought into view');
   const card = ui.leaderboard.cards[0];
+  assert.equal(ui.nodes.has('show-records'),false,'no separate button or navigation is needed to save');
+  assert.equal(ui.nodes.get('records-results').parentElement,ui.nodes.get('result-save-host'));
+  assert.equal(card.input.closest('form').parentElement,ui.nodes.get('records-result-list'));
+  assert.equal(ui.document.fullscreenElement,ui.nodes.get('race-stage'),'inline saving remains inside the fullscreen stage');
+  assert.equal(ui.nodes.get('records-center').scrollCalls?.length||0,0,'finishing never scrolls to the page leaderboard');
+  assert.equal((ui.html.match(/id="records-results"/g)||[]).length,1,'there is only one save area');
   assert.equal(ui.document.activeElement, card.input, 'only human result receives keyboard focus');
   for (const code of ['KeyW', 'Space', 'Enter', 'ArrowUp', 'Escape']) {
     assert.equal(ui.key(code).defaultPrevented, false);
@@ -571,6 +578,7 @@ test('finished racers reach one record center without changing the race or steal
   assert.equal(ui.engine.state, 'menu');
   assert.equal(ui.leaderboard.cards.length, 1, 'returning to menu preserves the unsaved result');
   assert.equal(ui.leaderboard.cards[0], card);
+  assert.equal(ui.nodes.get('records-results').parentElement,ui.nodes.get('records-pending-host'),'unsaved forms stay accessible after returning to the menu');
   ui.launch(); ui.frame();
   assert.equal(ui.leaderboard.cards.length, 0, 'starting a new race clears prior results');
 });
@@ -859,21 +867,21 @@ test('a real-control race saves one nickname for total, lap and complete three-l
 
 for (const search of ['', '?city=london']) {
   test(`harbor release is isolated from city parameters (${search || 'default'})`, async t => {
-    const ui = await loadUI(t, { search });
-    assert.equal(TRACK.id, 'coast');
+    const ui = await loadUI(t, { search, configureRace: false });
+    assert.equal(TRACK.id, 'coast-london');
     assert.equal(ui.renderer.canvas, ui.nodes.get('game'));
     assert.equal(ui.nodes.has('city-game'), false);
     assert.equal(ui.nodes.has('board-city'), false);
     assert.doesNotMatch(ui.html, /data-city=|london-guide|白金汉宫|伦敦/);
     assert.ok(ui.requests.length > 0);
     for (const request of ui.requests) {
-      assert.equal(new URL(request.url).searchParams.get('city'), 'coast');
+      assert.equal(new URL(request.url).searchParams.get('city'), 'coast-london');
       assert.equal(new URL(request.url).searchParams.get('version'), request.url.includes('/api/laps') ? GHOST_VERSION : LEADERBOARD_VERSION);
     }
     ui.launch();
     ui.advance(3.4);
     assert.equal(ui.engine.state, 'racing');
-    assert.equal(TRACK.id, 'coast');
+    assert.equal(TRACK.id, 'coast-london');
   });
 }
 
@@ -1111,8 +1119,14 @@ test('leaderboard map browsing is independent of the current race and keeps unsa
   assert.equal(ui.leaderboard.city,'coast-pines');assert.equal(ui.engine.state,'finished');
 });
 
-test('fresh product defaults to AI sprint and the fastest-lap board, with both complete keyboard layouts on the human side',async t=>{
+test('fresh product defaults to London, AI sprint and the fastest-lap board, with both complete keyboard layouts on the human side',async t=>{
   const ui=await loadUI(t,{configureRace:false});
+  assert.equal(TRACK.id,'coast-london');
+  assert.equal(ui.ghostClient.city,'coast-london');
+  assert.equal(ui.leaderboard.city,'coast-london');
+  assert.equal(ui.leaderboard.raceCity,'coast-london');
+  assert.equal(ui.nodes.get('records-track-choice').value,'coast-london');
+  assert.equal(ui.trackCards.get('coast-london').button.getAttribute('aria-pressed'),'true');
   assert.equal(ui.modeButtons.find(button=>button.dataset.mode==='ai').getAttribute('aria-pressed'),'true');
   assert.equal(ui.lapButtons.find(button=>button.dataset.laps==='1').getAttribute('aria-pressed'),'true');
   assert.equal(ui.leaderboard.category,'lap');
@@ -1129,4 +1143,20 @@ test('fresh product defaults to AI sprint and the fastest-lap board, with both c
   ui.modeButtons.find(button=>button.dataset.mode==='ai').click();assert.equal(alternative.classList.contains('hidden'),false);
   ui.launch();ui.advance(3.1);assert.equal(ui.engine.laps,1);assert.equal(ui.engine.state,'racing');
   ui.key('ArrowUp');ui.advance(.3);assert.ok(ui.engine.cars.every(car=>car.speed>50));assert.ok(ui.ai.elapsed>0);
+});
+
+test('solo mode uses one full human HUD and camera for both colors, while local mode restores two views',async t=>{
+ const ui=await loadUI(t,{configureRace:false});
+ assert.equal(ui.renderer.singlePlayer,true);assert.equal(ui.document.body.classList.contains('solo-mode'),true);
+ const context=ui.nodes.get('hud').context;let before=context.counts.get('scale')||0;context.calls.length=0;ui.frame();
+ assert.equal(context.counts.get('scale')-before,1,'only the human minimap is drawn');
+ assert.ok(context.calls.some(call=>call[0]==='translate'&&call[1]===1018&&call[2]===577));
+ assert.ok(!context.calls.some(call=>call[0]==='fillText'&&call[1]==='VS'));
+ assert.ok(!context.calls.some(call=>call[0]==='fillRect'&&call[1]===597));
+ ui.allNodes.find(node=>node.dataset.playerColor==='orange').click();ui.launch();ui.advance(3.1);
+ assert.equal(ui.engine.cars[0].colorIndex,1);assert.equal(ui.renderer.singlePlayer,true,'orange human remains the first camera');
+ ui.key('Escape');ui.frame();ui.click('pause-menu');ui.frame();
+ ui.modeButtons.find(button=>button.dataset.mode==='local').click();before=context.counts.get('scale');context.calls.length=0;ui.frame();
+ assert.equal(ui.renderer.singlePlayer,false);assert.equal(ui.document.body.classList.contains('solo-mode'),false);
+ assert.equal(context.counts.get('scale')-before,2);assert.ok(context.calls.some(call=>call[0]==='fillText'&&call[1]==='VS'));
 });

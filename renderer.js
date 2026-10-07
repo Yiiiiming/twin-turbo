@@ -865,7 +865,7 @@ export function sceneWeights(x,y) {
 
 export class RaceRenderer {
   constructor(canvas,{sceneUrls={}}={}) {
-    this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};this.obstacles=[];this.ghostPoses=[];
+    this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};this.obstacles=[];this.ghostPoses=[];this.singlePlayer=false;
     this.sceneUrls={coast:'./assets/coast.png',alpine:'./assets/alpine.png',city:'./assets/city.png',clouds:'./assets/cloud-sky.jpg',...sceneUrls};
     try {
       const gl=canvas.getContext('webgl',{alpha:false,antialias:true,depth:true,powerPreference:'high-performance'})||canvas.getContext('experimental-webgl',{alpha:false,antialias:true,depth:true});
@@ -919,7 +919,12 @@ export class RaceRenderer {
     };
     image.onerror=()=>{state.ready=0;};image.src=url;
   }
-  // Each half follows its own lap clock. This state is never passed to physics.
+  setSinglePlayer(enabled) {
+    const singlePlayer=Boolean(enabled);
+    if(this.singlePlayer!==singlePlayer){this.singlePlayer=singlePlayer;this.cameras=[null,null];}
+    return this;
+  }
+  // Each driver's view follows its own lap clock. This state never enters physics.
   setGhostPoses(poses = []) {
     this.ghostPoses = [0,1].map(index => {
       const group = Array.isArray(poses[index]) ? poses[index] : [poses[index]];
@@ -968,9 +973,9 @@ export class RaceRenderer {
     if(!w||!h)return;
     gl.enable(gl.SCISSOR_TEST);gl.disable(gl.BLEND);
     const divider=Math.floor(w/2);
-    for(let i=0;i<2;i++) {
+    for(let i=0;i<(this.singlePlayer?1:2);i++) {
       const car=engine.cars[i];if(!car)continue;
-      const x=i?divider:0,width=i?w-divider:divider;
+      const x=i?divider:0,width=this.singlePlayer?w:i?w-divider:divider;
       gl.viewport(x,0,width,h);gl.scissor(x,0,width,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
       const camera=this.cameras[i]=updateChaseCamera(car,this.cameras[i],dt);
       const aspect=width/h;

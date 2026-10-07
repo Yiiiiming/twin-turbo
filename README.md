@@ -1,6 +1,10 @@
 # Twin Turbo
 
-A compact split-screen arcade racer with eleven circuits. Choose Chinese or English, race the AI or a friend, and challenge up to two saved ghosts.
+A compact arcade racer with eleven circuits. Choose Chinese or English, race the AI in one full-width view or a friend in split screen, and challenge up to two saved ghosts.
+
+The opening selection is London Riverside, one lap, against the AI. Its fastest-lap leaderboard and ghost picker use the same London circuit.
+
+At the finish, each human driver enters one nickname directly in the results panel to save the race, fastest lap and ghosts together. Failed saves can be retried there without leaving fullscreen.
 
 [Play Twin Turbo](https://yiiiiming.github.io/twin-turbo/)
 

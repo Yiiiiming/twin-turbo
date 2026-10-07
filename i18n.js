@@ -1,6 +1,7 @@
 // Chinese remains the authoring language; a DOM adapter also translates dynamic
 // status messages. Player-entered nicknames are kept verbatim.
 const PHRASES = [
+['单人赛道，镜头跟随你的赛车','Single-player circuit, camera following your car'],['单人完整视野斜后方赛车。自定义按键见下方操作说明。','Full-view single-player chase-camera racing. See the controls below for your custom key bindings.'],
 ['更改地图/模式','Change track / mode'],['泰晤士河岸','Thames Riverside'],['伦敦河岸','London Riverside'],
 ['北京古都','Imperial Beijing'],['奥斯汀河谷','Austin River Valley'],['里约海岸','Rio Coast'],
 ['选择赛道，开始下一局','Choose a circuit for the next race'],['AI 自动驾驶 · 遵循相同物理规则','AI drives automatically with the same physics rules'],['或','or'],
@@ -17,7 +18,7 @@ const PHRASES = [
 ['按你的习惯驾驶。','Make it your drive.'],['点击一个按键，再按下想使用的键。设置会保存在这台设备。','Select an action, then press a key. Your settings stay on this device.'],['发车前，了解一下。','A quick drivers’ briefing.'],
 ['两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。','Share one keyboard with a chase camera for each driver. The first to finish wins, and the other can finish their race before results appear.'],
 ['两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。','Share one keyboard and a split screen. The first to finish wins; both drivers can complete the race.'],
-['你在左侧驾驶自己选择的赛车，右侧由 AI 驾驶。两套键位均控制你的赛车：WASD / 左 Shift / Q，或方向键 / Enter / 斜杠；也可在「自定义按键」中修改。两车遵循相同物理和赛道规则，双方完赛后结算。','You drive on the left; the AI drives on the right. Use WASD / Left Shift / Q or Arrow keys / Enter / Slash. Customize either set in Key bindings. Both cars follow the same physics and track rules.'],
+['镜头全屏跟随你的赛车，与 AI 在同一赛道较量。两套键位均控制你的赛车：WASD / 左 Shift / Q，或方向键 / Enter / 斜杠；也可在「自定义按键」中修改。两车遵循相同物理和赛道规则，双方完赛后结算。','The full view follows your car as you race the AI on the same circuit. Use WASD / Left Shift / Q or Arrow keys / Enter / Slash. Customize either set in Key bindings. Both cars follow the same physics and track rules.'],
 ['每圈设 3 个计时门和终点计时点。通过后显示与对手在同一圈、同一点的差距；载入幽灵时也会显示单圈对比。这条赛道有长直道、连续 S 弯和回头弯。弯前松油或轻点刹车，出弯再用氮气。氮气会自动恢复。树木、建筑与护栏会挡住车辆，撞上会减速；轻微压路肩仍能正常计圈，大幅抄近路不能完成一圈。卡住时，玩家一按','Each lap has three timing gates and a finish split. Compare times at the same point, including your ghosts. Ease off before bends and use nitro on exit. Nitro recharges automatically. Trees, buildings and barriers are solid. Cutting too far off course will invalidate the lap. If stuck, P1 presses '],
 ['、玩家二按',', and P2 presses '],['返回赛道，并承受 2 秒罚停。',' to recover, with a 2-second penalty.'],['暂停 / 继续 · 离开游戏窗口会自动暂停。','Pause / resume · Switching away automatically pauses the race.'],
 ['点击要修改的动作，再按一个新键。重复键会提示；Esc 取消选键。','Select an action, then press a new key. Duplicate keys are rejected; Esc cancels.'],
@@ -87,7 +88,7 @@ export function translateText(value, language='en') {
     .replace(/与(.+)并驾齐驱/g,'Level with $1').replace(/(.+)尚未通过/g,'Waiting for $1')
     .replace(/漏过检查点 · 按 (.+) 回赛道/g,'Missed checkpoint · $1 to recover')
     .replace(/你驾驶(.+)赛车，与 AI 较量。WASD 或方向键均可驾驶。/g,'Drive the $1 car against AI. Use WASD or Arrow keys.')
-    .replace(/你在左侧驾驶(.+)赛车，AI 使用另一种颜色。/g,'You drive the $1 car on the left; AI uses the other color.')
+    .replace(/你驾驶(.+)赛车，AI 使用另一种颜色。/g,'You drive the $1 car; AI uses the other color.')
     .replace(/AI 自动驾驶 · 你使用 (.+) 驾驶/g,'AI drives automatically · You use $1')
     .replace(/为 P(\d) 的(.+)按一个新键；Esc 取消。/g,'Press a new key for P$1 $2; Esc cancels.')
     .replace(/(.+) 已用于 P(\d) 的(.+)，请换一个键。/g,'$1 is already used for P$2 $3. Choose another key.')

@@ -50,11 +50,11 @@ export class UnifiedRecordsClient {
     try { return normalizeName(this.storage?.getItem(`twin-turbo-ghost-name-${playerId}`)); } catch { return ''; }
   }
   remember(playerId, name) { try { this.storage?.setItem(`twin-turbo-ghost-name-${playerId}`, name); } catch { /* Storage is optional. */ } }
-  init() {
+  init(city = this.city) {
     for (const category of [1, 3, 'lap']) this.node(`records-tab-${category}`).addEventListener('click', () => this.load(category));
     this.node('records-retry').addEventListener('click', () => this.load());
     this.node('records-results').hidden = true;
-    return this.load();
+    return city === this.city ? this.load() : this.setTrack(city);
   }
   async request(path, body) {
     const controller = new AbortController(); let timer;

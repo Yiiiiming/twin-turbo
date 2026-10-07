@@ -216,6 +216,44 @@ test('missing WebGL reports an actionable error instead of throwing', () => {
   assert.doesNotThrow(() => renderer.render(new RaceEngine()));
 });
 
+test('solo view fills the viewport with the human camera, both cars and only human-clock ghosts', () => {
+  const gl=mockGL(),canvas={width:1281,height:800,getContext:()=>gl,addEventListener:()=>{}},renderer=new RaceRenderer(canvas),engine=new RaceEngine();
+  engine.cars[0].colorIndex=1;engine.cars[1].colorIndex=0;
+  engine.cars[0].boosting=true;
+  const before=structuredClone(engine.cars);
+  renderer.setGhostPoses([
+    [{slotId:0,x:100,y:200,angle:.2,elevation:3},{slotId:1,x:140,y:260,angle:.3,elevation:4}],
+    [{slotId:0,x:900,y:1000,angle:0,elevation:0}],
+  ]);
+  renderer.setSinglePlayer(true);
+  for(const state of ['menu','countdown','racing','paused','finished']) {
+    engine.state=state;gl.calls.length=0;gl.draws.length=0;renderer.render(engine);
+    assert.deepEqual(gl.calls.filter(call=>call[0]==='viewport'),[['viewport',0,0,1281,800]]);
+    assert.deepEqual(gl.calls.filter(call=>call[0]==='scissor'),[['scissor',0,0,1281,800]]);
+    assert.equal(gl.calls.filter(call=>call[0]==='clear').length,1);
+    assert.equal(renderer.cameras[0].carX,engine.cars[0].x);
+    assert.equal(renderer.cameras[1],null,'AI does not get a rendered camera');
+    const camera=renderer.cameras[0];
+    assert.deepEqual(gl.uniforms.get('uViewProjection'),multiply(perspective(camera.fov,1281/800),lookAt(camera.eye,camera.target)));
+    assert.ok(gl.calls.some(call=>call[0]==='uniform1f'&&call[1]==='uAspect'&&call[2]===1281/800));
+    for(const [player,mesh]of [[0,renderer.meshes.cars[1]],[1,renderer.meshes.cars[0]]]){
+      const draws=gl.draws.filter(draw=>draw.buffer===mesh.buffer);assert.equal(draws.length,1);
+      assert.ok(Math.abs(draws[0].model[12]-engine.cars[player].x)<.01);
+    }
+    assert.equal(gl.draws.filter(draw=>draw.buffer===renderer.meshes.shadow.buffer).length,2);
+    assert.equal(gl.draws.filter(draw=>draw.buffer===renderer.meshes.flames.buffer).length,1);
+    for(const [mesh,x]of [[renderer.meshes.ghost,100],[renderer.meshes.ghostGold,140]]){
+      const draws=gl.draws.filter(draw=>draw.buffer===mesh.buffer);assert.equal(draws.length,1);
+      assert.equal(draws[0].model[12],x);assert.ok(draws[0].blending&&!draws[0].depthWrite);
+    }
+    assert.deepEqual(engine.cars,before,'changing viewport never changes race state');
+  }
+  const camera=renderer.cameras[0];renderer.setSinglePlayer(true);assert.equal(renderer.cameras[0],camera,'repeated mode sync keeps smoothing');
+  engine.cars[1].x+=120;renderer.setSinglePlayer(false);gl.calls.length=0;renderer.render(engine);
+  assert.deepEqual(gl.calls.filter(call=>call[0]==='viewport'),[['viewport',0,0,640,800],['viewport',640,0,641,800]]);
+  assert.equal(renderer.cameras[1].carX,engine.cars[1].x,'returning to split screen snaps to the current AI/opponent position');
+});
+
 test('physical colliders come from actual props, preserve road clearance and leave both grid slots clear', () => {
   const gl=mockGL(),renderer=new RaceRenderer({width:1280,height:800,getContext:()=>gl,addEventListener:()=>{}});
   assert.equal(renderer.available,true,renderer.error);

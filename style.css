@@ -89,3 +89,12 @@
 .race-results thead th small{display:block;font-size:8px;color:#718c99;margin-top:4px;font-weight:400}
 
 #player1-alternate-controls{margin-top:8px}.alternate-label{font-size:9px;color:#91a9ac;margin-right:3px}.records-return .menu-records{display:inline-flex;border:1px solid #698653;border-radius:7px;padding:12px 17px;background:#2c3c2a;color:var(--lime);gap:16px}
+
+/* A single save form per human lives in the finish panel, including fullscreen. */
+#result{top:50%;width:640px;max-width:calc(100% - 24px);max-height:calc(100% - 24px);padding:22px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#66818d transparent;scroll-padding:16px}
+#result .race-results{margin-bottom:12px}#result .records-results{padding:14px 0 0;margin:0;border-bottom:0;text-align:left}#result .records-results-heading{gap:10px;flex-wrap:wrap;margin-bottom:10px}#result .records-results-heading h3{font-size:13px}#result .records-result-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px}#result .records-save-card{padding:13px}#result .records-save-card h3{font-size:13px;margin-bottom:6px}#result .records-save-card>p{font-size:11px;margin:6px 0}#result .records-save-card label{margin:8px 0 0}#result .records-nickname{font-size:16px;min-height:42px;padding:9px 11px;border:1px solid #65857b;border-radius:6px;background:#112725;color:#edf5ee;outline-offset:3px}#result .records-nickname:focus-visible{outline:2px solid var(--lime)}#result .records-save-status{font-size:10px;line-height:1.55}#result .result-actions{gap:22px;flex-wrap:wrap}
+@media(max-width:540px){#result{padding:16px;max-width:calc(100% - 16px);max-height:calc(100% - 16px)}#result h2{font-size:22px}#result .race-results td{font-size:13px}#result .race-results tbody th{font-size:11px}#result .records-result-grid{grid-template-columns:1fr}#result .menu-description{margin:8px 0 11px}}
+
+/* Solo driving has one full-width human camera; the opponent remains in the race. */
+.solo-mode .opponent-ui{display:none!important}.solo-mode .scoreboard{grid-template-columns:minmax(0,1fr) 214px}.solo-mode .controls{grid-template-columns:minmax(0,1fr) auto}.solo-mode .lap-timing{justify-content:flex-start}.solo-mode #split1{right:18px;width:min(230px,35%)}.solo-mode #finisher1{left:50%;width:min(320px,85%)}
+@media(max-width:780px){.solo-mode .scoreboard{grid-template-columns:minmax(0,1fr) 125px}.solo-mode .controls{grid-template-columns:1fr}.solo-mode #split1{right:10px;width:min(195px,40%)}}
