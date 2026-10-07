@@ -6,7 +6,7 @@ A compact split-screen arcade racer with eleven circuits. Choose Chinese or Engl
 
 ## Circuits and controls
 
-The first four circuits are Austin River Run, Beijing Imperial Run, London Riverside and Rio Coastal Rhythm. Austin includes the UT Tower and a roadside football squad. The original seven harbor, forest, city and spiral circuits remain available.
+The first four circuits are London Riverside, Rio Coastal Rhythm, Austin River Run and Beijing Imperial Run. Austin includes the UT Tower and a roadside football squad. The original seven harbor, forest, city and spiral circuits remain available.
 
 Every circuit supports one-lap sprints and three-lap races, AI/local play, two ghost colors, checkpoint gaps, and independent top-five total and lap records. AI races accept either keyboard layout; custom bindings, language and nicknames are stored in this browser. Flat-road cruising is 240 km/h, with uphill slowing and downhill gains.
 

@@ -66,7 +66,7 @@ const COAST_TRACK = Object.freeze({
   carRadius: 21, carCollisionDistance: 37, carHeight: 25,
 });
 
-const CITY_CIRCUITS = ['coast-austin','coast-beijing','coast-london','coast-rio'];
+const CITY_CIRCUITS = ['coast-london','coast-rio','coast-austin','coast-beijing'];
 export const TRACKS = Object.fromEntries([
   ...CITY_CIRCUITS.map(id=>HARBOR_TRACKS.find(track=>track.id===id)),COAST_TRACK,
   ...HARBOR_TRACKS.filter(track=>!CITY_CIRCUITS.includes(track.id)),
