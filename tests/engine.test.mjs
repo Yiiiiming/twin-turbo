@@ -113,7 +113,7 @@ test('cyan starts in the left lane and orange in the right lane, including after
   const engine = running();
   for (const [index, car] of engine.cars.entries()) {
     const expectedLane = index === 0 ? -18 : 22;
-    const spawn = trackPoint(TRACK.startDistance - 30, expectedLane);
+    const spawn = trackPoint(TRACK.startDistance + TRACK.startGrid[index].offset, expectedLane);
     near(car.x, spawn.x); near(car.y, spawn.y);
     near(projectTrack(car.x, car.y).offset, expectedLane);
     engine.rescue(car.id);

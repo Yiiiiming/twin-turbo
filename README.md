@@ -1,84 +1,37 @@
-# TWIN TURBO · 双人分屏赛车
+# Twin Turbo
 
-两个人共用一块键盘，或选择单人挑战 AI。左右各占半屏，中间固定分界线，各自使用低位斜后方 3D 跟车镜头。
+A compact split-screen arcade racer with eleven circuits. Choose Chinese or English, race the AI or a friend, and challenge up to two saved ghosts.
 
-## 伦敦手工建模版（2026-10-03）
+[Play Twin Turbo](https://yiiiiming.github.io/twin-turbo/)
 
-已按用户要求采用完全免费的手工建模路线，不需要地图 API 账户或付费实景服务。伦敦使用手工建筑与开放路网，后续分批细化。
+## Circuits and controls
 
-使用开放地图的真实道路和建筑轮廓，逐栋查阅 Historic England 与建筑官方资料制作外观。首批建筑档案见 `assets/london-building-profiles.json`，来源与可信度见 `assets/london-building-sources.md`。已核实的开间、材料和屋顶特征与估算的颜色、尺寸明确区分；未知建筑的街区风格补全不能称为精确还原。
+The first four circuits are Austin River Run, Beijing Imperial Run, London Riverside and Rio Coastal Rhythm. Austin includes the UT Tower and a roadside football squad. The original seven harbor, forest, city and spiral circuits remain available.
 
-游戏已加入双方完赛后结算、Esc 返回菜单、城市分榜和伦敦赛道。伦敦按真实路网组织，但弯角、赛道宽度和部分行驶方向按封闭比赛调整；没有实测高度的建筑和起伏仍为估计值，详见 `assets/london-map-sources.md`。
+Every circuit supports one-lap sprints and three-lap races, AI/local play, two ghost colors, checkpoint gaps, and independent top-five total and lap records. AI races accept either keyboard layout; custom bindings, language and nicknames are stored in this browser. Flat-road cruising is 240 km/h, with uphill slowing and downhill gains.
 
-`tools/london-scene-test.html` 提供逐处检查和道路碰撞扫描。比赛路线有独立青绿色边线；红白实体路障封闭非比赛支路，路口人行道按道路并集裁剪。
+## Local development
 
-## 在线试玩
-
-[打开 TWIN TURBO](https://yiiiiming.github.io/mayi-shangshu/twin-turbo/)
-
-使用 GitHub Pages 发布，电脑浏览器直接打开。源码保存在独立的仓库 `Yiiiiming/twin-turbo`；网页发布在已有站点的 `twin-turbo/` 子目录。
-
-## 赛道与风景
-
-海岸大奖赛由长直道、连续 S 弯、左右转向和内场发夹弯组成，正常驾驶目标单圈约 40–60 秒。三圈标准大奖赛、五圈耐力挑战；每圈依次穿越海岸港湾、松林山谷和霓虹城区。
-
-三个全景背景由 ImageGen 专门绘制，搭配立体棕榈、松树、山石、灯塔、建筑、路肩、护栏及弯道标志。背景随所在路段平滑过渡，两个玩家各自看到自己所在的场景。素材与生成提示词见 `assets/prompts.json`。
-
-## 操作
-
-| 操作 | 玩家一：青色闪电 | 玩家二：橙色风暴 |
-|---|---|---|
-| 加速 | W | ↑ |
-| 刹车 / 倒车 | S | ↓ |
-| 左右转向 | A / D | ← / → |
-| 氮气 | 左 Shift | Enter |
-| 返回赛道，罚停 2 秒 | Q | / |
-
-Esc 暂停 / 继续。空格可出发或暂停。离开游戏窗口会自动暂停。声音默认关闭，可在右上角开启；全屏按钮可放大赛场。
-
-发车区可选择「本地双人」或「单人挑战 AI」。单人时你驾驶左侧青色赛车，右侧橙色赛车由 AI 控制。AI 使用相同的油门、刹车、转向和氮气，遵守碰撞与计圈规则；卡住时同样罚停 2 秒后返回赛道。
-
-弯前减速，出弯加速。普通与氮气速度均较首版提高 10%。正常车速下转向灵敏度降低约 16.5%，按键转向逐渐加力、松开及时回中，高速氮气期间进一步降低转向幅度。氮气自动恢复；驶出赛道会减速。树干、建筑、岩石、路灯支柱和护栏有实体碰撞，撞上会受阻并减速。计圈允许轻微压路肩；每一圈仍须顺序经过沿途检查点，逆行或大幅抄近路无法增加圈数。小地图显示双方位置。
-
-## 全站排行榜
-
-页面下方展示共享的历史前五，3 圈和 5 圈独立排名，以整场完赛时间越短越优。实际完赛的真人若进入前五，比赛结束后询问昵称；可填写最多 16 个字符或跳过。AI 不参与排名。昵称和成绩公开显示，不需要账号。
-
-排行榜通过独立在线服务持久保存到 D1，所有访问者共享。提交时再次检查资格，重复重试不会重复记录；相同用时先提交者在前。网络异常时保留本局结果与昵称并允许重试。重新开局会放弃尚未提交的本局记录。
-
-服务源码见 `leaderboard-service/`。游戏入口继续使用 GitHub Pages，服务地址仅用于后台 API。成绩为客户端报告并有基础合法性验证，适合休闲竞速榜，不是服务器权威的竞技反作弊系统。
-
-## 离线与开发
-
-双击 **Twin Turbo.html** 即可离线玩双人或 AI 对战，背景、逻辑和音效均包含在文件内；全站排行榜需要联网。浏览器需支持 WebGL。推荐使用有实体键盘的桌面电脑；部分键盘可能无法识别双方同时按下的全部按键。
-
-原生 JavaScript、WebGL、Canvas 2D HUD 和 Web Audio。伦敦使用 Three.js、polygon-clipping 与整数几何库 Clipper，由 esbuild 打包。
+Install Node.js and Python 3, then run:
 
 ```sh
+npm install
+npm test
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-访问 `http://127.0.0.1:8765`。构建网页及离线版本：
+Open `http://127.0.0.1:8765/`. Run `python3 build.py` to build `dist/` and the self-contained `Twin Turbo.html` offline edition.
 
-```sh
-pnpm install --frozen-lockfile
-python3 build.py
-node --test tests/*.test.mjs
-```
+## GitHub Pages
 
-`dist/index.html` 与 `dist/assets/` 是完整网页部署目录，发布到 GitHub Pages 的 `twin-turbo/` 子目录。离线单文件单独生成为根目录的 `Twin Turbo.html`。
+This repository owns the game's source and publication. In Settings → Pages, use **Deploy from a branch**, **main**, **/docs**. The `docs/` directory contains the verified standalone web bundle and four sky/scenery images. Rebuild with `python3 build.py`, copy the contents of `dist/` into `docs/`, and commit both source changes and the refreshed publication.
 
-## 文件
+The separate score service remains at `https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site`. Records and ghosts are keyed by their existing city/version/attempt identifiers, so moving the game URL does not reset them. Old and new Pages URLs share the same origin, preserving browser-local preferences.
 
-- `engine.js`：车辆物理、解析赛道、检查点、计圈与比赛状态。
-- `ai.js`：使用真实车辆控制的 AI 对手与避让、救援策略。
-- `leaderboard.js` / `leaderboard-client.js`：排名规则、在线查询、资格检查与昵称提交。
-- `collisions.js`：空间网格索引、圆形与旋转盒体实体碰撞及撞击响应。
-- `renderer.js`：原生 WebGL、两台透视跟车相机、立体车辆和分区场景。
-- `main.js`：键盘控制、HUD、小地图、界面及合成音效。
-- `index.html` / `style.css`：中文界面和响应式布局。
-- `assets/`：生成的三组风景及提示词。
-- `tests/`：真实操控完成比赛、镜头数学与界面事件的回归验证。
-- `build.py`：网页部署版本和离线单文件构建入口。
-- `city-frontages.js` / `city-landmarks.js`：街区立面及独立地标模型。
-- `city-roads.js` / `city-placement.js`：路口并集裁剪、支路封口与模型通行范围。
+The old large London prototype is retired. This main branch contains only the current compact game; the earlier prototype remains recoverable through Git history.
+
+## Validation
+
+The city release passed 303 frontend checks, including both AI drivers completing one- and three-lap races on every circuit, quarter splits, mesh and camera clearances, language/setup flows, record isolation and matching ghosts. The shared record service passed 45 checks. Browser screenshot acceptance was unavailable during this release.
+
+The four city skies use an original generated cloud-only image; other circuits retain their existing scenery. Landmark design references include [UT Austin's Tower history](https://news.utexas.edu/2018/10/04/whats-the-story-behind-the-tower/), [Beijing's Temple of Heaven architecture](https://english.visitbeijing.com.cn/article/47ONy6AX0b3), [Austin's downtown guide](https://www.austintexas.org/explore/entertainment-districts/downtown/), and [Visit Brasil's Rio guide](https://www.visitbrasil.com/en/location/rio-de-janeiro-en/).

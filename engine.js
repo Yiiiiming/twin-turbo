@@ -1,6 +1,6 @@
 import { ObstacleWorld } from './collisions.js';
-import { roadSurface, createLondonTrack } from './tracks.js';
-import londonMap from './assets/london-map.json' with { type: 'json' };
+import { roadSurface } from './tracks.js';
+import { HARBOR_TRACKS } from './harbor-tracks.js';
 
 /** Pure, deterministic arcade simulation. Distances are pixels; time is seconds. */
 const TAU = Math.PI * 2;
@@ -47,16 +47,30 @@ addArc(920, 1210, 220, 0, Math.PI / 2);
 addLine(920, 1430, 700, 1430);
 const LENGTH = circuitLength;
 
+// Keep the existing staggered-grid handicap, now set to 0.15 seconds at
+// the normal 363 px/s cruise speed. This is a distance equivalent, not a
+// launch delay; both cars accelerate at GO and time laps at the common line.
+const GRID_LANES = [-18, 22];
+export const GRID_HANDICAP_SECONDS = 0.15;
+const GRID_HANDICAP_DISTANCE = 363 * GRID_HANDICAP_SECONDS;
+const START_GRID = Object.freeze(GRID_LANES.map((lane, index) => Object.freeze({
+  lane, offset: -30 - (index === 1 ? GRID_HANDICAP_DISTANCE : 0),
+})));
+
 const COAST_TRACK = Object.freeze({
   id: 'coast', name: '海岸技术环线', city: 'coast',
   width: 2500 * CIRCUIT_SCALE, height: 1650 * CIRCUIT_SCALE, roadWidth: 120,
   checkpointMargin: 40,
-  length: LENGTH, startDistance: 0, checkpoints: CHECKPOINTS,
+  length: LENGTH, startDistance: 0, startGrid: START_GRID, checkpoints: CHECKPOINTS,
   segments: Object.freeze(segments), sections: Object.freeze([]),
   carRadius: 21, carCollisionDistance: 37, carHeight: 25,
 });
 
-export const TRACKS = { coast: COAST_TRACK, london: createLondonTrack(londonMap) };
+const CITY_CIRCUITS = ['coast-austin','coast-beijing','coast-london','coast-rio'];
+export const TRACKS = Object.fromEntries([
+  ...CITY_CIRCUITS.map(id=>HARBOR_TRACKS.find(track=>track.id===id)),COAST_TRACK,
+  ...HARBOR_TRACKS.filter(track=>!CITY_CIRCUITS.includes(track.id)),
+].map(track=>[track.id,track]));
 export let TRACK = COAST_TRACK;
 export function registerTrack(track) {
   if (!track?.id || !(track.length > 0) || !Array.isArray(track.segments)) throw new TypeError('Invalid track.');
@@ -108,7 +122,7 @@ function segmentPoint(segment, along, lane = 0) {
 }
 
 /** Exact nearest point on the bounded lines/arcs, including both turn signs. */
-export function projectTrack(x, y, referenceS = null) {
+export function projectTrack(x, y, referenceS = null, referenceElevation = null) {
   const { segments } = TRACK;
   let nearestS = 0, nearestSquared = Infinity;
   for (const segment of segments) {
@@ -141,8 +155,9 @@ export function projectTrack(x, y, referenceS = null) {
     const continuityPenalty = referenceS === null ? 0
       : Math.abs(signedDistance(referenceS, candidate.s)) > Math.max(250, TRACK.roadWidth * 3)
         ? TRACK.roadWidth ** 2 : 0;
-    if (squared + continuityPenalty < nearestSquared) {
-      nearestSquared = squared + continuityPenalty;
+    const heightPenalty = referenceElevation === null ? 0 : (roadSurface(TRACK, candidate.s).elevation - referenceElevation) ** 2;
+    if (squared + continuityPenalty + heightPenalty < nearestSquared) {
+      nearestSquared = squared + continuityPenalty + heightPenalty;
       nearestS = candidate.s;
     }
   }
@@ -152,8 +167,10 @@ export function projectTrack(x, y, referenceS = null) {
 }
 
 function createCar(id) {
-  const lane = id === 1 ? -18 : 22;
-  const p = trackPoint(TRACK.startDistance - 30, lane);
+  const grid = TRACK.startGrid?.[id - 1];
+  const lane = grid?.lane ?? (id === 1 ? -18 : 22);
+  const gridS = TRACK.startDistance + (grid?.offset ?? -30);
+  const p = trackPoint(gridS, lane);
   return {
     id, x: p.x, y: p.y, angle: p.angle, speed: 0,
     elevation: p.elevation, slope: p.slope, height: TRACK.carHeight,
@@ -161,9 +178,9 @@ function createCar(id) {
     lapTime: 0, bestLap: null, lastLap: null,
     offroad: false, steer: 0, lastSkid: false, impact: 0,
     finished: false, finishTime: null, missedCheckpoint: false, rescueCooldown: 0,
-    _lane: lane, _started: false, _nextCheckpoint: 0,
+    _lane: lane, _gridS: gridS, _started: false, _nextCheckpoint: 0,
     _lastTrackS: p.s, _lastX: p.x, _lastY: p.y,
-    _lastCheckpointS: TRACK.startDistance - 30, _lastCheckpointEligible: true,
+    _lastCheckpointS: gridS, _lastCheckpointEligible: true,
     _lapStartTime: 0,
   };
 }
@@ -279,7 +296,7 @@ export class RaceEngine {
   rescue(id) {
     const car = this.cars.find(candidate => candidate.id === id);
     if (!car || car.finished || this.state !== 'racing') return;
-    const s = car._started ? car._lastCheckpointS + 18 : TRACK.startDistance - 30;
+    const s = car._started ? car._lastCheckpointS + 18 : car._gridS;
     const p = trackPoint(s, car._lane);
     car.x = p.x; car.y = p.y; car.angle = p.angle;
     car.elevation = p.elevation; car.slope = p.slope;
@@ -318,7 +335,7 @@ export class RaceEngine {
       if (car.finished) continue;
       const previous = { x: car.x, y: car.y, elevation: car.elevation };
       this._drive(car, dt, keys);
-      const surface = projectTrack(car.x, car.y, car._lastTrackS);
+      const surface = projectTrack(car.x, car.y, car._lastTrackS, car.elevation);
       car.elevation = surface.elevation; car.slope = surface.slope;
       this.obstacleWorld.resolveCar(car, previous);
       if (this.traffic.length) this.trafficWorld.resolveCar(car, previous);
@@ -357,25 +374,34 @@ export class RaceEngine {
     const left = keys.has(p1 ? 'KeyA' : 'ArrowLeft');
     const right = keys.has(p1 ? 'KeyD' : 'ArrowRight');
     const boost = keys.has(p1 ? 'ShiftLeft' : 'Enter');
-    const surface = projectTrack(car.x, car.y, car._lastTrackS);
+    const surface = projectTrack(car.x, car.y, car._lastTrackS, car.elevation);
     car.offroad = surface.distance > TRACK.roadWidth / 2;
     car.boosting = boost && forward && !reverse && car.boost > 0.5
       && car.speed > 40 && !car.offroad;
     car.boost = clamp(car.boost + (car.boosting ? -32 : 12) * dt, 0, 100);
-    const maximum = car.offroad ? 145 : car.boosting ? 517 : 363;
+    // Slope follows the car's heading, not just the circuit direction: turning
+    // around swaps uphill/downhill, and driving across a slope has no assist.
+    const grade = clamp(surface.slope * Math.cos(car.angle - surface.angle), -.25, .25);
+    const slopeSpeed = clamp(grade * 1.2, -.18, .18);
+    const maximum = (car.offroad ? 145 : car.boosting ? 517 : 363) * (1 - slopeSpeed);
+    const reverseMaximum = -115 * (1 + slopeSpeed);
+    // Apply gravity before throttle/drag so it changes acceleration and coast
+    // distance without pushing a stationary car or defeating the brakes.
+    // The adjusted speed target keeps the slope effect present at full throttle.
+    if (car.speed !== 0 && grade !== 0) {
+      const speed = car.speed - grade * 180 * dt;
+      car.speed = car.speed > 0 ? Math.max(0, speed) : Math.min(0, speed);
+    }
     if (forward && reverse) {
       car.speed = approach(car.speed, 0, 400 * dt);
     } else if (reverse) {
-      car.speed = approach(car.speed, -115, (car.speed > 0 ? 375 : 150) * dt);
+      car.speed = approach(car.speed, reverseMaximum, (car.speed > 0 ? 375 : 150) * dt);
     } else if (forward) {
       car.speed = approach(car.speed, maximum, (car.speed < 0 ? 350 : car.offroad ? 145 : car.boosting ? 484 : 258.5) * dt);
     } else {
       car.speed = approach(car.speed, 0, (car.offroad ? 145 : 62) * dt);
     }
     if (car.speed > maximum) car.speed = approach(car.speed, maximum, (car.offroad ? 620 : 250) * dt);
-    if (surface.slope && Math.abs(car.speed) > 1) {
-      car.speed -= surface.slope * Math.cos(car.angle - surface.angle) * 90 * dt;
-    }
     const steerTarget = Number(right) - Number(left);
     // Ease into a held key over 200 ms. Release/countersteer returns toward
     // center faster, so corrections do not leave a long steering tail.
@@ -387,7 +413,7 @@ export class RaceEngine {
     const speed = Math.abs(car.speed);
     const turnLimit = (2.18 - .36 * clamp(speed / 363, 0, 1))
       * (1 - .08 * clamp((speed - 363) / (517 - 363), 0, 1));
-    const steeringGrip = TRACK.id === 'coast' ? 0.23 + grip * 0.77 : 0.8 + grip * 0.2;
+    const steeringGrip = TRACK.id === 'coast' || TRACK.id.startsWith('coast-') ? 0.23 + grip * 0.77 : 0.8 + grip * 0.2;
     const turn = car.steer * turnLimit * steeringGrip
       * Math.min(Math.abs(car.speed) / 30, 1) * Math.sign(car.speed);
     car.angle = mod(car.angle + turn * dt + Math.PI, TAU) - Math.PI;
@@ -437,7 +463,7 @@ export class RaceEngine {
 
   _advance(car, dt) {
     const { length: LENGTH, checkpoints: CHECKPOINTS } = TRACK;
-    const p = projectTrack(car.x, car.y, car._lastTrackS);
+    const p = projectTrack(car.x, car.y, car._lastTrackS, car.elevation);
     car.elevation = p.elevation; car.slope = p.slope;
     const onRoad = p.distance <= TRACK.roadWidth / 2;
     const checkpointLimit = TRACK.roadWidth / 2 + TRACK.checkpointMargin;

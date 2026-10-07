@@ -37,16 +37,15 @@ web_directory.mkdir(exist_ok=True)
 (web_directory / 'assets').mkdir(exist_ok=True)
 embedded = {}
 offline_css = css
-for name in ('coast', 'alpine', 'city', 'london-plane-tree'):
-    asset = ROOT / 'assets' / f'{name}.png'
+for name, filename in (('coast', 'coast.png'), ('alpine', 'alpine.png'), ('city', 'city.png'), ('clouds', 'cloud-sky.jpg')):
+    asset = ROOT / 'assets' / filename
     shutil.copy2(asset, web_directory / 'assets' / asset.name)
-    embedded[name] = 'data:image/png;base64,' + base64.b64encode(asset.read_bytes()).decode('ascii')
-    offline_css = offline_css.replace(f"url('./assets/{name}.png')", f'var(--scene-{name})')
+    mime = 'image/jpeg' if asset.suffix == '.jpg' else 'image/png'
+    embedded[name] = f'data:{mime};base64,' + base64.b64encode(asset.read_bytes()).decode('ascii')
+    offline_css = offline_css.replace(f"url('./assets/{filename}')", f'var(--scene-{name})')
 
 for name in ('THREE-LICENSE.txt', 'THIRD-PARTY-LICENSES.txt'):
     shutil.copy2(ROOT / 'vendor' / name, web_directory / name)
-for name in ('london-map-sources.md', 'london-landmark-sources.md', 'london-building-sources.md'):
-    shutil.copy2(ROOT / 'assets' / name, web_directory / 'assets' / name)
 (web_directory / 'index.html').write_text(edition(css))
 destination = ROOT / 'Twin Turbo.html'
 prelude = 'globalThis.TWIN_SCENE_ART=' + json.dumps(embedded) + ';\n'

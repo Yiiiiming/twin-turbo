@@ -131,6 +131,14 @@ export function createClosedTrack({ id, name, city, points, roadWidth = 90, radi
 export function roadSurface(track, distance) {
   const s = mod(distance, track.length);
   let elevation = 0, slope = 0, tunnel = false, bridge = false;
+  for (const profile of track.elevationProfile || []) {
+    if (s < profile.start || s > profile.end) continue;
+    const span = profile.end - profile.start, t = clamp((s - profile.start) / span, 0, 1);
+    elevation = profile.from + (profile.to - profile.from) * t * t * (3 - 2 * t);
+    slope = (profile.to - profile.from) * 6 * t * (1 - t) / span;
+    bridge = elevation > 3;
+    break;
+  }
   for (const section of track.sections || []) {
     const span = mod(section.end - section.start, track.length) || track.length;
     const along = mod(s - section.start, track.length);

@@ -23,7 +23,7 @@ export class RaceAI {
     const tick=Math.min(dt,.1);
     this.elapsed+=tick;
     const projection=projectTrack(car.x,car.y,car._lastTrackS);
-    const city=TRACK.id!=='coast';
+    const city=TRACK.id!=='coast'&&!TRACK.id.startsWith('coast-');
     const advanced=this._lastS===null?0:mod(projection.s-this._lastS+TRACK.length/2,TRACK.length)-TRACK.length/2;
     this._lastS=projection.s;
     if(car.rescueCooldown>0) {

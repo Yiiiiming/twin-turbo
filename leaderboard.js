@@ -1,8 +1,8 @@
 /** Pure leaderboard rules shared by the game and the score service. */
 export const LEADERBOARD_VERSION = 'twin-turbo-technical-v2-363-517';
 export const LEADERBOARD_LIMIT = 5;
-export const LEADERBOARD_CITIES = Object.freeze(['coast', 'london']);
-const SUPPORTED_LAPS = [3, 5];
+export const LEADERBOARD_CITIES = Object.freeze(['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-grand', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'london']);
+const SUPPORTED_LAPS = [1, 3, 5];
 const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Cs}]/gu;
 
 /** Scores created before city selection belong to the original coast circuit. */
@@ -44,7 +44,7 @@ function normalizeRecord(value) {
 
 /**
  * Copy, validate and order records for exactly one city (legacy default: coast).
- * Without laps, return its 3-lap board then 5-lap board. Equal times retain their
+ * Without laps, return its boards in increasing lap-count order. Equal times retain their
  * existing order. IDs are deduplicated within each city/lap category.
  */
 export function normalizeEntries(entries, laps, city = 'coast') {

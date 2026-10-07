@@ -77,7 +77,7 @@ test('a new record may follow existing ties while unfilled places remain', () =>
 test('only valid finished results qualify for the name prompt', () => {
   for (const value of [null, undefined, {}, result(0), result(-100), result(NaN), result(Infinity),
     result(123.5), result('123000'), result(120000, { finished: false }), result(120000, { finished: 1 }),
-    result(120000, { finished: 'true' }), result(120000, { laps: 1 }), result(120000, { playerId: 3 })]) {
+    result(120000, { finished: 'true' }), result(120000, { laps: 2 }), result(120000, { playerId: 3 })]) {
     assert.equal(qualifyingRank([], value), null);
   }
   assert.equal(qualifyingRank([], result(120000, { playerId: 2 })), 1);
@@ -128,7 +128,7 @@ test('inserting into one lap category preserves the other category exactly', () 
 });
 
 test('legacy records belong only to coast and city values are strictly validated', () => {
-  assert.deepEqual(LEADERBOARD_CITIES, ['coast', 'london']);
+  assert.deepEqual(LEADERBOARD_CITIES, ['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-grand', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'london']);
   assert.equal(normalizeCity(undefined), 'coast');
   assert.equal(normalizeCity('london'), 'london');
   for (const value of [null, '', 'London', 'unknown', 1, {}, []]) {
@@ -169,4 +169,15 @@ test('inserting in London preserves both coast boards and the other London lap b
   assert.equal(inserted.length, 16);
   const retry = insertRecord(inserted, record('london-new', 300000, { city: 'london' }));
   assert.deepEqual(retry, inserted, 'same city/lap/ID remains idempotent');
+});
+
+
+test('one-lap sprint boards stay separate from three-lap and historical five-lap records in every harbor course', () => {
+  for (const city of LEADERBOARD_CITIES.filter(value => value !== 'london')) {
+    const source = [record('sprint', 42000, { laps: 1, city }), record('three', 130000, { city }), record('five', 220000, { laps: 5, city })];
+    assert.equal(normalizeEntries(source, 1, city)[0].id, 'sprint');
+    assert.equal(qualifyingRank(source, result(41000, { laps: 1, city })), 1);
+    assert.equal(insertRecord(source, record('sprint-new', 41000, { laps: 1, city })).length, 4);
+    assert.deepEqual(normalizeEntries(source, 3, city).map(value => value.id), ['three']);
+  }
 });
