@@ -1,6 +1,6 @@
 # Twin Turbo
 
-A compact arcade racer with eleven circuits. Choose Chinese or English, race the AI in one full-width view or a friend in split screen, and challenge up to two saved ghosts.
+A compact arcade racer with twelve circuits. Choose Chinese or English, race the AI in one full-width view or a friend in split screen, and challenge up to two saved ghosts.
 
 The opening selection is London Riverside, one lap, against the AI. Its fastest-lap leaderboard and ghost picker use the same London circuit.
 
@@ -10,7 +10,7 @@ At the finish, each human driver enters one nickname directly in the results pan
 
 ## Circuits and controls
 
-The first four circuits are London Riverside, Rio Coastal Rhythm, Austin River Run and Beijing Imperial Run. Austin includes the UT Tower and a roadside football squad. The original seven harbor, forest, city and spiral circuits remain available.
+The first four circuits are London Riverside, Rio Coastal Rhythm, Austin River Run and Beijing Imperial Run. Austin includes the UT Tower and a roadside football squad. The original seven harbor, forest, city and spiral circuits remain available, followed by circuit 12, Paris Seine Loop: the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf.
 
 Every circuit supports one-lap sprints and three-lap races, AI/local play, two ghost colors, checkpoint gaps, and independent top-five total and lap records. AI races accept either keyboard layout; custom bindings, language and nicknames are stored in this browser. Flat-road cruising is 240 km/h, with uphill slowing and downhill gains.
 

@@ -337,9 +337,9 @@ test('changing track clears prior ghosts and rejects late search and ranked-boar
   h.client.startRace(); h.client.setTrack('coast'); assert.equal(h.client.city, 'coast-ridge');
 });
 
-test('Beijing, Austin and Rio each load only their own single-lap and three-lap challengers', async () => {
+test('Beijing, Austin, Rio and Paris each load only their own single-lap and three-lap challengers', async () => {
   const h = setup(); h.client.recordsManaged = true; await h.client.init();
-  for(const city of ['coast-beijing','coast-austin','coast-rio'])for(const laps of [1,3]) {
+  for(const city of ['coast-beijing','coast-austin','coast-rio','coast-paris'])for(const laps of [1,3]) {
     h.client.setTrack(city);assert.equal(h.client.city,city);
     const value=laps===1?entry('城市车手',`${city}-lap`):raceEntry('城市车手',`${city}-race`);
     h.queue.push(laps===1?response({city,entries:[value]}):raceResponse({city,entries:[value]}));

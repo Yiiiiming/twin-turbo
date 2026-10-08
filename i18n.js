@@ -3,7 +3,7 @@
 const PHRASES = [
 ['单人赛道，镜头跟随你的赛车','Single-player circuit, camera following your car'],['单人完整视野斜后方赛车。自定义按键见下方操作说明。','Full-view single-player chase-camera racing. See the controls below for your custom key bindings.'],
 ['更改地图/模式','Change track / mode'],['泰晤士河岸','Thames Riverside'],['伦敦河岸','London Riverside'],
-['北京古都','Imperial Beijing'],['奥斯汀河谷','Austin River Valley'],['里约海岸','Rio Coast'],
+['北京古都','Imperial Beijing'],['奥斯汀河谷','Austin River Valley'],['里约海岸','Rio Coast'],['巴黎塞纳河','Paris Seine'],
 ['选择赛道，开始下一局','Choose a circuit for the next race'],['AI 自动驾驶 · 遵循相同物理规则','AI drives automatically with the same physics rules'],['或','or'],
 ['从 GO 开始','From GO'],['起终点之间','Line to line'],
 ['TWIN TURBO · 双人分屏赛车','TWIN TURBO · Split-screen Racing'],

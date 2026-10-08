@@ -128,7 +128,7 @@ test('inserting into one lap category preserves the other category exactly', () 
 });
 
 test('legacy records belong only to coast and city values are strictly validated', () => {
-  assert.deepEqual(LEADERBOARD_CITIES, ['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-grand', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'london']);
+  assert.deepEqual(LEADERBOARD_CITIES, ['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-grand', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'coast-paris', 'london']);
   assert.equal(normalizeCity(undefined), 'coast');
   assert.equal(normalizeCity('london'), 'london');
   for (const value of [null, '', 'London', 'unknown', 1, {}, []]) {

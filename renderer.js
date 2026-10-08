@@ -295,7 +295,7 @@ function building(mesh,x,z,w,d,h,rng) {
 /** Smooth, coordinated terrain palettes keep asphalt and curbs easy to read. */
 export const TERRAIN_PALETTES=Object.freeze({
   coast:'#857766','coast-bay':'#91aa9b','coast-pines':'#2f5445','coast-neon':'#30394f',
-  'coast-marina':'#8d6456','coast-grand':'#958556','coast-ridge':'#637881','coast-london':'#72817b','coast-beijing':'#8d947d','coast-austin':'#929476','coast-rio':'#b6bd8e',
+  'coast-marina':'#8d6456','coast-grand':'#958556','coast-ridge':'#637881','coast-london':'#72817b','coast-beijing':'#8d947d','coast-austin':'#929476','coast-rio':'#b6bd8e','coast-paris':'#7e8f7d',
 });
 const localPoint=(x,z,angle,forward,up,lateral)=>[x+Math.cos(angle)*forward-Math.sin(angle)*lateral,up,z+Math.sin(angle)*forward+Math.cos(angle)*lateral];
 
@@ -687,7 +687,7 @@ function buildWorld() {
   if(london)londonPavements(terrain);
   if(themedCity)addCityPavements(terrain);
   const waterStart=river?river.centerZ-river.halfWidth:shoreZ,waterEnd=river?river.centerZ+river.halfWidth:h+2600;
-  if(!inland)water.quad([-1800,.12,waterStart],[w+2400,.12,waterStart],[w+2400,.12,waterEnd],[-1800,.12,waterEnd],london?'#577f88':'#318caa',.2,[0,1,0]);
+  if(!inland)water.quad([-1800,.12,waterStart],[w+2400,.12,waterStart],[w+2400,.12,waterEnd],[-1800,.12,waterEnd],london||TRACK.theme==='paris'?'#577f88':'#318caa',.2,[0,1,0]);
   for(let i=0;i<(inland?0:85);i++) {
     const x=-1100+rng()*(w+2200),z=waterStart+15+rng()*(river?waterEnd-waterStart-30:1600),len=25+rng()*130;
     water.quad([x,.17,z],[x+len,.17,z],[x+len,.17,z+1.6],[x,.17,z+1.6],'#78c6ce',.4,[0,1,0]);

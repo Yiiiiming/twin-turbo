@@ -373,7 +373,7 @@ test('old saves cannot notify after a new race clears all result cards', async (
   assert.equal(h.client.cards.length, 0); assert.equal(h.savedCalls, 0);
 });
 
-for (const trackId of ['coast-london', 'coast-beijing', 'coast-austin', 'coast-rio']) for (const laps of [1, 3]) test(`${trackId} ${laps}-lap result preserves its own map while another board is viewed, then returns an exact ghost challenge`, async () => {
+for (const trackId of ['coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'coast-paris']) for (const laps of [1, 3]) test(`${trackId} ${laps}-lap result preserves its own map while another board is viewed, then returns an exact ghost challenge`, async () => {
   const h = setup(), saved = [];
   h.handler = req => {
     const city = req.body?.city || req.url.searchParams.get('city');

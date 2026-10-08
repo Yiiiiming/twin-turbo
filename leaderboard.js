@@ -1,7 +1,7 @@
 /** Pure leaderboard rules shared by the game and the score service. */
 export const LEADERBOARD_VERSION = 'twin-turbo-technical-v2-363-517';
 export const LEADERBOARD_LIMIT = 5;
-export const LEADERBOARD_CITIES = Object.freeze(['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-grand', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'london']);
+export const LEADERBOARD_CITIES = Object.freeze(['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-grand', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'coast-paris', 'london']);
 const SUPPORTED_LAPS = [1, 3, 5];
 const CONTROL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Cs}]/gu;
 

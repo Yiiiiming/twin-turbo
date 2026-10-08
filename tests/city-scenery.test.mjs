@@ -4,7 +4,7 @@ import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack } from '.
 import { RaceAI } from '../ai.js';
 import { RaceRenderer, sceneObstacles, updateChaseCamera, TERRAIN_PALETTES } from '../renderer.js';
 import { cityLandmarkPlacements, citySceneryPlacements, addCityLandmark, addCityStreetScenery } from '../city-scenery.js';
-const cities=['coast-beijing','coast-austin','coast-rio'];
+const cities=['coast-beijing','coast-austin','coast-rio','coast-paris'];
 test.afterEach(()=>setTrack('coast'));
 
 class BoundsMesh {
@@ -26,7 +26,8 @@ function fakeGL(){
 for(const id of cities)test(`${id}: authentic landmark silhouettes fit reserved plots and detailed street buildings never overlap`,()=>{
  setTrack(id);const landmarks=cityLandmarkPlacements(),scenery=citySceneryPlacements();assert.ok(landmarks.length>=3);assert.ok(scenery.length>90);
  const kinds=new Set(landmarks.map(item=>item.kind));
- const required=id.endsWith('beijing')?['temple-of-heaven','palace-gate','beijing-paifang']:id.endsWith('austin')?['texas-capitol','music-guitar','austin-music-hall','ut-tower','football-team','austin-bridge-foot']:['christ-redeemer','sugarloaf','lapa-aqueduct'];
+ const required={'coast-beijing':['temple-of-heaven','palace-gate','beijing-paifang'],'coast-austin':['texas-capitol','music-guitar','austin-music-hall','ut-tower','football-team','austin-bridge-foot'],
+  'coast-rio':['christ-redeemer','sugarloaf','lapa-aqueduct'],'coast-paris':['eiffel-tower','arc-de-triomphe','louvre-pyramid','paris-bridge-pylon']}[id];
  for(const kind of required)assert.ok(kinds.has(kind),kind);
  for(const item of landmarks){
   assert.ok(projectTrack(item.x,item.z).distance>TRACK.roadWidth/2+item.radius+4,`${item.kind} road clearance`);
@@ -72,7 +73,7 @@ for(const id of cities)test(`${id}: both drivers finish real 1-lap and 3-lap rac
  }
 });
 
-test('four city skies bind only the clouds image and use a plain gradient while it loads',()=>{
+test('all five city skies bind only the clouds image and use a plain gradient while it loads',()=>{
  for(const id of ['coast-london',...cities]){
   setTrack(id);const gl=fakeGL(),bound=[],uniforms=new Map();gl.bindTexture=(_,texture)=>bound.push(texture);gl.uniform1f=(key,value)=>uniforms.set(key,value);
   const renderer=new RaceRenderer({width:1000,height:600,getContext:()=>gl,addEventListener(){}});
@@ -88,4 +89,17 @@ test('four city skies bind only the clouds image and use a plain gradient while 
  const renderer=new RaceRenderer({width:1000,height:600,getContext:()=>gl,addEventListener(){}});bound.length=0;
  renderer._sky(updateChaseCamera({...trackPoint(TRACK.startDistance),speed:0},null),{coast:1,alpine:0,city:0},.8);
  assert.deepEqual(bound,[renderer.textures.coast.texture,renderer.textures.alpine.texture,renderer.textures.city.texture]);
+});
+
+test('Paris crosses the Seine on two level bridges built on straights, from a flat start boulevard',()=>{
+ setTrack('coast-paris');assert.deepEqual(TRACK.bridges.map(bridge=>bridge.kind),['paris-alexandre','paris-pont-neuf']);
+ for(const section of TRACK.sections)assert.ok(TRACK.segments.some(segment=>segment.kind==='line'&&section.start>=segment.s&&section.end<=segment.s+segment.length),`${section.name} ramps stay off the corners`);
+ for(const bridge of TRACK.bridges){
+  for(let s=bridge.s-bridge.halfSpan;s<=bridge.s+bridge.halfSpan;s+=17)assert.ok(Math.abs(trackPoint(s).elevation-bridge.deckHeight)<1e-6,'deck is level over the river');
+  for(let s=bridge.s-bridge.halfSpan-600;s<bridge.s+bridge.halfSpan+600;s+=9)assert.ok(Math.abs(trackPoint(s).slope)<=.226);
+ }
+ for(const grid of TRACK.startGrid)for(const lane of [-30,0,30])assert.equal(trackPoint(TRACK.startDistance+grid.offset,lane).elevation,0);
+ const landmarks=cityLandmarkPlacements();assert.equal(landmarks.filter(item=>item.kind==='paris-bridge-pylon').length,4);
+ const heights=Object.fromEntries(landmarks.map(item=>{const mesh=new BoundsMesh(item);addCityLandmark(mesh,item);return [item.kind,mesh.height];}));
+ assert.ok(heights['eiffel-tower']>400&&heights['eiffel-tower']>2*heights['arc-de-triomphe'],'the Eiffel Tower rises above the skyline');
 });

@@ -73,6 +73,20 @@ function twinHelix() {
       Object.freeze({start:downStart,end:downEnd,degrees:1080,direction:'down',cx:3400,cy:2325,radius:275}),
     ]),metadata:Object.freeze({nameEn,description,descriptionEn,themeName:'双螺旋高架',suggestedLapSeconds:60,difficulty:'expert',elevationGain:570}) });
 }
+/** A river circuit crosses its east-west river on exactly two straights, west bridge first. */
+function riverBridges(base,river,{kinds,decks,abutment,ramp}) {
+  const crossings=base.segments.filter(segment=>segment.kind==='line'&&
+    (segment.y1-river.centerZ)*(segment.y2-river.centerZ)<0).map(segment=>{
+      const u=(river.centerZ-segment.y1)/(segment.y2-segment.y1);
+      return {s:segment.s+segment.length*u,angle:segment.angle,x:segment.x1+(segment.x2-segment.x1)*u,y:river.centerZ};
+    }).sort((a,b)=>a.x-b.x);
+  if(crossings.length!==2)throw new Error(`${base.id} must cross its river on exactly two bridges.`);
+  const bridges=crossings.map((crossing,index)=>Object.freeze({...crossing,kind:kinds[index],
+    halfSpan:river.halfWidth/Math.abs(Math.sin(crossing.angle))+abutment,deckHeight:decks[index]}));
+  const sections=bridges.map(bridge=>Object.freeze({type:'bridge',name:bridge.kind,
+    start:bridge.s-bridge.halfSpan-ramp,end:bridge.s+bridge.halfSpan+ramp,peak:bridge.deckHeight,ramp}));
+  return {bridges:Object.freeze(bridges),sections:Object.freeze(sections)};
+}
 function londonRiverside() {
   const spec={id:'coast-london',name:'伦敦河岸',nameEn:'London Riverside',themeName:'伦敦河岸',theme:'london',
     description:'穿过塔桥双塔，沿泰晤士河畔掠过大本钟、伦敦眼与红色双层巴士。',
@@ -81,17 +95,8 @@ function londonRiverside() {
     radius:420,lengthTarget:16600,sections:[],scene:{coast:.02,alpine:.53,city:.45}};
   const base=rounded(spec),scale=base.sourcePoints[0].x/900;
   const river=Object.freeze({centerZ:2050*scale,halfWidth:205*scale});
-  const crossings=base.segments.filter(segment=>segment.kind==='line'&&
-    (segment.y1-river.centerZ)*(segment.y2-river.centerZ)<0).map(segment=>{
-      const u=(river.centerZ-segment.y1)/(segment.y2-segment.y1);
-      return {s:segment.s+segment.length*u,angle:segment.angle,x:segment.x1+(segment.x2-segment.x1)*u,y:river.centerZ};
-    }).sort((a,b)=>a.x-b.x);
-  if(crossings.length!==2)throw new Error('The London circuit must cross its river on exactly two bridges.');
-  const bridges=crossings.map((crossing,index)=>Object.freeze({...crossing,kind:index===0?'tower-bridge':'westminster-bridge',
-    halfSpan:river.halfWidth/Math.abs(Math.sin(crossing.angle))+115,deckHeight:index===0?90:64}));
-  const sections=bridges.map(bridge=>Object.freeze({type:'bridge',name:bridge.kind,
-    start:bridge.s-bridge.halfSpan-600,end:bridge.s+bridge.halfSpan+600,peak:bridge.deckHeight,ramp:600}));
-  return Object.freeze({...base,river,bridges:Object.freeze(bridges),sections:Object.freeze(sections),
+  const {bridges,sections}=riverBridges(base,river,{kinds:['tower-bridge','westminster-bridge'],decks:[90,64],abutment:115,ramp:600});
+  return Object.freeze({...base,river,bridges,sections,
     metadata:Object.freeze({...base.metadata,themeName:'伦敦河岸',landmarks:['Tower Bridge','Big Ben','London Eye','London buses'],
       courseStyle:'Compact London-inspired racing circuit; not a geographic road reconstruction.'})});
 }
@@ -117,20 +122,25 @@ function austinRiverRun(){
     points:[[800,3200],[800,850],[2450,650],[3400,1250],[4600,700],[5400,1300],[5450,3250],[4150,3550],[3200,2800],[2200,3550]],
     radius:460,lengthTarget:16800,sections:[],scene:{coast:.16,alpine:.25,city:.59}});
   const scale=base.sourcePoints[0].x/800,river=Object.freeze({centerZ:1950*scale,halfWidth:175*scale});
-  const crossings=base.segments.filter(segment=>segment.kind==='line'&&(segment.y1-river.centerZ)*(segment.y2-river.centerZ)<0)
-    .map(segment=>{const u=(river.centerZ-segment.y1)/(segment.y2-segment.y1);return {
-      s:segment.s+segment.length*u,angle:segment.angle,x:segment.x1+(segment.x2-segment.x1)*u,y:river.centerZ};})
-    .sort((a,b)=>a.x-b.x);
-  if(crossings.length!==2)throw new Error('Austin must cross its river on exactly two bridges.');
-  const bridges=crossings.map((crossing,index)=>Object.freeze({...crossing,kind:index===0?'austin-arch':'austin-congress',
-    halfSpan:river.halfWidth/Math.abs(Math.sin(crossing.angle))+95,deckHeight:index===0?88:60}));
-  const sections=bridges.map(bridge=>Object.freeze({type:'bridge',name:bridge.kind,
-    start:bridge.s-bridge.halfSpan-620,end:bridge.s+bridge.halfSpan+620,peak:bridge.deckHeight,ramp:620}));
+  const {bridges,sections}=riverBridges(base,river,{kinds:['austin-arch','austin-congress'],decks:[88,60],abutment:95,ramp:620});
   // Keep both grid spots on a flat boulevard, clear of the first bridge approach.
   const startDistance=base.segments.find(segment=>segment.kind==='line'&&segment.s>sections[0].end&&segment.length>500)?.s+250;
   return Object.freeze({...base,startDistance:Number.isFinite(startDistance)?startDistance:base.startDistance,river,
-    bridges:Object.freeze(bridges),sections:Object.freeze(sections),
+    bridges,sections,
     metadata:Object.freeze({...base.metadata,landmarks:['Texas State Capitol','Pennybacker-inspired bridge','Live music streets'],
       courseStyle:'Compact Austin-inspired racing circuit; not a geographic road reconstruction.'})});
 }
-export const HARBOR_TRACKS = Object.freeze([...profiles.map(rounded),twinHelix(),londonRiverside(),rounded(cityProfiles[0]),austinRiverRun(),rounded(cityProfiles[1])]);
+function parisSeineLoop(){
+  const base=rounded({id:'coast-paris',name:'巴黎塞纳',nameEn:'Paris Seine Loop',theme:'paris',themeName:'巴黎塞纳河',
+    description:'驶过埃菲尔铁塔，经金色桥塔与石拱桥两跨塞纳河，再掠过凯旋门与卢浮宫玻璃金字塔。',
+    descriptionEn:'Race past the Eiffel Tower, cross the Seine on a gilded bridge and a stone-arch bridge, then sweep by the Arc de Triomphe and the Louvre Pyramid.',
+    points:[[4400,3600],[3300,3600],[2650,3000],[1800,3550],[650,3050],[650,900],[1800,560],[2550,1350],[3550,1150],[4150,560],[5350,760],[5450,3050]],
+    radius:450,lengthTarget:16600,sections:[],scene:{coast:.10,alpine:.22,city:.68}});
+  const scale=base.sourcePoints[0].x/4400,river=Object.freeze({centerZ:2000*scale,halfWidth:150*scale});
+  // Short ramps keep both bridge approaches on their straights, with the start grid flat.
+  const {bridges,sections}=riverBridges(base,river,{kinds:['paris-alexandre','paris-pont-neuf'],decks:[80,62],abutment:95,ramp:580});
+  return Object.freeze({...base,river,bridges,sections,
+    metadata:Object.freeze({...base.metadata,landmarks:['Eiffel Tower','Arc de Triomphe','Louvre Pyramid','Pont Alexandre III','Pont Neuf'],
+      courseStyle:'Compact Paris-inspired racing circuit; not a geographic road reconstruction.'})});
+}
+export const HARBOR_TRACKS = Object.freeze([...profiles.map(rounded),twinHelix(),londonRiverside(),rounded(cityProfiles[0]),austinRiverRun(),rounded(cityProfiles[1]),parisSeineLoop()]);

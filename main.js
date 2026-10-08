@@ -191,7 +191,7 @@ function refreshTrackUI() {
 }
 for(const [index,track]of Object.values(TRACKS).entries()) {
   const button=document.createElement('button');button.type='button';button.className='track-card';button.dataset.track=track.id;
-  const scene=['neon','london','beijing','austin'].includes(track.theme)?'city':['pines','ridge'].includes(track.theme)?'alpine':'coast';
+  const scene=['neon','london','beijing','austin','paris'].includes(track.theme)?'city':['pines','ridge'].includes(track.theme)?'alpine':'coast';
   button.style.setProperty('--card-scene',`url('${globalThis.TWIN_SCENE_ART?.[scene] || `./assets/${scene}.png`}')`);
   button.style.setProperty('--card-position',`${35+index*6}% 60%`);
   const number=document.createElement('small');number.className='track-card-number';number.textContent=String(index+1).padStart(2,'0');button.appendChild(number);

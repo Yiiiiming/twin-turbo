@@ -248,7 +248,7 @@ export class GhostClient {
     this.laps = next; this.resetPickerCategory();
   }
   setTrack(city) {
-    if (this.locked || !['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-grand', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio'].includes(city)
+    if (this.locked || !['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-grand', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'coast-paris'].includes(city)
       || city === this.city) return;
     this.city = city; this.resetPickerCategory();
   }

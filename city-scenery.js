@@ -2,7 +2,7 @@
 import { TRACK, trackPoint, projectTrack } from './engine.js';
 import { addAustinCampus } from './austin-campus.js';
 const TAU=Math.PI*2;
-const THEMES=new Set(['beijing','austin','rio']);
+const THEMES=new Set(['beijing','austin','rio','paris']);
 export const isCityTheme=()=>THEMES.has(TRACK.theme);
 const seedRandom=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 const point=(item,x,y,z)=>[item.x+Math.cos(item.angle)*x-Math.sin(item.angle)*z,y,item.z+Math.sin(item.angle)*x+Math.cos(item.angle)*z];
@@ -12,6 +12,7 @@ const profiles={
  beijing:[['temple-of-heaven',.20,116,-1],['palace-gate',.51,163,1],['beijing-paifang',.79,120,-1]],
  austin:[['texas-capitol',.20,172,-1],['ut-tower',.37,75,-1],['football-team',.40,115,1],['music-guitar',.57,106,1],['austin-music-hall',.80,136,-1]],
  rio:[['christ-redeemer',.19,111,-1],['sugarloaf',.50,238,1],['lapa-aqueduct',.79,147,-1]],
+ paris:[['eiffel-tower',.20,124,1],['arc-de-triomphe',.50,96,1],['louvre-pyramid',.72,150,-1]],
 };
 const placementCache=new WeakMap(),sceneryCache=new WeakMap();
 
@@ -33,10 +34,10 @@ export function cityLandmarkPlacements() {
   if(!found)throw new Error(`${TRACK.id}: no clear roadside plot for ${kind}`);
   result.push(Object.freeze(found));
  }
- for(const bridge of TRACK.bridges||[])if(bridge.kind==='austin-arch'){
+ for(const bridge of TRACK.bridges||[])if(bridge.kind==='austin-arch'||bridge.kind==='paris-alexandre'){
   for(const station of [-1,1])for(const side of [-1,1]){
    const p=trackPoint(bridge.s+station*bridge.halfSpan,side*99);
-   result.push(Object.freeze({kind:'austin-bridge-foot',x:p.x,z:p.y,angle:p.angle,radius:21,s:bridge.s+station*bridge.halfSpan,deck:bridge.deckHeight}));
+   result.push(Object.freeze({kind:bridge.kind==='austin-arch'?'austin-bridge-foot':'paris-bridge-pylon',x:p.x,z:p.y,angle:p.angle,radius:21,s:bridge.s+station*bridge.halfSpan,deck:bridge.deckHeight}));
   }
  }
  const frozen=Object.freeze(result);placementCache.set(TRACK,frozen);return frozen;
@@ -44,14 +45,16 @@ export function cityLandmarkPlacements() {
 export function citySceneryPlacements() {
  if(!isCityTheme())return [];
  if(sceneryCache.has(TRACK))return sceneryCache.get(TRACK);
- const random=seedRandom({beijing:20751,austin:49178,rio:61937}[TRACK.theme]),items=[],landmarks=cityLandmarkPlacements();
+ const random=seedRandom({beijing:20751,austin:49178,rio:61937,paris:33871}[TRACK.theme]),items=[],landmarks=cityLandmarkPlacements();
  for(let s=110,index=0;s<TRACK.length;s+=110,index++)for(const side of [-1,1]){
-  const tree=index%5===0,kind=tree?(TRACK.theme==='rio'?'rio-palm':'city-tree'):TRACK.theme==='beijing'?'hutong':TRACK.theme==='austin'?'music-street':'rio-house';
+  const tree=index%5===0,kind=tree?(TRACK.theme==='rio'?'rio-palm':'city-tree'):{beijing:'hutong',austin:'music-street',paris:'haussmann'}[TRACK.theme]||'rio-house';
   const width=tree?24:58+random()*30,depth=tree?24:46+random()*20,radius=tree?36:Math.hypot(width+16,depth+16)/2;
   const p=trackPoint(s,side*(TRACK.roadWidth/2+radius+35+random()*20));
   if(p.elevation>5||!clearOfRiver(p.x,p.y,radius)||projectTrack(p.x,p.y).distance<TRACK.roadWidth/2+radius+18)continue;
   if(landmarks.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+25)||items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+7))continue;
-  items.push(Object.freeze({kind,x:p.x,z:p.y,angle:p.angle,side,radius,width,depth,height:TRACK.theme==='beijing'?38+random()*22:58+random()*45,variant:index%6}));
+  // Haussmann blocks keep the even cornice line Paris streets are known for.
+  const height=TRACK.theme==='beijing'?38+random()*22:TRACK.theme==='paris'?64+random()*14:58+random()*45;
+  items.push(Object.freeze({kind,x:p.x,z:p.y,angle:p.angle,side,radius,width,depth,height,variant:index%6}));
  }
  const frozen=Object.freeze(items);sceneryCache.set(TRACK,frozen);return frozen;
 }
@@ -216,14 +219,169 @@ function lapa(mesh,item){
  boxAt(mesh,item,0,102,0,282,3,4,cream);
 }
 
+/** Zinc mansard: a steep lower slope, a shallow upper slope and a flat crown. */
+function mansard(mesh,item,cx,cz,y,w,d,h,color){
+ const ring=(level,shrink)=>[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b])=>point(item,cx+a*(w/2-shrink),level,cz+b*(d/2-shrink)));
+ const low=ring(y,0),mid=ring(y+h*.78,Math.min(w,d)*.12),top=ring(y+h,Math.min(w,d)*.3);
+ for(let i=0;i<4;i++){const j=(i+1)%4;mesh.quad(low[i],low[j],mid[j],mid[i],color);mesh.quad(mid[i],mid[j],top[j],top[i],color);}
+ mesh.quad(...top,color);
+}
+function eiffel(mesh,item){
+ const iron='#7b6553',lattice='#5d4c40',half=y=>5+73*Math.exp(-y/118);
+ const at=(sx,sz,y,insetX=0,insetZ=0)=>point(item,sx*(half(y)-insetX),y,sz*(half(y)-insetZ));
+ for(const sx of [-1,1])for(const sz of [-1,1])boxAt(mesh,item,sx*(half(0)-13),4,sz*(half(0)-13),30,8,30,'#bdb6a2');
+ // Four splayed lattice legs, each a tapering square column with crossed bracing.
+ const legLevels=[0,24,48,72,100,126,152],leg=y=>Math.max(9,26-y*.11);
+ for(const sx of [-1,1])for(const sz of [-1,1])for(let i=0;i<legLevels.length-1;i++){
+  const corners=y=>[[0,0],[leg(y),0],[leg(y),leg(y)],[0,leg(y)]].map(([a,b])=>at(sx,sz,y,a,b));
+  const low=corners(legLevels[i]),high=corners(legLevels[i+1]);
+  for(let k=0;k<4;k++){
+   beam(mesh,low[k],high[k],3,iron);
+   beam(mesh,low[k],high[(k+1)%4],1.4,lattice);beam(mesh,low[(k+1)%4],high[k],1.4,lattice);
+  }
+ }
+ // The decorative arches spring between the legs beneath the first platform.
+ for(const axis of [0,1])for(const face of [-1,1]){
+  const arch=t=>{const y=22+44*Math.sin(t),span=(half(22)-leg(22))*-Math.cos(t);
+   return axis?point(item,face*half(y),y,span):point(item,span,y,face*half(y));};
+  for(let i=0;i<16;i++)beam(mesh,arch(i/16*Math.PI),arch((i+1)/16*Math.PI),2.6,iron);
+ }
+ const platform=(y,depth,color)=>{const w=half(y)*2+8;boxAt(mesh,item,0,y,0,w,depth,w,color);
+  for(const side of [-1,1]){boxAt(mesh,item,0,y+depth/2+3,side*w/2,w,1.2,1.2,lattice);boxAt(mesh,item,side*w/2,y+depth/2+3,0,1.2,1.2,w,lattice);}
+  return w;};
+ const first=platform(72,7,'#6d5847');boxAt(mesh,item,0,82,0,first*.72,11,first*.72,'#8b745f');
+ for(const side of [-1,1]){boxAt(mesh,item,0,82,side*first*.36,first*.66,4,.8,'#e7c47d',.45);boxAt(mesh,item,side*first*.36,82,0,.8,4,first*.66,'#e7c47d',.45);}
+ const second=platform(152,6,'#6d5847');boxAt(mesh,item,0,160,0,second*.62,9,second*.62,'#8b745f');
+ // Above the second platform the legs join into one slender braced shaft.
+ const shaft=[152,182,212,242,272,302,330,352];
+ for(let i=0;i<shaft.length-1;i++){
+  const ring=y=>[[-1,-1],[1,-1],[1,1],[-1,1]].map(([sx,sz])=>at(sx,sz,y));
+  const low=ring(shaft[i]),high=ring(shaft[i+1]);
+  for(let k=0;k<4;k++){beam(mesh,low[k],high[k],2.4,iron);beam(mesh,low[k],high[(k+1)%4],1.1,lattice);beam(mesh,low[(k+1)%4],high[k],1.1,lattice);}
+ }
+ platform(352,4,'#6d5847');boxAt(mesh,item,0,361,0,12,12,12,'#8b745f');
+ mesh.cone(item.x,367,item.z,7,7,iron,12,2.5);mesh.cone(item.x,374,item.z,2.5,46,'#cdc3ae',8,0);
+ boxAt(mesh,item,0,364,0,12.6,2.4,12.6,'#f3d58b',.8);
+}
+function arcDeTriomphe(mesh,item){
+ const stone='#d8ceb4',shade='#c2b89e',trim='#e6dec8',relief='#b9ae93';
+ boxAt(mesh,item,0,2,0,158,4,80,'#b5ad98');
+ for(const side of [-1,1]){
+  boxAt(mesh,item,side*52,53,0,46,102,74,stone);
+  for(const face of [-1,1]){
+   boxAt(mesh,item,side*52,40,face*37.6,30,34,1.2,relief);boxAt(mesh,item,side*52,80,face*37.6,34,9,1,relief);
+   for(const edge of [-1,1])boxAt(mesh,item,side*52+edge*20,52,face*37.8,3,96,1.2,trim);
+  }
+  // Smaller transverse arches pierce each side face.
+  boxAt(mesh,item,side*75.6,30,0,1,44,26,'#6f6a5d');
+  for(let i=0;i<10;i++){const a=i/10*Math.PI,b=(i+1)/10*Math.PI;
+   mesh.triangle(point(item,side*75.7,52,0),point(item,side*75.7,52+Math.sin(a)*13,Math.cos(a)*13),point(item,side*75.7,52+Math.sin(b)*13,Math.cos(b)*13),'#6f6a5d');}
+ }
+ // The great arch: a barrel vault with spandrels filled up to the entablature.
+ for(let i=0;i<20;i++){
+  const a=i/20*Math.PI,b=(i+1)/20*Math.PI,p=(angle,z)=>point(item,Math.cos(angle)*29,62+Math.sin(angle)*29,z);
+  mesh.quad(p(a,-37),p(b,-37),p(b,37),p(a,37),shade);
+  for(const face of [-1,1])mesh.quad(p(a,face*37),p(b,face*37),point(item,Math.cos(b)*29,104,face*37),point(item,Math.cos(a)*29,104,face*37),stone);
+ }
+ boxAt(mesh,item,0,108,0,154,8,78,trim);boxAt(mesh,item,0,118,0,150,12,74,stone);
+ for(let x=-66;x<=66;x+=12)for(const face of [-1,1])boxAt(mesh,item,x,118,face*37.5,5,7,1,relief);
+ boxAt(mesh,item,0,126,0,154,4,78,trim);boxAt(mesh,item,0,142,0,146,28,70,stone);boxAt(mesh,item,0,157,0,150,3,74,trim);
+ for(const [x,color]of [[-9,'#2f4f8f'],[0,'#efefea'],[9,'#c0393b']])boxAt(mesh,item,x,68,0,9,44,.8,color);
+}
+function louvre(mesh,item){
+ const glass='#86aebd',frame='#3f5560',stone='#dcd2b8',back=item.side;
+ mesh.quad(point(item,-102,.4,-76*back),point(item,102,.4,-76*back),point(item,102,.4,66*back),point(item,-102,.4,66*back),'#cfc7b1',0,[0,1,0]);
+ // The I. M. Pei pyramid: four glass faces with a visible diamond grid.
+ const apex=point(item,0,56,0),base=[[-44,-44],[44,-44],[44,44],[-44,44]].map(([x,z])=>point(item,x,1,z));
+ for(let i=0;i<4;i++){
+  const a=base[i],b=base[(i+1)%4],lerp=(p,q,t)=>p.map((v,k)=>v+(q[k]-v)*t);
+  mesh.triangle(a,b,apex,glass,.18);
+  for(let k=1;k<6;k++){const t=k/6;beam(mesh,lerp(a,apex,t),lerp(b,apex,t),.9,frame);beam(mesh,lerp(a,b,t),apex,.9,frame);}
+  beam(mesh,a,apex,1.6,frame);beam(mesh,a,b,1.6,frame);
+ }
+ for(const [x,z]of [[-64,-26],[64,-26],[0,-60]]){
+  const c=point(item,x,1,z*back);mesh.cone(c[0],1,c[2],13,12,glass,4,0,item.angle+Math.PI/4);
+ }
+ for(const x of [-72,72]){boxAt(mesh,item,x,1.5,28*back,46,3,26,'#bdb39b');boxAt(mesh,item,x,3.2,28*back,40,.6,20,'#6ea8b9',.2);}
+ // The palace wing stands behind the courtyard, away from the road.
+ const wingZ=back*87;boxAt(mesh,item,0,24,wingZ,200,48,34,stone);boxAt(mesh,item,0,49,wingZ,204,3,37,'#e6dec8');
+ for(let x=-92;x<=92;x+=11.5)for(const y of [13,33]){boxAt(mesh,item,x,y,wingZ-back*17.3,6,11,.8,'#4a5b60');boxAt(mesh,item,x+5.75,y+1,wingZ-back*17.6,1.6,20,.8,'#e8e0ca');}
+ mansard(mesh,item,0,wingZ,50.5,200,34,17,'#5d6a73');
+ boxAt(mesh,item,0,36,wingZ,44,72,38,stone);mansard(mesh,item,0,wingZ,72,44,38,26,'#566570');
+ for(const x of [-14,0,14])boxAt(mesh,item,x,22,wingZ-back*19.6,7,24,1,'#4a5b60');
+}
+function bridgePylon(mesh,item){
+ const top=item.deck+58,gold='#d9b04f';
+ boxAt(mesh,item,0,top/2,0,18,top,18,'#d8cfb6');boxAt(mesh,item,0,top+2,0,22,5,22,'#e5dcc4');boxAt(mesh,item,0,6,0,24,12,24,'#c8bfa4');
+ for(const y of [item.deck+8,item.deck+30])boxAt(mesh,item,0,y,0,20,3,20,'#c8bfa4');
+ for(const x of [-1,1])for(const z of [-1,1])boxAt(mesh,item,x*8.5,top/2,z*8.5,3,top-12,3,'#e5dcc4');
+ // A gilded winged figure crowns each of the four Pont Alexandre III pylons.
+ mesh.cone(item.x,top+4,item.z,6,14,gold,10,3.5);boxAt(mesh,item,0,top+21,0,7,9,5,gold,.25);
+ for(const side of [-1,1])beam(mesh,point(item,0,top+22,0),point(item,side*14,top+31,0),3.4,gold);
+ mesh.cone(item.x,top+25,item.z,2.5,5,gold,8,0);
+}
+function parisBridges(mesh){
+ for(const bridge of TRACK.bridges||[]){
+  const deck=bridge.deckHeight,span=bridge.halfSpan;
+  if(bridge.kind==='paris-alexandre'){
+   // One low steel arch under the deck, with Belle Époque lamps along both parapets.
+   for(const side of [-1,1])for(let i=0;i<32;i++){
+    const a=-span+30+i/32*(span*2-60),b=-span+30+(i+1)/32*(span*2-60),height=s=>8+(deck-18)*(1-(s/(span-30))**2);
+    const ap=trackPoint(bridge.s+a,side*64),bp=trackPoint(bridge.s+b,side*64);
+    beam(mesh,[ap.x,height(a),ap.y],[bp.x,height(b),bp.y],6,'#5c6f68');
+    if(i%3===0)beam(mesh,[ap.x,height(a),ap.y],[ap.x,deck-4,ap.y],2,'#7c8c84');
+   }
+   for(let offset=-span+40;offset<=span-40;offset+=58)for(const side of [-1,1]){
+    const p=trackPoint(bridge.s+offset,side*84);
+    mesh.box(p.x,deck+20,p.y,3,40,3,'#3c4a45',p.angle);
+    for(const lift of [-6,0,6]){const q=trackPoint(bridge.s+offset+lift,side*84);mesh.cone(q.x,deck+38,q.y,3,5,'#f4e3a8',8,3);}
+   }
+  }else if(bridge.kind==='paris-pont-neuf'){
+   // Five masonry arches on cutwater piers, built entirely beneath the road deck.
+   const length=span*2-40,pier=20,count=5,opening=(length-(count+1)*pier)/count,rise=Math.min(opening/2,deck-16);
+   for(let k=0;k<=count;k++){
+    const s=bridge.s-length/2+pier/2+k*(opening+pier),p=trackPoint(s);
+    mesh.box(p.x,(deck-4)/2,p.y,pier,deck-4,128,'#c9bea1',p.angle);
+    for(const side of [-1,1]){const q=trackPoint(s,side*70);mesh.cone(q.x,0,q.y,pier*.55,deck-14,'#bfb498',10,pier*.5);}
+   }
+   for(let k=0;k<count;k++)for(let i=0;i<12;i++){
+    const from=-length/2+pier+k*(opening+pier)+i/12*opening,to=from+opening/12,mid=(from+to)/2;
+    const t=(mid-(-length/2+pier+k*(opening+pier)))/opening,arch=deck-16-rise+rise*Math.sin(t*Math.PI);
+    const p=trackPoint(bridge.s+mid);
+    mesh.box(p.x,(arch+deck-4)/2,p.y,opening/12+.4,deck-4-arch,128,'#d3c9ad',p.angle);
+   }
+   for(const side of [-1,1])for(let offset=-span+20;offset<span-20;offset+=24){
+    const p=trackPoint(bridge.s+offset,side*72);mesh.box(p.x,deck-6,p.y,25,4,8,'#e2d9c0',p.angle);
+   }
+  }
+ }
+}
+function parisQuays(mesh){
+ const river=TRACK.river;if(!river)return;
+ for(const side of [-1,1])for(let x=-700;x<TRACK.width+700;x+=80){
+  const z=river.centerZ+side*(river.halfWidth+8);if(projectTrack(x,z).distance<140)continue;
+  mesh.box(x,7,z,80,14,12,'#c9bfa5');mesh.box(x,15,z,80,3,15,'#ddd4bc');
+  // Green bouquiniste book stalls line the parapets of both banks.
+  if((Math.round(x/80)+side)%3===0)mesh.box(x,20,z+side*2,16,7,7,'#3f5f4a');
+ }
+ for(const [fraction,lane]of [[.18,-1],[.42,1],[.63,-1],[.86,1]]){
+  const x=TRACK.width*fraction,z=river.centerZ+lane*river.halfWidth*.45;
+  if((TRACK.bridges||[]).some(bridge=>Math.abs(bridge.x-x)<420))continue;
+  mesh.box(x,3,z,124,7,26,'#ecebe2');mesh.box(x,1.5,z,126,3,27,'#34505c');
+  mesh.box(x+4,10.5,z,92,8,19,'#8fb5c1',0,.12);mesh.box(x+4,15.2,z,95,1.4,21,'#f2f1ea');
+ }
+}
+
 export function addCityLandmark(mesh,item){
- const draw={'temple-of-heaven':temple,'palace-gate':palaceGate,'beijing-paifang':paifang,'texas-capitol':capitol,'music-guitar':guitar,'austin-music-hall':musicHall,'christ-redeemer':christ,sugarloaf,'lapa-aqueduct':lapa};
+ const draw={'temple-of-heaven':temple,'palace-gate':palaceGate,'beijing-paifang':paifang,'texas-capitol':capitol,'music-guitar':guitar,'austin-music-hall':musicHall,'christ-redeemer':christ,sugarloaf,'lapa-aqueduct':lapa,
+  'eiffel-tower':eiffel,'arc-de-triomphe':arcDeTriomphe,'louvre-pyramid':louvre,'paris-bridge-pylon':bridgePylon};
  if(item.kind==='ut-tower'||item.kind==='football-team')addAustinCampus(mesh,item.kind==='football-team'&&item.side<0?{...item,angle:item.angle+Math.PI}:item);
  else draw[item.kind]?.(mesh,item);
 }
 export function addCityLandmarks(mesh){
  if(!isCityTheme())return;
  for(const item of cityLandmarkPlacements())addCityLandmark(mesh,item);
+ if(TRACK.theme==='paris'){parisBridges(mesh);parisQuays(mesh);}
  if(TRACK.theme==='austin'){
   archBridge(mesh);
   if(TRACK.river)for(const side of [-1,1])for(let x=-700;x<TRACK.width+700;x+=80){
@@ -257,6 +415,26 @@ function streetBuilding(mesh,item){
   const q=point(item,end*w*.4,27,front-side*4);mesh.cone(q[0],q[1],q[2],4,11,'#b64d3d',16,4);mesh.cone(q[0],q[1]-1,q[2],4.5,2,'#d1b167',16,4.5);
  }
 }
+function haussmann(mesh,item){
+ const {width:w,depth:d,height:h,side,variant}=item,out=-side,front=out*(d/2+1);
+ const wall=['#d9cdb0','#e2d7bd','#d2c4a4','#ddd2b8','#cfc19f','#e6dcc4'][variant],trim='#ece4cf',glass='#3c5057',iron='#2f3537';
+ boxAt(mesh,item,0,h/2,0,w,h,d,wall);boxAt(mesh,item,0,7,0,w+3,14,d+3,'#c3b493');
+ const bays=Math.max(3,Math.floor(w/13)),floors=[];
+ for(let y=21;y+5<h-3;y+=11.5)floors.push(y);
+ for(let i=0;i<bays;i++){
+  const x=-w*.4+i*w*.8/(bays-1);boxAt(mesh,item,x,7,front+out*.8,8,10,1,'#344a50');
+  for(const y of floors){boxAt(mesh,item,x,y,front+out*.2,5,8,1,glass);boxAt(mesh,item,x,y+4.8,front+out*.6,6.4,1.4,1.2,trim);}
+ }
+ // Continuous wrought-iron balconies on the second and top floors.
+ for(const y of [floors[0]-4.8,floors.at(-1)-4.8])boxAt(mesh,item,0,y,front+out*2.2,w*.92,2.4,3.4,iron);
+ boxAt(mesh,item,0,h-1.5,0,w+4,3,d+4,trim);
+ mansard(mesh,item,0,0,h,w,d,16,'#6b7782');
+ for(let i=0;i<bays;i+=2){
+  const x=-w*.4+i*w*.8/(bays-1);boxAt(mesh,item,x,h+6,out*(d/2-4),6,8,5,wall);boxAt(mesh,item,x,h+6,out*(d/2-1.4),3.6,5,.6,glass);
+ }
+ for(const x of [-w*.3,w*.3])boxAt(mesh,item,x,h+17,0,5,7,4,'#b5866a');
+ if(variant%3===0)mesh.quad(point(item,-w*.42,16,front),point(item,w*.42,16,front),point(item,w*.42,11,front+out*8),point(item,-w*.42,11,front+out*8),variant%2?'#a8423b':'#2f5d4a');
+}
 function tree(mesh,item){
  const{x,z,kind}=item;
  mesh.cone(x,0,z,3.5,kind==='rio-palm'?65:42,'#81715e',12,2.5);
@@ -267,7 +445,8 @@ function tree(mesh,item){
  }
 }
 export function addCityStreetScenery(mesh,item){
- if(['hutong','music-street','rio-house'].includes(item.kind))streetBuilding(mesh,item);else tree(mesh,item);
+ if(['hutong','music-street','rio-house'].includes(item.kind))streetBuilding(mesh,item);
+ else if(item.kind==='haussmann')haussmann(mesh,item);else tree(mesh,item);
 }
 export function addCityPavements(mesh){
  if(!isCityTheme())return;
@@ -277,7 +456,7 @@ export function addCityPavements(mesh){
   for(let band=0;band<5;band++){
    const a=trackPoint(s,side*(69+band*9)),b=trackPoint(s+24,side*(69+band*9)),c=trackPoint(s+24,side*(78+band*9)),d=trackPoint(s,side*(78+band*9));
    if(!clearOfRiver(a.x,a.y,2)||!clearOfRiver(c.x,c.y,2))continue;
-   let color=TRACK.theme==='beijing'?'#a9aaa0':TRACK.theme==='austin'?'#b5ab92':'#d4d0b8';
+   let color={beijing:'#a9aaa0',austin:'#b5ab92',paris:'#c6bfaa'}[TRACK.theme]||'#d4d0b8';
    mesh.quad([a.x,.5,a.y],[b.x,.5,b.y],[c.x,.5,c.y],[d.x,.5,d.y],color,0,[0,1,0]);
   }
  }
