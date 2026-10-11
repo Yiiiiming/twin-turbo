@@ -10,7 +10,11 @@ At the finish, each human driver enters one nickname directly in the results pan
 
 ## Circuits and controls
 
-The first four circuits are London Riverside, Rio Coastal Rhythm, Austin River Run and Beijing Imperial Run. Austin includes the UT Tower and a roadside football squad. The original seven harbor, forest, city and spiral circuits remain available, followed by circuit 12, Paris Seine Loop: the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf.
+The first five circuits are London Riverside, Rio Coastal Rhythm, Austin River Run, Beijing Imperial Run and Paris Seine Loop. Austin includes the UT Tower and a roadside football squad. Paris includes the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf. The original seven harbor, forest, city and spiral circuits follow the city courses.
+
+London adds four detailed roadside landmarks along its existing route: the Royal Opera House and glazed Floral Hall, the red terracotta Palace Theatre, the classical London Palladium, and Piccadilly Circus with curved illuminated panels and the Shaftesbury Memorial Fountain. These are compact architectural interpretations for the game, not a geographically exact reconstruction; track geometry, checkpoints, elevation and physics are unchanged.
+
+Architectural references: [Royal Opera House history](https://www.rbo.org.uk/about/history), [Floral Hall](https://www.rbo.org.uk/venue-hire), [Palace Theatre](https://historicengland.org.uk/listing/the-list/list-entry/1066339), [London Palladium](https://historicengland.org.uk/listing/the-list/list-entry/1210130), and [Shaftesbury Memorial Fountain](https://historicengland.org.uk/listing/the-list/list-entry/1265625).
 
 Every circuit supports one-lap sprints and three-lap races, AI/local play, two ghost colors, checkpoint gaps, and independent top-five total and lap records. AI races accept either keyboard layout; custom bindings, language and nicknames are stored in this browser. Flat-road cruising is 240 km/h, with uphill slowing and downhill gains.
 
@@ -36,6 +40,6 @@ The old large London prototype is retired. This main branch contains only the cu
 
 ## Validation
 
-The city release passed 303 frontend checks, including both AI drivers completing one- and three-lap races on every circuit, quarter splits, mesh and camera clearances, language/setup flows, record isolation and matching ghosts. The shared record service passed 45 checks. Browser screenshot acceptance was unavailable during this release.
+The London landmarks / Paris leaderboard update passed 93 focused frontend checks, covering all twelve circuits' AI one- and three-lap completion, city selection, record isolation and the new landmark geometry. London's sampled route and elevation fingerprint is unchanged; the new buildings clear the driving corridor and chase camera. All four additions were visually checked in the browser in close-up and driving views. The shared record service passed 47 checks, and live read-only requests verified Paris race and ghost boards without inserting test scores.
 
 The four city skies use an original generated cloud-only image; other circuits retain their existing scenery. Landmark design references include [UT Austin's Tower history](https://news.utexas.edu/2018/10/04/whats-the-story-behind-the-tower/), [Beijing's Temple of Heaven architecture](https://english.visitbeijing.com.cn/article/47ONy6AX0b3), [Austin's downtown guide](https://www.austintexas.org/explore/entertainment-districts/downtown/), and [Visit Brasil's Rio guide](https://www.visitbrasil.com/en/location/rio-de-janeiro-en/).

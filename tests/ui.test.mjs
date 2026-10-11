@@ -1046,8 +1046,8 @@ test('language choice is required before starting, persists the choice, and swit
 
 test('changing a harbor circuit resets its opponents, recording, splits and leaderboard and is blocked during a race',async t=>{
   const ui=await loadUI(t);
-  assert.deepEqual([...ui.trackCards.keys()],Object.keys(TRACKS));assert.equal(ui.trackCards.size,12);assert.equal([...ui.trackCards.keys()].at(-1),'coast-paris');
-  assert.deepEqual([...ui.trackCards.keys()].slice(0,4),['coast-london','coast-rio','coast-austin','coast-beijing']);
+  assert.deepEqual([...ui.trackCards.keys()],Object.keys(TRACKS));assert.equal(ui.trackCards.size,12);
+  assert.deepEqual([...ui.trackCards.keys()].slice(0,5),['coast-london','coast-rio','coast-austin','coast-beijing','coast-paris']);
   for(const {button,preview}of ui.trackCards.values()){assert.equal(button.tagName,'BUTTON');assert.equal(preview.tagName,'SVG');assert.ok(preview.querySelector('path').getAttribute('d').startsWith('M'));}
   ui.ghostClient.select({entry:{id:'prior-lap',name:'旧赛道记录',timeMs:42000,playerId:1,mode:'local'},
     replay:{version:1,durationMs:42000,frames:[[0,100,100,0,0],[42000,100,100,0,0]]}});
