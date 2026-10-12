@@ -3,7 +3,7 @@ import { createI18n } from './i18n.js';
 import { SplitTiming } from './split-timing.js';
 import { GhostClient } from './ghost-client.js';
 import { GhostRecorder, sampleReplay } from './ghost-replay.js';
-import { RaceEngine, TRACK, TRACKS, trackPoint, projectTrack, mod } from './engine.js';
+import { RaceEngine, TRACK, TRACKS, trackPoint, projectTrack, mod, OFFROAD_GRACE_SECONDS } from './engine.js';
 import { RaceRenderer, sceneWeights } from './renderer.js';
 import { RaceAI } from './ai.js';
 import { UnifiedRecordsClient } from './unified-records.js';
@@ -43,7 +43,7 @@ void ghostClient.init();
 
 const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
-let selectedLaps = 1, selectedMode = 'ai', raceMode = 'local', lastAIRescues = 0;
+let selectedLaps = 1, selectedMode = 'ai', raceMode = 'local', lastRescueCounts = [0, 0];
 let selectedColor = 'cyan';
 let lastTime = performance.now(), lastState = '', lastCount = 0;
 let goUntil = 0, soundEnabled = false, audio = null, audioNodes = [];
@@ -205,7 +205,7 @@ for(const [index,track]of Object.values(TRACKS).entries()) {
 function selectCircuit(id) {
   if(engine.state!=='menu'||!Object.hasOwn(TRACKS,id))return;
   keys.clear();engine.selectTrack(id);renderer.rebuild(engine);applyPlayerColors();ai.reset();
-  ghostRecorder.reset();splitTiming.reset();activeGhosts=[];renderer.setGhostPoses?.([]);
+  ghostRecorder.reset();splitTiming.reset();activeGhosts=[];lastRescueCounts=[0,0];renderer.setGhostPoses?.([]);
   ghostClient.setTrack(id);ghostClient.setLaps(selectedLaps);void leaderboard.setTrack(id);
   lastLaps=[0,0];notices=['',''];lastState='';refreshTrackUI();
 }
@@ -252,7 +252,12 @@ function updateUI(now) {
     $('personal-best'+car.id).textContent = car.bestLap === null ? '—' : fmt(car.bestLap);
     $('boost'+car.id).style.width=car.boost+'%';$('boost-label'+car.id).textContent=Math.round(car.boost)+'%';
     $('speed'+car.id).textContent=Math.round(Math.abs(car.speed)*(TRACK.unitsPerMeter ? 3.6/TRACK.unitsPerMeter : .66));
-    $('offroad'+car.id).textContent=car.finished?`第 ${place} 名 · 已完赛`:car.rescueCooldown>0?'返回赛道 · 罚停中':car.missedCheckpoint?`漏过检查点 · 按 ${bindings.label(car.id,'rescue')} 回赛道`:car.impact>.15?'碰撞 · 减速':car.offroad?'草地减速':car.boosting?'NITRO ON':'';
+    const warning=engine.state==='racing'&&!car.finished&&car.offroad&&car.offroadTime>=OFFROAD_GRACE_SECONDS-3-1e-8;
+    const seconds=Math.max(1,Math.ceil(OFFROAD_GRACE_SECONDS-car.offroadTime-1e-8));
+    const warningText=`请返回赛道，${seconds} 秒后自动复位`;
+    $('offroad-warning'+car.id).classList.toggle('hidden',!warning);
+    if(warning&&$('offroad-countdown'+car.id).textContent!==warningText)$('offroad-countdown'+car.id).textContent=warningText;
+    $('offroad'+car.id).textContent=car.finished?`第 ${place} 名 · 已完赛`:car.rescueCooldown>0?'返回赛道 · 罚停中':warning?warningText:car.missedCheckpoint?`漏过检查点 · 按 ${bindings.label(car.id,'rescue')} 回赛道`:car.impact>.15?'碰撞 · 减速':car.offroad?'草地减速':car.boosting?'NITRO ON':'';
     $('finisher'+car.id).classList.toggle('hidden', !car.finished || engine.state !== 'racing');
     if (car.finished) {
       $('finisher-place'+car.id).textContent=`第 ${place} 名 · 已完赛`;
@@ -306,7 +311,7 @@ function begin(skipGhosts = false) {
   leaderboard.newRace(); leaderboard.setRaceActive(true);
   activeGhosts = ghostClient.startRace(); ghostRecorder.reset(); splitTiming.reset(activeGhosts);
   $('ghost-race-label').textContent = activeGhosts.map(ghost=>`${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」 · ${fmt(ghost.entry.timeMs/1000)}`).join('  /  ');
-  raceMode=selectedMode; renderer.setSinglePlayer(raceMode==='ai'); engine.start(selectedLaps); applyPlayerColors(); ai.reset(); lastAIRescues=0;
+  raceMode=selectedMode; renderer.setSinglePlayer(raceMode==='ai'); engine.start(selectedLaps); applyPlayerColors(); ai.reset(); lastRescueCounts=[0,0];
   keys.clear(); lastLaps=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine); goUntil=0;
   canvas.focus({preventScroll:true}); if(soundEnabled){initAudio();audio?.resume();}
 }
@@ -329,7 +334,7 @@ function togglePause(){
   } else engine.pause();
   keys.clear();
 }
-function rescue(id){if(engine.cars[id-1].finished)return;ghostRecorder.invalidate(id);engine.rescue(id);renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
+function rescue(id){if(engine.cars[id-1].finished)return;ghostRecorder.invalidate(id);engine.rescue(id);lastRescueCounts[id-1]=engine.cars[id-1].rescueCount;renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
 $('start').addEventListener('click',openRaceSetup);$('again').addEventListener('click',showRaceStart);$('restart').addEventListener('click',openRaceSetup);
 $('resume').addEventListener('click',()=>{keys.clear();engine.resume();canvas.focus({preventScroll:true});});$('pause').addEventListener('click',togglePause);
 function raceRecords(cars = engine.cars) {
@@ -343,7 +348,7 @@ function returnToMenu() {
   ghostClient.menu(); leaderboard.setRaceActive(false);
   if (!['finished','menu'].includes(engine.state)) leaderboard.showResults(raceRecords());
   ghostRecorder.reset(); splitTiming.reset(); activeGhosts=[]; renderer.setGhostPoses?.([]);
-  engine.reset(); applyPlayerColors(); ai.reset(); lastAIRescues=0; keys.clear(); renderer.resetCameras(engine);
+  engine.reset(); applyPlayerColors(); ai.reset(); lastRescueCounts=[0,0]; keys.clear(); renderer.resetCameras(engine);
   const selected = ghostClient.node('ghost-enabled').checked ? ghostClient.selections() : [];
   $('ghost-race-label').textContent = selected.map(ghost => `${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」`).join('  /  ');
   updateUI(performance.now()/1000);
@@ -491,11 +496,18 @@ function loop(timestamp) {
   let frameKeys = bindings.frameKeys(keys, raceMode === 'ai');
   if (raceMode === 'ai' && engine.state === 'racing') {
     for (const code of ai.update(engine, dt)) if (player2Keys.has(code) && code !== 'Slash') frameKeys.add(code);
-    if (ai.rescues > lastAIRescues) { renderer.resetCameras(engine, 2); lastAIRescues = ai.rescues; }
   }
   ghostRecorder.sample(engine, raceMode === 'ai' ? [1] : [1, 2]);
   splitTiming.sample(engine);
   engine.step(dt, frameKeys);
+  for(const [i,car] of engine.cars.entries()){
+    if(car.rescueCount>lastRescueCounts[i]){
+      ghostRecorder.invalidate(car.id);renderer.resetCameras(engine,car.id);
+      notices[i]=car.rescueReason==='offroad'?'离开赛道满 7 秒 · 已自动复位':'返回赛道 · 罚停 2 秒';
+      noticeUntil[i]=toastTime+2.2;
+    }
+    lastRescueCounts[i]=car.rescueCount;
+  }
   splitTiming.sample(engine);
   ghostRecorder.sample(engine, raceMode === 'ai' ? [1] : [1, 2]);
   renderer.setGhostPoses?.(engine.cars.map(car => !car.finished && ['racing','paused'].includes(engine.state) ? activeGhosts.filter(ghost=>ghost.replay.kind==='race'||car._started).map(ghost => ({...sampleReplay(ghost.replay,(ghost.replay.kind==='race'?engine.time:car.lapTime)*1000),slotId:ghost.slotId})).filter(pose=>Number.isFinite(pose.x)) : []));

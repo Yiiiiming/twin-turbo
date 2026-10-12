@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, TRACK, trackPoint, projectTrack, mod } from '../engine.js';
+import { RaceEngine, TRACK, trackPoint, projectTrack, mod, OFFROAD_GRACE_SECONDS } from '../engine.js';
 
 const near = (actual, expected, tolerance = 1e-7) =>
   assert.ok(Math.abs(actual - expected) < tolerance, `${actual} ≠ ${expected}`);
@@ -349,25 +349,28 @@ test('teleporting across an expected checkpoint does not award it', () => {
   assert.equal(car.lap, 0); assert.equal(car._nextCheckpoint, 1);
 });
 
-test('crossing a checkpoint far beyond the runoff is rejected; rescue restores earned progress', () => {
-  const engine = running();
-  const car = engine.cars[0];
-  const start = TRACK.startDistance;
-  path(engine, car, start - 30, start + 5);
-  const gate = start + TRACK.length / TRACK.checkpoints;
-  path(engine, car, start + 5, gate - 20);
-  const outsideRunoff = TRACK.roadWidth / 2 + TRACK.checkpointMargin + 35;
-  sample(engine, car, gate - 15, outsideRunoff);
-  path(engine, car, gate - 15, gate + 20, outsideRunoff);
+for (const player of [1, 2]) test(`player ${player} returns within seven seconds after a far-grass gate and finishes normally`, () => {
+  const engine = running(1), car = engine.cars[player - 1];
+  const start = TRACK.startDistance, gate = start + TRACK.length / TRACK.checkpoints;
+  const lane = car._lane, grassLane = Math.sign(lane) * (TRACK.roadWidth / 2 + TRACK.checkpointMargin + 35);
+  path(engine, car, start - 30, gate - 200);
+  for (let s = gate - 195; s <= gate - 80; s += 5) {
+    sample(engine, car, s, lane + (grassLane - lane) * Math.min(1, (s - gate + 200) / 100));
+  }
+  for (let i = 0; i < 60; i++) engine.step(.1);
+  path(engine, car, gate - 80, gate + 40, grassLane);
   assert.equal(car.offroad, true);
-  assert.equal(car._nextCheckpoint, 1);
-  assert.equal(car.missedCheckpoint, true);
-  engine.rescue(1);
-  assert.equal(car.offroad, false); assert.equal(car.missedCheckpoint, false);
-  assert.equal(car._nextCheckpoint, 1); assert.equal(car.lap, 0);
-  near(projectTrack(car.x, car.y).s, mod(start + 18, TRACK.length));
-  path(engine, car, start + 18, gate + 5);
-  assert.equal(car._nextCheckpoint, 2);
+  assert.ok(car.offroadTime > 6 && car.offroadTime < OFFROAD_GRACE_SECONDS);
+  assert.equal(car._nextCheckpoint, 2, 'the ordered gate is earned during the grace period');
+  assert.equal(car.missedCheckpoint, false);
+  for (let s = gate + 45; s <= gate + 140; s += 5) {
+    sample(engine, car, s, grassLane + (lane - grassLane) * (s - gate - 40) / 100);
+  }
+  assert.equal(car.offroad, false); assert.equal(car.offroadTime, 0);
+  assert.equal(car.rescueCount, 0);
+  path(engine, car, gate + 140, start + TRACK.length + 5);
+  assert.equal(car.lap, 1); assert.equal(car.finished, true);
+  assert.equal(car.missedCheckpoint, false);
 });
 
 for (const player of [1, 2]) {
@@ -391,8 +394,8 @@ for (const player of [1, 2]) {
   });
 }
 
-test('checkpoint runoff admits a near-road line but rejects movement outside its explicit margin', () => {
-  for (const extra of [-1, 1]) {
+test('brief continuous checkpoint crossings work on either side of the former runoff limit', () => {
+  for (const extra of [-1, 1, 80]) {
     const engine = running();
     const car = engine.cars[0];
     const gate = TRACK.startDistance + TRACK.length / TRACK.checkpoints;
@@ -401,9 +404,10 @@ test('checkpoint runoff admits a near-road line but rejects movement outside its
     for (let s = gate - 95; s < gate + 11; s += 5) {
       sample(engine, car, s, car._lane + Math.min(1, (s - gate + 100) / 70) * (lane - car._lane));
     }
-    assert.equal(car.offroad, true, 'grass slowdown remains active even inside the checkpoint margin');
-    assert.equal(car._nextCheckpoint, extra < 0 ? 2 : 1);
-    assert.equal(car.missedCheckpoint, extra > 0);
+    assert.equal(car.offroad, true, 'grass slowdown remains active throughout the grace period');
+    assert.ok(car.offroadTime > 0 && car.offroadTime < OFFROAD_GRACE_SECONDS);
+    assert.equal(car._nextCheckpoint, 2);
+    assert.equal(car.missedCheckpoint, false);
   }
 });
 
@@ -498,6 +502,72 @@ test('offroad driving slows a fast car and a long racing frame advances at most 
   near(engine.time - before, 0.1);
   assert.equal(car.offroad, true); assert.equal(car.boosting, false);
   assert.ok(car.speed < 315);
+});
+
+test('both offroad timers use racing time, pause safely, and recover only at seven continuous seconds', () => {
+  const engine = running();
+  assert.equal(OFFROAD_GRACE_SECONDS, 7);
+  for (const car of engine.cars) {
+    Object.assign(car, trackPoint(200, Math.sign(car._lane) * 150), { speed: 0 });
+  }
+  for (let i = 0; i < 40; i++) engine.step(.1);
+  for (const car of engine.cars) { near(car.offroadTime, 4); assert.equal(car.rescueCount, 0); }
+  const before = engine.time;
+  engine.pause();
+  for (let i = 0; i < 100; i++) engine.step(.1);
+  near(engine.time, before);
+  for (const car of engine.cars) near(car.offroadTime, 4);
+  engine.resume();
+  for (let i = 0; i < 29; i++) engine.step(.1);
+  for (const car of engine.cars) { near(car.offroadTime, 6.9); assert.equal(car.rescueCount, 0); }
+  engine.step(.1);
+  for (const car of engine.cars) {
+    assert.equal(car.rescueCount, 1); assert.equal(car.rescueReason, 'offroad');
+    assert.equal(car.offroadTime, 0); assert.equal(car.offroad, false);
+    near(car.rescueCooldown, 2); assert.equal(car.lap, 0);
+    near(projectTrack(car.x, car.y).s, mod(car._gridS, TRACK.length));
+  }
+});
+
+test('returning before seven seconds clears both timers instead of adding separate excursions', () => {
+  const engine = running();
+  for (let excursion = 0; excursion < 2; excursion++) {
+    for (const car of engine.cars) Object.assign(car, trackPoint(200, Math.sign(car._lane) * 150), { speed: 0 });
+    for (let i = 0; i < 69; i++) engine.step(.1);
+    for (const car of engine.cars) { near(car.offroadTime, 6.9); assert.equal(car.rescueCount, 0); }
+    for (const car of engine.cars) Object.assign(car, trackPoint(200, car._lane), { speed: 0 });
+    engine.step(1 / 120);
+    for (const car of engine.cars) { assert.equal(car.offroadTime, 0); assert.equal(car.offroad, false); }
+  }
+});
+
+test('seven-second expiry takes precedence over a simultaneous finish-line crossing', () => {
+  for (const player of [1, 2]) {
+    const engine = running(1), car = engine.cars[player - 1];
+    finalApproach(engine, car, 1, Math.sign(car._lane) * 135);
+    car.offroadTime = OFFROAD_GRACE_SECONDS - 1 / 120;
+    engine.step(1 / 120);
+    assert.equal(car.finished, false); assert.equal(car.lap, 0);
+    assert.equal(car._nextCheckpoint, TRACK.checkpoints);
+    assert.equal(car.rescueCount, 1); assert.equal(car.rescueReason, 'offroad');
+    assert.equal(car.offroadTime, 0);
+    near(distanceDifference(projectTrack(car.x, car.y).s, car._lastCheckpointS + 18), 0);
+  }
+});
+
+test('rescue events are counted once and a fresh start clears recovery state', () => {
+  const engine = running(), car = engine.cars[0];
+  car.offroadTime = 5;
+  engine.rescue(1);
+  assert.equal(car.rescueCount, 1); assert.equal(car.rescueReason, 'manual');
+  assert.equal(car.offroadTime, 0);
+  engine.pause(); engine.rescue(1); engine.rescue(99);
+  assert.equal(car.rescueCount, 1, 'unsuccessful recovery requests do not emit events');
+  engine.start();
+  for (const reset of engine.cars) {
+    assert.equal(reset.rescueCount, 0); assert.equal(reset.rescueReason, null);
+    assert.equal(reset.offroadTime, 0);
+  }
 });
 
 test('rescue has a real two-second immobilization penalty without lap or time credit', () => {

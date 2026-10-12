@@ -52,6 +52,7 @@ const LENGTH = circuitLength;
 // launch delay; both cars accelerate at GO and time laps at the common line.
 const GRID_LANES = [-18, 22];
 export const GRID_HANDICAP_SECONDS = 0.15;
+export const OFFROAD_GRACE_SECONDS = 7;
 const GRID_HANDICAP_DISTANCE = 363 * GRID_HANDICAP_SECONDS;
 const START_GRID = Object.freeze(GRID_LANES.map((lane, index) => Object.freeze({
   lane, offset: -30 - (index === 1 ? GRID_HANDICAP_DISTANCE : 0),
@@ -176,11 +177,12 @@ function createCar(id) {
     elevation: p.elevation, slope: p.slope, height: TRACK.carHeight,
     boost: 100, boosting: false, lap: 0, progress: 0,
     lapTime: 0, bestLap: null, lastLap: null,
-    offroad: false, steer: 0, lastSkid: false, impact: 0,
+    offroad: false, offroadTime: 0, steer: 0, lastSkid: false, impact: 0,
     finished: false, finishTime: null, missedCheckpoint: false, rescueCooldown: 0,
+    rescueCount: 0, rescueReason: null,
     _lane: lane, _gridS: gridS, _started: false, _nextCheckpoint: 0,
     _lastTrackS: p.s, _lastX: p.x, _lastY: p.y,
-    _lastCheckpointS: gridS, _lastCheckpointEligible: true,
+    _lastCheckpointS: gridS,
     _lapStartTime: 0,
   };
 }
@@ -293,7 +295,7 @@ export class RaceEngine {
   }
 
   /** Return a stuck car to its last earned checkpoint; never advances lap credit. */
-  rescue(id) {
+  rescue(id, reason = 'manual') {
     const car = this.cars.find(candidate => candidate.id === id);
     if (!car || car.finished || this.state !== 'racing') return;
     const s = car._started ? car._lastCheckpointS + 18 : car._gridS;
@@ -302,9 +304,10 @@ export class RaceEngine {
     car.elevation = p.elevation; car.slope = p.slope;
     car.speed = 0; car.boosting = false; car.steer = 0;
     car.rescueCooldown = 2;
-    car.offroad = false; car.lastSkid = false; car.impact = 0;
+    car.rescueCount += 1; car.rescueReason = reason;
+    car.offroad = false; car.offroadTime = 0; car.lastSkid = false; car.impact = 0;
     car._lastTrackS = p.s; car._lastX = p.x; car._lastY = p.y;
-    car._lastCheckpointEligible = true; car.missedCheckpoint = false;
+    car.missedCheckpoint = false;
     this._updateProgress(car, p.s);
   }
 
@@ -466,18 +469,21 @@ export class RaceEngine {
     const p = projectTrack(car.x, car.y, car._lastTrackS, car.elevation);
     car.elevation = p.elevation; car.slope = p.slope;
     const onRoad = p.distance <= TRACK.roadWidth / 2;
-    const checkpointLimit = TRACK.roadWidth / 2 + TRACK.checkpointMargin;
-    const checkpointEligible = p.distance <= checkpointLimit;
+    car.offroadTime = onRoad ? 0 : car.offroadTime + dt;
+    // Use the post-collision position and racing simulation time. Returning
+    // inside the asphalt cancels the excursion; pauses never advance this clock.
+    // Recovery takes precedence over a checkpoint crossed on the expiry tick.
+    if (car.offroadTime + 1e-9 >= OFFROAD_GRACE_SECONDS) {
+      this.rescue(car.id, 'offroad');
+      return;
+    }
     const delta = signedDistance(car._lastTrackS, p.s);
     const displacement = Math.hypot(car.x - car._lastX, car.y - car._lastY);
-    const midpoint = projectTrack((car.x + car._lastX) / 2, (car.y + car._lastY) / 2, car._lastTrackS);
-    // Short excursions onto the shoulder still pass invisible checkpoints.
-    // Asphalt grip/slowdown stays strict, while both ends and the midpoint of
-    // checkpoint movement must stay within the road plus its narrow runoff.
-    // Ordered gates and bounded forward movement still reject shortcuts,
-    // teleports, and repeated backward/forward finish-line crossings.
-    const valid = checkpointEligible && car._lastCheckpointEligible && midpoint.distance <= checkpointLimit
-      && delta > 0 && delta < 24 && displacement < 24;
+    // During the grace period, continuous forward driving still earns ordered
+    // checkpoints. A brief excursion must not leave an invisible missed gate
+    // behind after the driver returns. Bounded progress and actual movement
+    // continue rejecting teleports, branch jumps and finish-line oscillation.
+    const valid = delta > 0 && delta < 24 && displacement < 24;
     if (valid) {
       const gate = mod(TRACK.startDistance + car._nextCheckpoint * LENGTH / CHECKPOINTS, LENGTH);
       const untilGate = mod(gate - car._lastTrackS, LENGTH);
@@ -506,8 +512,7 @@ export class RaceEngine {
         }
       }
     }
-    // Give the renderer a helpful recover prompt if an expected gate was
-    // crossed beyond the runoff, or if a relocation skipped it.
+    // Relocations that jump over an expected gate still require recovery.
     if (!valid && delta > 0) {
       const gate = mod(TRACK.startDistance + car._nextCheckpoint * LENGTH / CHECKPOINTS, LENGTH);
       if (mod(gate - car._lastTrackS, LENGTH) <= delta) car.missedCheckpoint = true;
@@ -517,7 +522,6 @@ export class RaceEngine {
     car.offroad = !onRoad;
     this._updateProgress(car, p.s);
     car._lastTrackS = p.s; car._lastX = car.x; car._lastY = car.y;
-    car._lastCheckpointEligible = checkpointEligible;
   }
 
   _updateProgress(car, s) {

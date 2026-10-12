@@ -98,3 +98,7 @@
 /* Solo driving has one full-width human camera; the opponent remains in the race. */
 .solo-mode .opponent-ui{display:none!important}.solo-mode .scoreboard{grid-template-columns:minmax(0,1fr) 214px}.solo-mode .controls{grid-template-columns:minmax(0,1fr) auto}.solo-mode .lap-timing{justify-content:flex-start}.solo-mode #split1{right:18px;width:min(230px,35%)}.solo-mode #finisher1{left:50%;width:min(320px,85%)}
 @media(max-width:780px){.solo-mode .scoreboard{grid-template-columns:minmax(0,1fr) 125px}.solo-mode .controls{grid-template-columns:1fr}.solo-mode #split1{right:10px;width:min(195px,40%)}}
+
+.offroad-warning{position:absolute;z-index:3;top:24%;left:25%;transform:translateX(-50%);width:min(340px,43%);box-sizing:border-box;padding:14px 16px;border:1px solid #ffc56a;border-radius:9px;background:#342618ee;box-shadow:0 5px 20px #0004;text-align:center;pointer-events:none;color:#ffe0a6}
+.offroad-warning strong{display:block;font-size:17px;line-height:1.45}.offroad-warning span{display:block;margin-top:5px;font-size:11px;color:#e0c6a2}#offroad-warning2{left:75%}.solo-mode #offroad-warning1{left:50%;width:min(380px,85%)}
+@media(max-width:780px){.offroad-warning{padding:10px 8px}.offroad-warning strong{font-size:13px}.offroad-warning span{font-size:10px}}

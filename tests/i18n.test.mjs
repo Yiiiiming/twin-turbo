@@ -114,3 +114,9 @@ test('the actual HTML has no untranslated English UI copy outside the bilingual 
     assert.doesNotMatch(translateText(value),/[\u3400-\u9fff]/,`Untranslated UI: ${value}`);
   }
 });
+
+test('off-road recovery warnings translate all three countdown values and the recovery notice',()=>{
+ for(const seconds of [3,2,1])assert.equal(translateText(`请返回赛道，${seconds} 秒后自动复位`),`Return to the road — automatic recovery in ${seconds}s`);
+ assert.equal(translateText('回到路面即可取消倒计时'),'Return to the road to cancel the countdown');
+ assert.equal(translateText('离开赛道满 7 秒 · 已自动复位'),'7 seconds off-road · Automatically recovered');
+});

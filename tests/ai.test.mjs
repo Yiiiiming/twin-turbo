@@ -157,6 +157,30 @@ test('a persistently skipped checkpoint triggers ordinary recovery without givin
   assert.ok(projectTrack(car.x,car.y).s<30,'return is to the last earned checkpoint');
 });
 
+test('a stationary offroad computer receives the full common seven-second grace period',()=>{
+  for(const missedCheckpoint of [false,true]){
+    const engine=new RaceEngine().start(),ai=new RaceAI();engine.state='racing';
+    const car=engine.cars[1],p=trackPoint(200,150);
+    Object.assign(car,{x:p.x,y:p.y,angle:p.angle,speed:0,missedCheckpoint,
+      _lastTrackS:p.s,_lastX:p.x,_lastY:p.y});
+    // Keep the car parked to cover both the former 3.5-second offroad helper
+    // and the 4.2-second no-progress helper (including a prior missed gate).
+    for(let frame=0;frame<69;frame++){
+      ai.update(engine,.1);
+      assert.equal(ai.rescues,0,'the AI must not preempt the shared offroad rule');
+      engine.step(.1);
+      assert.equal(car.rescueCount,0);
+    }
+    assert.ok(Math.abs(car.offroadTime-6.9)<1e-7);
+    assert.equal(ai._stuckFor,0);assert.equal(ai._missedFor,0);
+    ai.update(engine,.1);assert.equal(ai.rescues,0);
+    engine.step(.1);
+    assert.equal(car.rescueCount,1);assert.equal(car.rescueReason,'offroad');
+    assert.equal(car.offroadTime,0);assert.equal(car.offroad,false);
+    assert.ok(Math.abs(car.rescueCooldown-2)<1e-7);
+  }
+});
+
 test('reset clears recovery and boost state, and invalid frame times have no side effects',()=>{
   const engine=new RaceEngine().start(),ai=new RaceAI();engine.state='racing';
   ai.update(engine,.1);assert.ok(ai.elapsed>0);

@@ -1160,3 +1160,39 @@ test('solo mode uses one full human HUD and camera for both colors, while local 
  assert.equal(ui.renderer.singlePlayer,false);assert.equal(ui.document.body.classList.contains('solo-mode'),false);
  assert.equal(context.counts.get('scale')-before,2);assert.ok(context.calls.some(call=>call[0]==='fillText'&&call[1]==='VS'));
 });
+
+for (const player of [1, 2]) test(`player ${player} sees a cancellable final-three-second off-road warning and automatic recovery`, async t => {
+  const ui = await loadUI(t);
+  ui.launch(); ui.advance(3.1);
+  const car=ui.engine.cars[player-1],sign=Math.sign(car._lane),station=car._gridS;
+  const moveToLane=lane=>{
+    const from=projectTrack(car.x,car.y).offset,steps=Math.ceil(Math.abs(lane-from)/5);
+    for(let i=1;i<=steps;i++){
+      const p=trackPoint(station,from+(lane-from)*i/steps);
+      Object.assign(car,{x:p.x,y:p.y,angle:p.angle,speed:0});ui.frame(1/120);
+    }
+  };
+  const warning=ui.nodes.get('offroad-warning'+player),label=ui.nodes.get('offroad-countdown'+player);
+  moveToLane(sign*135);ui.advance(3.8-car.offroadTime);
+  assert.equal(warning.classList.contains('hidden'),true);
+  for(const [time,seconds]of [[4.05,3],[5.05,2],[6.05,1]]){
+    ui.advance(time-car.offroadTime);
+    assert.equal(warning.classList.contains('hidden'),false);
+    assert.equal(label.textContent,`请返回赛道，${seconds} 秒后自动复位`);
+  }
+  ui.click('pause');ui.frame();const pausedTime=car.offroadTime;ui.advance(2);
+  assert.equal(car.offroadTime,pausedTime);assert.equal(warning.classList.contains('hidden'),true);
+  ui.click('resume');ui.frame();assert.equal(warning.classList.contains('hidden'),false);
+  moveToLane(car._lane);
+  assert.equal(car.offroadTime,0);assert.equal(car.rescueCount,0);
+  assert.equal(warning.classList.contains('hidden'),true,'returning before seven seconds cancels the warning');
+  moveToLane(sign*135);ui.advance(4.05-car.offroadTime);
+  assert.equal(label.textContent,'请返回赛道，3 秒后自动复位','a second departure gets a fresh grace period');
+  const resets=ui.renderer.resetCalls.length;
+  ui.advance(7.02-car.offroadTime);
+  assert.equal(car.rescueCount,1);assert.equal(car.rescueReason,'offroad');assert.equal(car.offroadTime,0);
+  assert.ok(car.rescueCooldown>1.9);assert.equal(warning.classList.contains('hidden'),true);
+  assert.equal(ui.renderer.resetCalls.length,resets+1);
+  assert.equal(ui.renderer.resetCalls.at(-1).playerId,player,'only the recovered player camera snaps back');
+  assert.equal(ui.nodes.get('offroad'+player).textContent,'返回赛道 · 罚停中');
+});

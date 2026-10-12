@@ -11,7 +11,7 @@ export class RaceAI {
   reset() {
     this.elapsed=0;this.rescues=0;
     this._lane=this.carId===1?-24:24;
-    this._lastS=null;this._stuckFor=0;this._missedFor=0;this._offroadFor=0;
+    this._lastS=null;this._stuckFor=0;this._missedFor=0;
     this._boostRemaining=0;this._boostCooldown=15;
   }
 
@@ -27,17 +27,19 @@ export class RaceAI {
     const advanced=this._lastS===null?0:mod(projection.s-this._lastS+TRACK.length/2,TRACK.length)-TRACK.length/2;
     this._lastS=projection.s;
     if(car.rescueCooldown>0) {
-      this._stuckFor=0;this._missedFor=0;this._offroadFor=0;this._boostRemaining=0;
+      this._stuckFor=0;this._missedFor=0;this._boostRemaining=0;
       return keys;
     }
-    this._stuckFor=advanced<tick*12?this._stuckFor+tick:Math.max(0,this._stuckFor-tick*2);
-    this._missedFor=car.missedCheckpoint?this._missedFor+tick:0;
-    this._offroadFor=projection.distance>TRACK.roadWidth/2?this._offroadFor+tick:0;
-    if(this._stuckFor>4.2||this._missedFor>2.5||this._offroadFor>3.5) {
+    // Leaving the asphalt uses the same seven-second engine recovery as the
+    // player. On-road assistance must not shorten that grace period.
+    const onRoad=projection.distance<=TRACK.roadWidth/2;
+    this._stuckFor=onRoad?(advanced<tick*12?this._stuckFor+tick:Math.max(0,this._stuckFor-tick*2)):0;
+    this._missedFor=onRoad&&car.missedCheckpoint?this._missedFor+tick:0;
+    if(onRoad&&(this._stuckFor>4.2||this._missedFor>2.5)) {
       engine.rescue(this.carId);
       this.rescues++;
       this._lastS=projectTrack(car.x,car.y).s;
-      this._stuckFor=0;this._missedFor=0;this._offroadFor=0;this._boostRemaining=0;
+      this._stuckFor=0;this._missedFor=0;this._boostRemaining=0;
       return keys;
     }
 

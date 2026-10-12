@@ -19,7 +19,7 @@ const PHRASES = [
 ['两位玩家共用键盘，各占半个屏幕，使用斜后方 3D 镜头跟随自己的赛车。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。','Share one keyboard with a chase camera for each driver. The first to finish wins, and the other can finish their race before results appear.'],
 ['两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。','Share one keyboard and a split screen. The first to finish wins; both drivers can complete the race.'],
 ['镜头全屏跟随你的赛车，与 AI 在同一赛道较量。两套键位均控制你的赛车：WASD / 左 Shift / Q，或方向键 / Enter / 斜杠；也可在「自定义按键」中修改。两车遵循相同物理和赛道规则，双方完赛后结算。','The full view follows your car as you race the AI on the same circuit. Use WASD / Left Shift / Q or Arrow keys / Enter / Slash. Customize either set in Key bindings. Both cars follow the same physics and track rules.'],
-['每圈设 3 个计时门和终点计时点。通过后显示与对手在同一圈、同一点的差距；载入幽灵时也会显示单圈对比。这条赛道有长直道、连续 S 弯和回头弯。弯前松油或轻点刹车，出弯再用氮气。氮气会自动恢复。树木、建筑与护栏会挡住车辆，撞上会减速；轻微压路肩仍能正常计圈，大幅抄近路不能完成一圈。卡住时，玩家一按','Each lap has three timing gates and a finish split. Compare times at the same point, including your ghosts. Ease off before bends and use nitro on exit. Nitro recharges automatically. Trees, buildings and barriers are solid. Cutting too far off course will invalidate the lap. If stuck, P1 presses '],
+['每圈设 3 个计时门和终点计时点。通过后显示与对手在同一圈、同一点的差距；载入幽灵时也会显示单圈对比。这条赛道有长直道、连续 S 弯和回头弯。弯前松油或轻点刹车，出弯再用氮气。氮气会自动恢复。树木、建筑与护栏会挡住车辆，撞上会减速；离开赛道后有 7 秒返回时间，最后 3 秒会显示倒计时；及时回到路面即可继续正常计圈，连续离开满 7 秒会自动复位。卡住时，玩家一按','Each lap has three timing gates and a finish split. Compare times at the same point, including your ghosts. Ease off before bends and use nitro on exit. Nitro recharges automatically. Trees, buildings and barriers are solid. Return to the road within 7 seconds to keep racing normally. A countdown appears for the final 3 seconds; after 7 continuous seconds off-road, the car automatically recovers. If stuck, P1 presses '],
 ['、玩家二按',', and P2 presses '],['返回赛道，并承受 2 秒罚停。',' to recover, with a 2-second penalty.'],['暂停 / 继续 · 离开游戏窗口会自动暂停。','Pause / resume · Switching away automatically pauses the race.'],
 ['点击要修改的动作，再按一个新键。重复键会提示；Esc 取消选键。','Select an action, then press a new key. Duplicate keys are rejected; Esc cancels.'],
 ['请选择字母、数字、方向键、Shift、Enter 或标点键；空格和 Esc 留给开始与暂停。','Use a letter, number, arrow, Shift, Enter or punctuation key. Space and Esc are reserved for starting and pausing.'],
@@ -72,6 +72,7 @@ PHRASES.push(
 ['单圈用时','Lap time'],['全站前五名','Global top five'],
 ['对战 AI',' vs AI'],
 );
+PHRASES.push(['回到路面即可取消倒计时','Return to the road to cancel the countdown'],['离开赛道满 7 秒 · 已自动复位','7 seconds off-road · Automatically recovered']);
 const exact = new Map(PHRASES);
 const pieces = [...exact].sort((a,b)=>b[0].length-a[0].length);
 export function translateText(value, language='en') {
@@ -86,6 +87,7 @@ export function translateText(value, language='en') {
     .replace(/两位车手均已完成 (\d+) 圈/g,'Both drivers completed $1 laps').replace(/(.+)获胜！/g,'$1 wins!')
     .replace(/(领先|落后)(.+?) ([+−][\d.]+) 秒/g,(_,direction,target,gap)=>`${direction==='领先'?'Ahead of':'Behind'} ${target} ${gap}s`)
     .replace(/与(.+)并驾齐驱/g,'Level with $1').replace(/(.+)尚未通过/g,'Waiting for $1')
+    .replace(/请返回赛道，(\d) 秒后自动复位/g,'Return to the road — automatic recovery in $1s')
     .replace(/漏过检查点 · 按 (.+) 回赛道/g,'Missed checkpoint · $1 to recover')
     .replace(/你驾驶(.+)赛车，与 AI 较量。WASD 或方向键均可驾驶。/g,'Drive the $1 car against AI. Use WASD or Arrow keys.')
     .replace(/你驾驶(.+)赛车，AI 使用另一种颜色。/g,'You drive the $1 car; AI uses the other color.')
