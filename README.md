@@ -82,3 +82,7 @@ Shanghai has a 3,000-unit Bund straight, six additional Pudong skyline groups an
 ## London expansion and larger theatre artwork
 
 London adds ten roadside landmarks: the Tower of London, National Gallery, Trafalgar Square, St Pancras, Tate Modern, the Gherkin, the Shard, Battersea Power Station, Royal Albert Hall and Natural History Museum. All eight theatre advertisements are larger; The Book of Mormon, The Play That Goes Wrong and The Lion King retain authentic locally hosted artwork in proportional frames. These additions preserve the exact road layout, elevation and checkpoints. Complete London geometry measures 37.22 MB, within the existing 40 MB limit. All ten landmarks and eight advertisements were inspected from detail and driving cameras; both AI cars finish one and three laps without rescue.
+
+## Beijing architecture expansion
+
+Beijing adds twenty individually modeled landmarks: Bird’s Nest, Water Cube, National Centre for the Performing Arts, CCTV Headquarters, China Zun, Beihai White Pagoda, Summer Palace Tower of Buddhist Incense, Seventeen-Arch Bridge, Drum Tower, Bell Tower, Zhengyangmen, Jingshan Wanchun Pavilion, Yonghe Temple, Confucius Temple, National Museum, Beijing Railway Station, Beijing Exhibition Center, Miaoying White Pagoda, Capital Museum and Beijing Planetarium. The Temple of Heaven, Tiananmen gate and decorative paifang are refined. The Great Wall and road geometry are unchanged. Full Beijing geometry measures 37.47 MB, within the unchanged 40 MB budget; both AI drivers finish one- and three-lap races without rescue.

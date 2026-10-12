@@ -2,6 +2,7 @@ import { shanghaiRiverClearance } from './shanghai-riverfront.js';
 /** Compact city districts: native geometry shared by rendering and collisions. */
 import { TRACK, trackPoint, projectTrack } from './engine.js';
 import { addBeijingGreatWall, beijingWallClearance } from './beijing-great-wall.js';
+import { BEIJING_LANDMARKS, BEIJING_REFINEMENTS, beijingLandmarkPlacements, addBeijingCityLandmark } from './beijing-city-landmarks.js';
 import { SHANGHAI_LANDMARKS, shanghaiLandmarkPlacements, addShanghaiLandmark } from './shanghai-landmarks.js';
 import { addAustinCampus } from './austin-campus.js';
 import { addAustinFootball } from './austin-football.js';
@@ -48,6 +49,7 @@ export function cityLandmarkPlacements() {
   }
  }
  if(TRACK.theme==='austin'){result.push(...sixthStreetPlacements());result.push(...austinLandmarkPlacements(result));}
+ if(TRACK.theme==='beijing')result.push(...beijingLandmarkPlacements(result));
  const frozen=Object.freeze(result);placementCache.set(TRACK,frozen);return frozen;
 }
 export function citySceneryPlacements() {
@@ -386,7 +388,8 @@ function parisQuays(mesh){
 export function addCityLandmark(mesh,item){
  const draw={'temple-of-heaven':temple,'palace-gate':palaceGate,'beijing-paifang':paifang,'texas-capitol':capitol,'music-guitar':guitar,'austin-music-hall':musicHall,'christ-redeemer':christ,sugarloaf,'lapa-aqueduct':lapa,
   'eiffel-tower':eiffel,'arc-de-triomphe':arcDeTriomphe,'louvre-pyramid':louvre,'paris-bridge-pylon':bridgePylon};
- if(item.kind==='ut-tower')addAustinCampus(mesh,item);
+ if([...BEIJING_LANDMARKS,...BEIJING_REFINEMENTS].some(meta=>meta.kind===item.kind))addBeijingCityLandmark(mesh,item);
+ else if(item.kind==='ut-tower')addAustinCampus(mesh,item);
  else if(item.kind==='football-team')addAustinFootball(mesh,item);
  else if(AUSTIN_LANDMARKS.some(landmark=>landmark.kind===item.kind))addAustinLandmark(mesh,item);
  else if(SIXTH_STREET_VENUES.some(venue=>venue.kind===item.kind))addSixthStreetVenue(mesh,item);
