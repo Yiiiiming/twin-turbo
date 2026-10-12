@@ -4,6 +4,7 @@
  * the circuit deliberately does not claim real geographic placement. */
 import { TRACK, trackPoint } from './engine.js';
 import { frame, details, beam, word, frontDisk, arch, cornice, column, pediment } from './london-west-end.js';
+import { SHANGHAI_RIVER } from './shanghai-riverfront.js';
 const TAU=Math.PI*2;
 export const SHANGHAI_LANDMARKS=Object.freeze([
  {kind:'oriental-pearl',label:'Oriental Pearl',radius:112,width:208,depth:208,height:586},
@@ -18,6 +19,9 @@ export const SHANGHAI_LANDMARKS=Object.freeze([
  {kind:'shanghai-museum',label:'Shanghai Museum',radius:145,width:244,depth:148,height:151},
  {kind:'yu-garden',label:'Yu Garden Pavilion',radius:135,width:222,depth:152,height:143},
  {kind:'wukang-mansion',label:'Wukang Mansion',radius:154,width:284,depth:130,height:171},
+ {kind:'shanghai-postal-museum',label:'Shanghai Postal Museum',radius:154,width:260,depth:156,height:253},
+ {kind:'shanghai-concert-hall',label:'Shanghai Concert Hall',radius:144,width:244,depth:142,height:162},
+ {kind:'xujiahui-cathedral',label:'Xujiahui Cathedral',radius:145,width:222,depth:174,height:278},
 ].map(Object.freeze));
 /** Plot directions share the renderer's local −Z façade convention. Buildings
  * stay on the ground beside the descending skyway, with their upper floors at
@@ -26,12 +30,14 @@ export function shanghaiLandmarkPlacements(){
  if(TRACK.theme!=='shanghai')return [];
  const plots={
   'shanghai-tower':[7550,1], 'shanghai-swfc':[8750,1], 'jin-mao':[10000,1],
-  'shanghai-customs':[12450,-1], 'bund-hsbc':[12900,-1], 'peace-hotel':[13350,-1],
-  'shanghai-exhibition':[17100,1], 'shanghai-grand-theatre':[17900,1],
-  'shanghai-museum':[18700,1], 'yu-garden':[650,-1], 'wukang-mansion':[1450,-1],
+  'shanghai-customs':[TRACK.bund.start+300,-1], 'bund-hsbc':[TRACK.bund.start+1100,-1], 'peace-hotel':[TRACK.bund.start+2150,-1],
+  'shanghai-exhibition':[20470,1], 'shanghai-grand-theatre':[21270,1],
+  'shanghai-museum':[22070,1], 'shanghai-postal-museum':[20470,-1], 'shanghai-concert-hall':[21270,-1], 'xujiahui-cathedral':[22070,-1], 'yu-garden':[650,-1], 'wukang-mansion':[1450,-1],
  };
  return SHANGHAI_LANDMARKS.map(meta=>{
   if(meta.kind==='oriental-pearl')return {...meta,x:2900,z:1660,angle:0,elevation:0,s:2565,side:1};
+  const skyline={'shanghai-tower':[2900,690],'shanghai-swfc':[2150,710],'jin-mao':[1450,695]};
+  if(skyline[meta.kind]){const [t,n]=skyline[meta.kind],a=SHANGHAI_RIVER.angle,r=SHANGHAI_RIVER;return {...meta,x:r.x+Math.cos(a)*t-Math.sin(a)*n,z:r.z+Math.sin(a)*t+Math.cos(a)*n,angle:a,elevation:0,s:TRACK.bund.start+t,side:1,skyline:true};}
   const [s,side]=plots[meta.kind],p=trackPoint(s,side*(meta.radius+100));
   return {...meta,s,side,x:p.x,z:p.y,angle:p.angle+(side<0?Math.PI:0),elevation:0};
  });
@@ -284,10 +290,79 @@ function wukang(mesh,item){
   f.box(92,164,39,19,14,15,dark);
  });
 }
+// Postal clock-tower, neoclassical concert hall and red-brick Gothic nave give
+// the late course an equally composed outer frontage, rather than a blank side.
+function postalMuseum(mesh,item){
+ const f=frame(mesh,item),stone='#c8c3ad',trim='#e4dfc9',glass='#41646e',copper='#547f70';
+ f.box(0,5,0,248,10,146,'#a4a894');f.box(0,70,7,236,128,122,stone);f.box(60,160,-5,51,60,63,stone);
+ details(mesh,()=>{
+  for(const y of[33,66,103])for(let x=-99;x<=99;x+=22)window(f,x,y,-55,12,22,trim,glass);
+  for(let x=-102;x<=102;x+=34)column(f,x,13,-62,99,5.1,trim,'#a5a58e');
+  cornice(f,0,136,7,242,129,trim);f.box(0,143,10,224,8,114,'#75867c');
+  cornice(f,60,190,-5,60,72,trim);clock(f,60,171,-37.2,14);
+  for(const side of[-1,1]){f.box(60+side*26,168,-35,3,40,3,trim);f.box(60+side*29,198,-5,6,16,53,trim);}
+  f.cone(60,201,-5,31,21,copper,8,18,Math.PI/8);f.cone(60,222,-5,18,17,copper,16,5);f.cone(60,239,-5,4,11,'#d4bb80',16,1);f.cone(60,250,-5,2,3,'#c8b27a',12,0);
+  // Two rooftop sculptural groups frame the postal clock, with fine plinths.
+  for(const x of[7,109]){f.box(x,150,-18,25,5,24,trim);f.cone(x,153,-18,3.5,15,'#76847a',16,2.5);sphere(f,x,170,-18,3,'#8c9c8c',8,12);beam(mesh,f.p(x,164,-18),f.p(x-9,174,-18),2,'#889b89');beam(mesh,f.p(x,164,-18),f.p(x+10,168,-18),2,'#889b89');}
+  word(f,'SHANGHAI POST',-29,120,-65,6.2,138,'#6b735b');
+ });
+}
+function concertHall(mesh,item){
+ const f=frame(mesh,item),stone='#d8ceba',trim='#efe5cd',shade='#b4a990',glass='#456272';
+ f.box(0,5,0,238,10,136,'#b4ad99');f.box(0,64,6,222,118,116,stone);
+ details(mesh,()=>{
+  for(const x of[-90,-60,-30,0,30,60,90])arch(f,x,51,-53,18,44,trim,glass);
+  for(const x of[-94,-67,-40,40,67,94])column(f,x,10,-60,95,5.4,trim,shade);
+  for(const x of[-36,0,36])arch(f,x,11,-55,23,30,trim,'#3a514f');
+  cornice(f,0,121,6,230,123,trim);f.box(0,132,6,224,15,117,stone);
+  word(f,'SHANGHAI CONCERT HALL',0,126,-56.2,6,203,'#84724e');
+  pediment(f,0,142,-61,131,18,110,trim,stone);
+  for(let x=-105;x<=105;x+=10)f.box(x,116,-56,3.2,4,4,shade);
+  for(const x of[-93,93]){f.box(x,33,-57,24,25,3,'#334f5a');word(f,'MUSIC',x,29,-59,4.6,21,'#ead7a7');}
+  f.box(0,46,-66,110,4,23,'#638186');f.box(0,43,-78,111,6,2,'#a9a18b');
+ });
+}
+function pointed(f,x,bottom,z,w,h,trim,glass){
+ const spring=bottom+h*.56,top=bottom+h;
+ f.box(x,(bottom+spring)/2,z,w,spring-bottom,1.3,glass);
+ f.tri([x-w/2,spring,z],[x+w/2,spring,z],[x,top,z],glass);
+ for(const side of[-1,1]){f.box(x+side*(w/2+1),bottom+(spring-bottom)/2,z-1,2,spring-bottom,2,trim);}
+ for(const side of[-1,1]){
+  const a=[x+side*w/2,spring,z-1],b=[x,top,z-1],c=[x,top+3,z-1],d=[x+side*(w/2+2.5),spring,z-1];f.quad(a,b,c,d,trim);
+ }
+ f.box(x,bottom+h*.36,z-1.7,1,h*.7,1,trim);f.box(x,bottom+h*.30,z-1.7,w,1,1,trim);
+}
+function cathedral(mesh,item){
+ const f=frame(mesh,item),brick='#9e5142',stone='#d9c3a1',roofSlate='#596d70',glass='#415d76';
+ f.box(0,5,6,209,10,158,'#a99b84');f.box(0,68,17,113,126,133,brick);
+ for(const x of[-78,78])f.box(x,100,-22,47,190,53,brick);
+ details(mesh,()=>{
+  for(const side of[-1,1]){
+   const x=side*78;for(const y of[38,91,142,185])cornice(f,x,y,-22,49,56,stone);
+   for(const y of[53,111,164])pointed(f,x,y-17,-50,24,39,stone,glass);
+   for(const dx of[-22,22])f.box(x+dx,102,-50,3,172,3,stone);
+   f.cone(x,195,-22,34,68,roofSlate,4,0,Math.PI/4);
+   f.box(x,270,-22,2,15,2,stone);f.box(x,272,-22,10,2,2,stone);
+   for(const z of[-44,0])for(const dx of[-22,22]){f.cone(x+dx,190,z,4,18,stone,8,1);}
+  }
+  // Nave roof and central red-brick gable have real slopes, not painted shapes.
+  f.tri([-56,132,-51],[56,132,-51],[0,181,-51],brick);
+  f.quad([-59,132,-51],[0,181,-51],[0,181,87],[-59,132,87],roofSlate);
+  f.quad([0,181,-51],[59,132,-51],[59,132,87],[0,181,87],roofSlate);
+  pointed(f,0,12,-53,35,53,stone,'#454b42');pointed(f,-39,13,-53,21,40,stone,'#434b43');pointed(f,39,13,-53,21,40,stone,'#434b43');
+  frontDisk(f,0,116,-52.2,26,stone,0,48);frontDisk(f,0,116,-52.7,22,glass,.05,48);
+  for(let i=0;i<12;i++){const a=i/12*TAU;beam(mesh,f.p(0,116,-53.4),f.p(Math.cos(a)*22,116+Math.sin(a)*22,-53.4),1.2,stone);frontDisk(f,Math.cos(a)*15,116+Math.sin(a)*15,-53.6,3.2,i%2?'#ab775e':'#73999e',.08,12);}
+  for(const side of[-1,1])for(const z of[-25,12,49,77]){
+   f.box(side*59,65,z,9,114,6,stone);f.box(side*61,28,z,12,42,8,stone);
+   const pos=f.p(side*58,0,z),sf=frame(mesh,{x:pos[0],z:pos[2],angle:item.angle+side*Math.PI/2});pointed(sf,0,47,-1,18,62,stone,glass);
+  }
+  word(f,'XUJIAHUI',0,75,-54,6,86,'#dfc9a0');
+ });
+}
 export function addShanghaiLandmark(mesh,item){
  const draw={'oriental-pearl':pearl,'shanghai-tower':shanghaiTower,'shanghai-swfc':swfc,'jin-mao':jinMao,
   'shanghai-customs':customs,'bund-hsbc':hsbc,'peace-hotel':peaceHotel,'shanghai-exhibition':exhibition,
-  'shanghai-grand-theatre':grandTheatre,'shanghai-museum':museum,'yu-garden':yuGarden,'wukang-mansion':wukang};
+  'shanghai-grand-theatre':grandTheatre,'shanghai-museum':museum,'yu-garden':yuGarden,'wukang-mansion':wukang,'shanghai-postal-museum':postalMuseum,'shanghai-concert-hall':concertHall,'xujiahui-cathedral':cathedral};
  if(!draw[item.kind])throw new RangeError(`Unknown Shanghai landmark: ${item.kind}`);
  draw[item.kind](mesh,item);
 }

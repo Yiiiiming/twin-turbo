@@ -5,6 +5,8 @@ import { RaceAI } from '../ai.js';
 import { ObstacleWorld } from '../collisions.js';
 import { SHANGHAI_LANDMARKS, shanghaiLandmarkPlacements, addShanghaiLandmark } from '../shanghai-landmarks.js';
 import { updateChaseCamera, sceneObstacles } from '../renderer.js';
+import { citySceneryPlacements } from '../city-scenery.js';
+import { pudongSkylinePlacements, shanghaiRiverClearance } from '../shanghai-riverfront.js';
 
 class AuditMesh {
  constructor(item){this.item=item;this.colliders=[];this.radius=0;this.low=Infinity;this.high=-Infinity;this.triangles=0;this.colors=new Set();}
@@ -27,7 +29,7 @@ const plots=()=>{setTrack('coast-shanghai');return shanghaiLandmarkPlacements();
 test.afterEach(()=>setTrack('coast'));
 
 test('Shanghai closes exactly, has a flat staggered grid, and keeps the compact 240 km/h scale',()=>{
- setTrack('coast-shanghai');assert.ok(TRACK.length>19000&&TRACK.length<20000);assert.equal(Math.round(363*3.6/TRACK.unitsPerMeter),240);
+ setTrack('coast-shanghai');assert.ok(TRACK.length>23000&&TRACK.length<24000);assert.equal(Math.round(363*3.6/TRACK.unitsPerMeter),240);
  assert.equal(TRACK.checkpoints%4,0);assert.equal(TRACK.roadWidth,120);
  for(const grid of TRACK.startGrid){assert.equal(trackPoint(TRACK.startDistance+grid.offset).elevation,0);}
  for(const segment of TRACK.segments){
@@ -50,8 +52,8 @@ test('the Pearl ascent makes two complete turns with safe vertical separation an
  }
 });
 
-test('all twelve named landmarks have bounded, distinct, solid detailed geometry within a 35k triangle budget',()=>{
- const items=plots();assert.equal(items.length,12);assert.equal(new Set(items.map(i=>i.kind)).size,12);assert.equal(SHANGHAI_LANDMARKS.length,12);
+test('all fifteen named landmarks have bounded, distinct, solid detailed geometry within a 50k triangle budget',()=>{
+ const items=plots();assert.equal(items.length,15);assert.equal(new Set(items.map(i=>i.kind)).size,15);assert.equal(SHANGHAI_LANDMARKS.length,15);
  let triangles=0;
  for(const item of items){
   const mesh=new AuditMesh(item);addShanghaiLandmark(mesh,item);triangles+=mesh.triangles;
@@ -60,7 +62,7 @@ test('all twelve named landmarks have bounded, distinct, solid detailed geometry
   assert.ok(mesh.triangles>500,`${item.kind} should have architectural detail`);assert.ok(mesh.colors.size>=4,`${item.kind} needs material detail`);
   assert.ok(mesh.colliders.length>0,`${item.kind} needs solid structures`);
  }
- assert.ok(triangles<35000,`${triangles} landmark triangles exceed budget`);
+ assert.ok(triangles<50000,`${triangles} landmark triangles exceed budget`);
 });
 
 test('all plots stay beside the circuit, avoid each other and leave every lane and chase camera clear',()=>{
@@ -88,9 +90,9 @@ test('Shanghai production AI finishes both 1- and 3-lap races without rescue or 
  setTrack('coast-shanghai');const obstacles=sceneObstacles();
  for(const laps of [1,3]){
   const engine=new RaceEngine({laps,obstacles}).start(laps),drivers=[new RaceAI({carId:1}),new RaceAI({carId:2})];
-  for(let frame=0;frame<60*220&&engine.state!=='finished';frame++)engine.step(1/60,new Set(drivers.flatMap(d=>[...d.update(engine,1/60)])));
+  for(let frame=0;frame<60*280&&engine.state!=='finished';frame++)engine.step(1/60,new Set(drivers.flatMap(d=>[...d.update(engine,1/60)])));
   assert.equal(engine.state,'finished');assert.deepEqual(drivers.map(d=>d.rescues),[0,0]);
-  for(const car of engine.cars){assert.equal(car.lap,laps);assert.ok(car.bestLap>=45&&car.bestLap<=65,`Shanghai lap ${car.bestLap}`);}
+  for(const car of engine.cars){assert.equal(car.lap,laps);assert.ok(car.bestLap>=55&&car.bestLap<=85,`Shanghai lap ${car.bestLap}`);}
  }
 });
 
@@ -108,15 +110,30 @@ test('Shanghai production supports, lifted timing gates and lamps clear all chas
 
 test('Huangpu has two finite banks, a raised crossing and a sustained Bund-to-Pearl driving view',async()=>{
  const {shanghaiRiverContains,shanghaiRiverClearance}=await import('../shanghai-riverfront.js');setTrack('coast-shanghai');
+ assert.ok(TRACK.bund.length>=2800&&TRACK.bund.length<=3400,'Bund should offer at least eight seconds of riverfront driving at cruising speed');
  let entries=0,insideBefore=false;
  for(let s=0;s<TRACK.length;s+=9){const p=trackPoint(s),inside=shanghaiRiverContains(p.x,p.y);
   if(inside&&!insideBefore)entries++;if(inside)assert.ok(p.elevation>=85.9,'crossing must stay on a raised bridge deck');insideBefore=inside;}
  assert.equal(entries,1);for(const item of shanghaiLandmarkPlacements())assert.ok(shanghaiRiverClearance(item.x,item.z,item.radius),`${item.kind} overlaps Huangpu`);
  const pearl=shanghaiLandmarkPlacements()[0];
- for(let s=12400;s<=13500;s+=50){
+ for(let s=TRACK.bund.start+25;s<=TRACK.bund.end-25;s+=50){
   const p=trackPoint(s),bearing=Math.atan2(pearl.z-p.y,pearl.x-p.x);
   assert.ok(Math.abs(mod(bearing-p.angle+Math.PI,Math.PI*2)-Math.PI)<Math.PI/6,'Pearl fits forward driving FOV throughout the Bund straight');
   let crossesWater=false;for(let t=.02;t<1;t+=.02)crossesWater ||= shanghaiRiverContains(p.x+(pearl.x-p.x)*t,p.y+(pearl.z-p.y)*t);
   assert.ok(crossesWater,'the visible Pearl must be across actual water, not merely beside a decorative lake');
+ }
+});
+
+test('the grand Pudong skyline has clear plots and late-course architectural landmarks face both sides',()=>{
+ setTrack('coast-shanghai');const skyline=pudongSkylinePlacements(),landmarks=shanghaiLandmarkPlacements(),streets=citySceneryPlacements();
+ assert.equal(skyline.length,6);
+ for(const item of skyline){
+  assert.ok(projectTrack(item.x,item.z).distance>=item.radius+85,'Pudong buildings must not crowd the racing course');
+  assert.ok(shanghaiRiverClearance(item.x,item.z,item.radius),'Pudong buildings must stand beyond the riverbank');
+  for(const other of [...skyline,...landmarks,...streets])if(other!==item)assert.ok(Math.hypot(item.x-other.x,item.z-other.z)>=item.radius+other.radius+10,'skyline plots must not intersect landmarks or ordinary street buildings');
+ }
+ for(const kind of ['shanghai-postal-museum','shanghai-concert-hall','xujiahui-cathedral']){
+  const item=landmarks.find(p=>p.kind===kind);assert.equal(item.side,-1);
+  assert.ok(landmarks.some(p=>p.s===item.s&&p.side===1),'late-course additions should face the existing landmark side');
  }
 });

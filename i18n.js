@@ -68,7 +68,7 @@ PHRASES.push(
 ['挑战三圈幽灵','Challenge three-lap ghost'],['挑战单圈幽灵','Challenge single-lap ghost'],['加入紫色幽灵','Add purple ghost'],['加入金色幽灵','Add gold ghost'],
 ['替换紫色幽灵','Replace purple ghost'],['替换金色幽灵','Replace gold ghost'],
 ['已找到记录。','Record found. '],['圈','laps'],
-['蔚蓝海湾','Azure Bay'],['游艇港湾','Marina'],['海港大奖赛','Harbor Grand Prix'],['双螺旋高架','Spiral Flyover'],
+['蔚蓝海湾','Azure Bay'],['游艇港湾','Marina'],['双螺旋高架','Spiral Flyover'],
 ['单圈用时','Lap time'],['全站前五名','Global top five'],
 ['对战 AI',' vs AI'],
 );

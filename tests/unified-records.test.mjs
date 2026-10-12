@@ -378,7 +378,7 @@ for (const trackId of ['coast-london', 'coast-beijing', 'coast-austin', 'coast-r
   h.handler = req => {
     const city = req.body?.city || req.url.searchParams.get('city');
     const version = req.body?.version || req.url.searchParams.get('version');
-    const race = [RACE_GHOST_VERSION, 'coast-race-ghost-v2'].includes(version);
+    const race = [RACE_GHOST_VERSION, 'coast-race-ghost-v2', 'coast-race-ghost-v3'].includes(version);
     if (req.method === 'POST') {
       const entry = { ...req.body, ...(race ? { kind: 'race', laps: 3 } : {}), createdAt: 1 }; delete entry.replay;
       saved.push({ entry, version, total: req.url.pathname === '/api/records' });
@@ -404,7 +404,7 @@ for (const trackId of ['coast-london', 'coast-beijing', 'coast-austin', 'coast-r
   assert.ok(posted(h).every(req => req.body.city === trackId));
   assert.equal(posted(h).length, laps === 3 ? 3 : 2);
   const revised=['coast-austin','coast-shanghai'].includes(trackId);
-  assert.deepEqual(posted(h).map(req=>req.body.version),[LEADERBOARD_VERSION,revised?'coast-ghost-v2':GHOST_VERSION,...(laps===3?[revised?'coast-race-ghost-v2':RACE_GHOST_VERSION]:[])]);
+  assert.deepEqual(posted(h).map(req=>req.body.version),[LEADERBOARD_VERSION,trackId==='coast-shanghai'?'coast-ghost-v3':revised?'coast-ghost-v2':GHOST_VERSION,...(laps===3?[trackId==='coast-shanghai'?'coast-race-ghost-v3':revised?'coast-race-ghost-v2':RACE_GHOST_VERSION]:[])]);
   await h.client.setTrack(trackId, { preserveResults: true }); await h.client.load(laps);
   assert.equal(h.client.challengeButtons.length, 1); await h.client.challengeButtons[0].dispatch('click');
   assert.equal(h.challenges[0].city, trackId); assert.equal(h.challenges[0].laps, laps);
@@ -427,7 +427,7 @@ for(const city of ['coast-austin','coast-shanghai'])test(`${city} completes tota
   h.handler=req=>{
     const categoryCity=req.body?.city||req.url.searchParams.get('city'),version=req.body?.version||req.url.searchParams.get('version');
     if(req.method==='POST'){
-      const entry={...req.body,createdAt:1,...(version==='coast-race-ghost-v2'?{kind:'race',laps:3}:{})};delete entry.replay;
+      const entry={...req.body,createdAt:1,...(['coast-race-ghost-v2','coast-race-ghost-v3'].includes(version)?{kind:'race',laps:3}:{})};delete entry.replay;
       if(req.url.pathname==='/api/records'){storedTotal=entry;return response({city:categoryCity,version,laps:3,saved:true});}
       return response({city:categoryCity,version,saved:true,retained:false,retentionLimit:20,entry});
     }
@@ -440,7 +440,7 @@ for(const city of ['coast-austin','coast-shanghai'])test(`${city} completes tota
   await h.client.save(card);
   assert.equal(card.total.state,'saved');assert.equal(card.lap.state,'archived');assert.equal(card.race.state,'archived');
   assert.equal(card.done,true);assert.equal(h.savedCalls,1);assert.equal(card.button.textContent,'已完成');assert.match(card.message.textContent,/个人前 20/);
-  assert.deepEqual(posted(h).map(req=>req.body.version),[LEADERBOARD_VERSION,'coast-ghost-v2','coast-race-ghost-v2']);
+  assert.deepEqual(posted(h).map(req=>req.body.version),[LEADERBOARD_VERSION,city==='coast-shanghai'?'coast-ghost-v3':'coast-ghost-v2',city==='coast-shanghai'?'coast-race-ghost-v3':'coast-race-ghost-v2']);
   assert.ok(!h.client.lapCache.get(card.lap.id));assert.ok(!h.client.raceCache.get(card.race.id));
   await h.client.load(3);assert.equal(h.client.entries.length,1,'total score remains ranked even though ghost is archived');
   assert.equal(h.client.raceCache.get(card.race.id),null);assert.equal(h.client.challengeButtons.length,0);
@@ -452,7 +452,7 @@ for(const city of ['coast-austin','coast-shanghai'])test(`${city} unified board 
     const categoryCity=req.body?.city||req.url.searchParams.get('city');
     if(req.method==='POST'){
       if(req.url.pathname==='/api/records')return response({city:categoryCity,version:LEADERBOARD_VERSION,laps:3,saved:true});
-      const race=req.body.version==='coast-race-ghost-v2',entry={...req.body,createdAt:1,...(race?{kind:'race',laps:3}:{})};delete entry.replay;
+      const race=['coast-race-ghost-v2','coast-race-ghost-v3'].includes(req.body.version),entry={...req.body,createdAt:1,...(race?{kind:'race',laps:3}:{})};delete entry.replay;
       return response({city:categoryCity,version:race?RACE_GHOST_VERSION:GHOST_VERSION,saved:true,entry});
     }
     return response({city:categoryCity,version:GHOST_VERSION,entries:[lap('Old Racer')]});

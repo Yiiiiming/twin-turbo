@@ -2,7 +2,9 @@
 export const GHOST_VERSION = 'coast-ghost-v1';
 export const RACE_GHOST_VERSION = 'coast-race-ghost-v1';
 export const isNewGhostCircuit = city => ['coast-austin', 'coast-shanghai'].includes(city);
-export const ghostVersionForCity = (city, laps = 1) => isNewGhostCircuit(city)
+export const ghostVersionForCity = (city, laps = 1) => city === 'coast-shanghai'
+  ? (laps === 3 ? 'coast-race-ghost-v3' : 'coast-ghost-v3')
+  : isNewGhostCircuit(city)
   ? (laps === 3 ? 'coast-race-ghost-v2' : 'coast-ghost-v2')
   : (laps === 3 ? RACE_GHOST_VERSION : GHOST_VERSION);
 export const GHOST_LIMITS = Object.freeze({ minDurationMs: 25000, maxDurationMs: 900000, maxFrames: 12000, intervalMs: 100 });

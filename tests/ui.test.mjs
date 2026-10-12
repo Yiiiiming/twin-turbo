@@ -876,7 +876,7 @@ for (const search of ['', '?city=london']) {
     assert.ok(ui.requests.length > 0);
     for (const request of ui.requests) {
       assert.equal(new URL(request.url).searchParams.get('city'), 'coast-shanghai');
-      assert.equal(new URL(request.url).searchParams.get('version'), request.url.includes('/api/laps') ? 'coast-ghost-v2' : LEADERBOARD_VERSION);
+      assert.equal(new URL(request.url).searchParams.get('version'), request.url.includes('/api/laps') ? 'coast-ghost-v3' : LEADERBOARD_VERSION);
     }
     ui.launch();
     ui.advance(3.4);
@@ -1046,7 +1046,7 @@ test('language choice is required before starting, persists the choice, and swit
 
 test('changing a harbor circuit resets its opponents, recording, splits and leaderboard and is blocked during a race',async t=>{
   const ui=await loadUI(t);
-  assert.deepEqual([...ui.trackCards.keys()],Object.keys(TRACKS));assert.equal(ui.trackCards.size,13);
+  assert.deepEqual([...ui.trackCards.keys()],Object.keys(TRACKS));assert.equal(ui.trackCards.size,12);
   assert.deepEqual([...ui.trackCards.keys()].slice(0,6),['coast-shanghai','coast-london','coast-rio','coast-austin','coast-beijing','coast-paris']);
   for(const {button,preview}of ui.trackCards.values()){assert.equal(button.tagName,'BUTTON');assert.equal(preview.tagName,'SVG');assert.ok(preview.querySelector('path').getAttribute('d').startsWith('M'));}
   ui.ghostClient.select({entry:{id:'prior-lap',name:'旧赛道记录',timeMs:42000,playerId:1,mode:'local'},
@@ -1084,7 +1084,7 @@ test('every harbor map starts local and AI races in both one-lap sprint and thre
     assert.match(ui.nodes.get('race-setup-summary').textContent,new RegExp(track.name));
     const ghostRequest=ui.requests.filter(request=>request.url.includes('/api/laps')).at(-1);
     assert.equal(new URL(ghostRequest.url).searchParams.get('city'),id);
-    assert.equal(new URL(ghostRequest.url).searchParams.get('version'),['coast-austin','coast-shanghai'].includes(id)?(laps===3?'coast-race-ghost-v2':'coast-ghost-v2'):(laps===3?RACE_GHOST_VERSION:GHOST_VERSION));
+    assert.equal(new URL(ghostRequest.url).searchParams.get('version'),id==='coast-shanghai'?(laps===3?'coast-race-ghost-v3':'coast-ghost-v3'):id==='coast-austin'?(laps===3?'coast-race-ghost-v2':'coast-ghost-v2'):(laps===3?RACE_GHOST_VERSION:GHOST_VERSION));
     ui.click('setup-skip');ui.advance(3.1);assert.equal(ui.engine.state,'racing');assert.equal(ui.engine.laps,laps);
     ui.key('ArrowUp');if(mode==='local')ui.key('KeyW');ui.advance(.3);
     assert.ok(ui.engine.cars.every(car=>car.speed>50),`${id}/${mode}/${laps} both racers move`);

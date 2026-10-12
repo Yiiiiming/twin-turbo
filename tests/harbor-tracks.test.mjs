@@ -9,10 +9,10 @@ const angleDifference=(a,b)=>Math.abs(mod(a-b+Math.PI,Math.PI*2)-Math.PI);
 
 test.afterEach(()=>setTrack('coast'));
 
-test('twelve distinct compact courses close with continuous headings and enough racing width',()=>{
- assert.equal(tracks.length,12);const shapes=new Set();
+test('eleven distinct additional courses close with continuous headings and enough racing width',()=>{
+ assert.equal(tracks.length,11);const shapes=new Set();
  for(const track of tracks){
-  setTrack(track.id);assert.ok(track.length>=15000&&track.length<=20000);assert.equal(track.roadWidth,120);
+  setTrack(track.id);assert.ok(track.length>=15000&&track.length<=(track.id==='coast-shanghai'?24000:20000));assert.equal(track.roadWidth,120);
   assert.ok(track.startDistance>100);assert.ok(track.nameEn&&track.descriptionEn);
   shapes.add(JSON.stringify(track.segments.map(s=>[s.kind,Math.round(s.length),s.sweep])));
   for(const seg of track.segments){
@@ -29,7 +29,7 @@ test('twelve distinct compact courses close with continuous headings and enough 
    assert.ok(Math.abs(mod(projected.s-row.distance+track.length/2,track.length)-track.length/2)<.001,`${track.id} projection skipped a layer`);
   }
  }
- assert.equal(shapes.size,12,'courses cannot be cosmetic mirrors of one layout');
+ assert.equal(shapes.size,11,'courses cannot be cosmetic mirrors of one layout');
 });
 
 test('the ridge has two genuine 1080-degree helices with safe floor separation and correct route projection',()=>{
@@ -92,18 +92,18 @@ for(const track of Object.values(TRACKS))test(`${track.id}: both drivers finish 
  setTrack(track.id);const obstacles=sceneObstacles();
  for(const laps of [1,3]){
   const engine=new RaceEngine({laps,obstacles}).start(laps),drivers=[new RaceAI({carId:1}),new RaceAI({carId:2})],splits=new SplitTiming(),passages=[];
-  for(let frame=0;frame<60*225&&engine.state!=='finished';frame++){
+  for(let frame=0;frame<60*300&&engine.state!=='finished';frame++){
    const keys=new Set(drivers.flatMap(driver=>[...driver.update(engine,1/60)]));engine.step(1/60,keys);passages.push(...splits.sample(engine));
   }
   assert.equal(engine.state,'finished',`${track.id}/${laps} laps did not finish`);
   assert.deepEqual(drivers.map(driver=>driver.rescues),[0,0]);
   for(const playerId of [1,2])assert.equal(passages.filter(p=>p.playerId===playerId).length,laps*4,`${track.id}: every quarter must report a checkpoint split`);
-  for(const car of engine.cars){assert.equal(car.lap,laps);assert.ok(car.bestLap>=40&&car.bestLap<=70,`lap ${car.bestLap} outside intended pace`);}
+  for(const car of engine.cars){assert.equal(car.lap,laps);assert.ok(car.bestLap>=40&&car.bestLap<=(track.id==='coast-shanghai'?90:70),`lap ${car.bestLap} outside intended pace`);}
  }
 });
 
-test('all thirteen maps share the same 240 km/h cruising and 341 km/h boost speedometer scale',()=>{
- assert.equal(Object.keys(TRACKS).length,13);
+test('all twelve maps share the same 240 km/h cruising and 341 km/h boost speedometer scale',()=>{
+ assert.equal(Object.keys(TRACKS).length,12);
  for(const track of Object.values(TRACKS)){
   const scale=track.unitsPerMeter?3.6/track.unitsPerMeter:.66;
   assert.equal(Math.round(363*scale),240,track.id);assert.equal(Math.round(517*scale),341,track.id);
@@ -159,7 +159,7 @@ test('London has two real river bridges, solid nearby landmarks, and clear car/c
 });
 
 test('London uploads finite detailed geometry and distinct gentle ground palettes for the original seven maps',()=>{
- assert.equal(new Set(Object.values(TERRAIN_PALETTES)).size,13);
+ assert.equal(new Set(Object.values(TERRAIN_PALETTES)).size,12);
  setTrack('coast-london');const gl=fakeGL(),renderer=new RaceRenderer({width:1440,height:820,getContext:()=>gl,addEventListener(){}});
  assert.equal(renderer.available,true,renderer.error);let floats=0;
  for(const buffer of gl.buffers.values()) {floats+=buffer.length;for(const value of buffer)assert.ok(Number.isFinite(value));}

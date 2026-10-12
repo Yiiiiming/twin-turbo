@@ -329,7 +329,7 @@ function building(mesh,x,z,w,d,h,rng) {
 /** Smooth, coordinated terrain palettes keep asphalt and curbs easy to read. */
 export const TERRAIN_PALETTES=Object.freeze({
   coast:'#857766','coast-bay':'#91aa9b','coast-pines':'#2f5445','coast-neon':'#30394f',
-  'coast-marina':'#8d6456','coast-grand':'#958556','coast-ridge':'#637881','coast-london':'#72817b','coast-beijing':'#8d947d','coast-austin':'#929476','coast-rio':'#b6bd8e','coast-paris':'#7e8f7d','coast-shanghai':'#71898b',
+  'coast-marina':'#8d6456','coast-ridge':'#637881','coast-london':'#72817b','coast-beijing':'#8d947d','coast-austin':'#929476','coast-rio':'#b6bd8e','coast-paris':'#7e8f7d','coast-shanghai':'#71898b',
 });
 const localPoint=(x,z,angle,forward,up,lateral)=>[x+Math.cos(angle)*forward-Math.sin(angle)*lateral,up,z+Math.sin(angle)*forward+Math.cos(angle)*lateral];
 
@@ -612,7 +612,8 @@ export function roadsideLamps() {
     if((coastal||city||TRACK.theme==='neon'||TRACK.theme==='ridge'||TRACK.theme==='london'||isCityTheme())&&i%3===0){
       // Light the opposite verge along the stadium approach so arms do not
       // cut across the players or the roadside video board.
-      const side=football&&s>=football.s-1500&&s<=football.s+300?-football.side:1;
+      const bund=TRACK.theme==='shanghai'&&s>=TRACK.bund.start-300&&s<=TRACK.bund.end+500;
+      const side=bund?-1:football&&s>=football.s-1500&&s<=football.s+300?-football.side:1;
       lamps.push(lampGeometry(s,side));
     }
   }

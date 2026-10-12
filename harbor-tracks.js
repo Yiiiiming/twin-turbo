@@ -21,10 +21,7 @@ const profiles = [
     description:'环绕帆船码头，以长弧弯接入船坞区的技术 S 弯。', descriptionEn:'Sweep past sailboat quays into a technical dockside S section.',
     points:[[650,2400],[900,950],[2150,650],[3800,900],[5150,700],[5400,2350],[4450,3350],[3150,3400],[2800,2450],[1850,2900],[1250,3500]], radius:460,
     sections:[{type:'bridge',from:.36,to:.59,peak:95,ramp:780}], scene:{coast:.90,alpine:.03,city:.07}, lengthTarget:15900 },
-  { id:'coast-grand', name:'灯塔大奖赛', nameEn:'Lighthouse Grand Prix', themeName:'海港大奖赛', theme:'grand',
-    description:'发车长直道、连弯、抬升观景桥与终点回头弯的综合赛。', descriptionEn:'A long launch straight, linked bends, a viewing bridge and a final hairpin.',
-    points:[[700,3000],[700,750],[2350,650],[2950,1500],[3950,650],[5350,1050],[5100,2800],[4400,3300],[3500,2700],[2500,3450],[1800,2400]], radius:440,
-    sections:[{type:'bridge',from:.13,to:.30,peak:110,ramp:750},{type:'hill',from:.52,to:.7,peak:65,ramp:800}], scene:{coast:.47,alpine:.29,city:.24}, lengthTarget:16900 },
+
 ];
 function rounded(spec) {
   const raw = createClosedTrack({ ...spec, city:spec.id, width:6200, height:4200, roadWidth:120,
@@ -161,20 +158,20 @@ function shanghaiSkylineSpiral(){
     x=cx+Math.cos(startAngle)*radius;y=cy+Math.sin(startAngle)*radius;heading+=sweep;
   };
   line(2000);const upStart=s;arc(360,TAU*2);const upEnd=s;
-  line(1600);arc(600,Math.PI/2);line(1500);arc(600,Math.PI/2);
+  line(2025);arc(600,Math.PI/2);line(1500+1850*Math.sin(Math.PI/3));arc(600,Math.PI/2);
   const descentEnd=s;
-  line(500);arc(350,Math.PI/3);line(1150);arc(350,-Math.PI/3);line(300);
+  arc(350,Math.PI/3);const bundStart=s;line(3000);const bundEnd=s;arc(350,-Math.PI/3);line(300);
   arc(350,-Math.PI/3);line(1150);arc(350,Math.PI/3);
   line(x-900);arc(600,Math.PI/2);line(1500);arc(600,Math.PI/2);
   const name='上海云环',nameEn='Shanghai Skyline Spiral',description='绕东方明珠连续 720° 螺旋爬升，驶过黄浦江桥，再沿外滩长弯隔江望向陆家嘴天际线。';
   const descriptionEn='Climb a 720-degree spiral around the Oriental Pearl, cross the Huangpu and follow the Bund promenade toward the Lujiazui skyline.';
   return Object.freeze({...shared,id:'coast-shanghai',city:'coast-shanghai',name,nameEn,description,descriptionEn,
-    width:5600,height:4550,length:s,startDistance:400,checkpoints:Math.ceil(s/240/4)*4,segments:Object.freeze(segments),
-    sections:Object.freeze([{type:'bridge',start:11130,end:12930,peak:86,ramp:560}].map(Object.freeze)),
+    width:6125,height:6175,length:s,startDistance:400,checkpoints:Math.ceil(s/240/4)*4,segments:Object.freeze(segments),
+    sections:Object.freeze([{type:'bridge',start:12550,end:14410,peak:86,ramp:560}].map(Object.freeze)),
     elevationProfile:Object.freeze([Object.freeze({start:upStart,end:upEnd,from:0,to:420}),Object.freeze({start:upEnd,end:descentEnd,from:420,to:0})]),
     spirals:Object.freeze([Object.freeze({start:upStart,end:upEnd,degrees:720,direction:'up',cx:2900,cy:1660,radius:360})]),
-    theme:'shanghai',themeName:'上海天际线',scene:Object.freeze({coast:.03,alpine:.05,city:.92}),
-    metadata:Object.freeze({nameEn,description,descriptionEn,themeName:'上海天际线',suggestedLapSeconds:58,difficulty:'expert',elevationGain:420,
+    bund:Object.freeze({start:bundStart,end:bundEnd,length:3000}),theme:'shanghai',themeName:'上海天际线',scene:Object.freeze({coast:.03,alpine:.05,city:.92}),
+    metadata:Object.freeze({nameEn,description,descriptionEn,themeName:'上海天际线',suggestedLapSeconds:72,difficulty:'expert',elevationGain:420,
       landmarks:['Oriental Pearl','Shanghai Tower','Shanghai World Financial Center','Jin Mao Tower','Customs House','HSBC Building','Peace Hotel','Shanghai Exhibition Centre','Shanghai Grand Theatre','Shanghai Museum','Yu Garden','Wukang Mansion'],
       courseStyle:'Compact Shanghai-inspired racing circuit; not a geographic road reconstruction.'})});
 }

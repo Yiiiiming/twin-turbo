@@ -1,6 +1,6 @@
 # Twin Turbo
 
-A compact arcade racer with thirteen circuits. Choose Chinese or English, race the AI in one full-width view or a friend in split screen, and challenge up to two saved ghosts.
+A compact arcade racer with twelve circuits. Choose Chinese or English, race the AI in one full-width view or a friend in split screen, and challenge up to two saved ghosts.
 
 The opening selection is Shanghai Skyline Spiral, one lap, against the AI. Its fastest-lap leaderboard and ghost picker use the same Shanghai circuit.
 
@@ -74,3 +74,7 @@ Austin includes a continuous Sixth Street district with The Driskill Bar, Maggie
 Shanghai now crosses a bounded Huangpu River and follows a 1,150-unit northwest-facing Bund avenue, with Customs House, HSBC and Peace Hotel on the Puxi side. The Oriental Pearl remains visible across the in-scene river from the normal driving camera for several seconds. The start and 720° spiral remain; the revised route is 19,897.45 units. Two banks, a granite promenade, benches, lamps, planters and a ferry replace the open sea.
 
 Final combined release validation: all 364 frontend checks and 51 backend checks passed. Visual review covered the three official theatre posters, the Bund from the normal chase camera, Sixth Street, the new Austin buildings, the 22-player formation and the real-time scoreboard from both the approach road and close-up views. Austin’s route fingerprint is unchanged; Shanghai is the only revised circuit geometry in this update.
+
+## 2026-10-12: Extended Bund and circuit retirement
+
+Shanghai now has a 3,000-unit continuous Bund straight, six Pudong skyline groups and fifteen detailed named landmarks, with extra architecture on both sides of the last sector. The Pearl 720-degree spiral is unchanged. Shanghai ghost paths use v3; older paths are not offered. Lighthouse Grand Prix has been removed from the game and all score/ghost categories. Its source definition is recoverable in macOS Trash and its online records were moved atomically to the private database recycle bin. All remaining routes are frozen unless the owner explicitly authorizes a specific change.
