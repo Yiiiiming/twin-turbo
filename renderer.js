@@ -1,3 +1,4 @@
+import { austinScoreboardSurface, paintAustinScoreboard } from './austin-football.js';
 import { addShanghaiRiverfront } from './shanghai-riverfront.js';
 import { isCityTheme, citySceneryPlacements, cityLandmarkPlacements, addCityLandmarks, addCityStreetScenery, addCityPavements } from './city-scenery.js';
 import { WEST_END_LANDMARKS, addWestEndLandmark } from './london-west-end.js';
@@ -154,8 +155,8 @@ void main() {
   float sun = max(dot(n, normalize(vec3(-0.45, 0.86, 0.35))), 0.0);
   float hemisphere = 0.54 + 0.12 * n.y;
   vec3 color = vColor.rgb * mix(vec3(hemisphere) + vec3(0.52,0.46,0.36)*sun, vec3(1.17), vEmission);
-  float fog = smoothstep(uFogRange.x, uFogRange.y, length(vPosition - uEye));
-  color = mix(color, uFog, fog * uFogRange.z);
+  float fog = smoothstep(uFogRange.x,uFogRange.y,length(vPosition-uEye));
+  color = mix(color, uFog, fog*uFogRange.z);
   gl_FragColor = vec4(color, vColor.a);
 }`;
 const SKY_VERTEX = `attribute vec2 aPosition; varying vec2 vUV; void main(){vUV=aPosition*0.5+0.5;gl_Position=vec4(aPosition,0.999,1.0);}`;
@@ -605,10 +606,15 @@ export function lampGeometry(distance,side=1) {
 }
 
 export function roadsideLamps() {
-  const lamps=[];
+  const lamps=[],football=TRACK.theme==='austin'?cityLandmarkPlacements().find(item=>item.kind==='football-team'):null;
   for(let s=0,i=0;s<TRACK.length;s+=47,i++) {
     const p=trackPoint(s),coastal=p.y>TRACK.height*.63,city=p.x>TRACK.width*.56&&p.y<TRACK.height*.63;
-    if((coastal||city||TRACK.theme==='neon'||TRACK.theme==='ridge'||TRACK.theme==='london'||isCityTheme())&&i%3===0)lamps.push(lampGeometry(s));
+    if((coastal||city||TRACK.theme==='neon'||TRACK.theme==='ridge'||TRACK.theme==='london'||isCityTheme())&&i%3===0){
+      // Light the opposite verge along the stadium approach so arms do not
+      // cut across the players or the roadside video board.
+      const side=football&&s>=football.s-1500&&s<=football.s+300?-football.side:1;
+      lamps.push(lampGeometry(s,side));
+    }
   }
   return lamps;
 }
@@ -943,7 +949,7 @@ export class RaceRenderer {
     this.posterProgram=program(gl,POSTER_VERTEX,POSTER_FRAGMENT);
     this.posterAttributes={position:gl.getAttribLocation(this.posterProgram,'aPosition'),uv:gl.getAttribLocation(this.posterProgram,'aUV')};
     this.posterUniforms={};for(const name of ['uViewProjection','uPoster','uImageAspect','uFrameAspect','uEye','uFog','uFogRange'])this.posterUniforms[name]=gl.getUniformLocation(this.posterProgram,name);
-    this.posterMeshes=[];
+    this.posterMeshes=[];this.scoreboardCanvas=null;
     this.attributes={};this.uniforms={};
     for(const name of ['aPosition','aNormal','aColor','aEmission'])this.attributes[name]=gl.getAttribLocation(this.mainProgram,name);
     for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
@@ -989,12 +995,28 @@ export class RaceRenderer {
   _buildPosters() {
     const gl=this.gl;
     for(const mesh of this.posterMeshes||[])gl.deleteBuffer?.(mesh.buffer);
-    this.posterMeshes=theatrePosterSurfaces(londonLandmarkPlacements()).map(poster=>{
+    const scoreboard=TRACK.theme==='austin'?austinScoreboardSurface(cityLandmarkPlacements().find(item=>item.kind==='football-team')):null;
+    this.posterMeshes=[...theatrePosterSurfaces(londonLandmarkPlacements()),...(scoreboard?[scoreboard]:[])].map(poster=>{
       const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,poster.vertices,gl.STATIC_DRAW);
       const textureKey=`poster:${poster.key}`;
-      if(!this.textures[textureKey])this._loadTexture(textureKey,this.posterUrls[poster.key]);
+      if(!this.textures[textureKey])this._loadTexture(textureKey,this.posterUrls[poster.key]||'');
       return {...poster,buffer,textureKey};
     });
+    this._refreshAustinScoreboard();
+  }
+  _refreshAustinScoreboard(now=Date.now()) {
+    if(TRACK.theme!=='austin')return;
+    const state=this.textures['poster:austin-scoreboard'];
+    if(!state||state.updatedMinute===Math.floor(now/60000))return;
+    const owner=this.canvas.ownerDocument||globalThis.document;
+    this.scoreboardCanvas ||= owner?.createElement?.('canvas');
+    if(!this.scoreboardCanvas)return;
+    const info=paintAustinScoreboard(this.scoreboardCanvas,now);if(!info)return;
+    try{
+      const gl=this.gl;gl.bindTexture(gl.TEXTURE_2D,state.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,this.scoreboardCanvas);
+      state.ready=1;state.aspect=this.scoreboardCanvas.width/this.scoreboardCanvas.height;state.updatedMinute=info.minute;state.text=info.text;
+    }catch{state.ready=0;}
   }
   _posters(viewProjection,camera) {
     const visible=this.posterMeshes.filter(p=>this.textures[p.textureKey]?.ready);
@@ -1067,6 +1089,7 @@ export class RaceRenderer {
     if(!this.available)return;
     const gl=this.gl,w=this.canvas.width,h=this.canvas.height;
     if(!w||!h)return;
+    this._refreshAustinScoreboard();
     gl.enable(gl.SCISSOR_TEST);gl.disable(gl.BLEND);
     const divider=Math.floor(w/2);
     for(let i=0;i<(this.singlePlayer?1:2);i++) {
