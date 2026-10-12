@@ -23,7 +23,9 @@ const ACCEPTED_MODELS = [
   ['beijing-china-zun', 4012, '52e8206d61e18854b5e11175dd2274a23133e991e7182dd6dc9a1a1ae6d7b6db'],
   ['beijing-beihai-dagoba', 1414, '36c3fd770d8e85eb04975dec60974d8095588d7ce9061046a52bf0c44b5573f9'],
   ['beijing-fragrant-tower', 610, '0aef5c543d465c70429a8cce7f6ae62d0660244cfef3598123757455f53f87c9'],
-  ['beijing-seventeen-arch', 573, '63af7e1e6f3cec6e0ba6279402a0cfd8d66f0adb879eb3af7b25d5ad3330da81'],
+  // 2026-10-12 user-requested water-flicker fix: only the water box center
+  // moves from y=7.5 to y=8.5; all other 572 accepted draw calls are unchanged.
+  ['beijing-seventeen-arch', 573, 'f534ad1dc4fe47d5edc38adbc847316febfc38738819b7958ee5974756ddc548'],
   ['beijing-drum-tower', 2122, '2dbdc794bad1395e3d02cc1d509a81ee5a868669ad3ec4b2da03b08210eaf383'],
   ['beijing-bell-tower', 1420, '64d6d74a723e2c8039e3c61cfbeb826ffeaca2913b4974ab7b3486c315a7fd8f'],
   ['beijing-zhengyangmen', 1456, 'a9ad8b835b298a167de0a20b6347a819dcfc390a278b7fea3608a2b940036d67'],

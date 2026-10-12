@@ -214,7 +214,10 @@ function fragrant(mesh,item){const f=frame(mesh,item);for(let i=0;i<4;i++)f.box(
  for(let i=0;i<8;i++){const a=i/8*TAU;f.cone(Math.cos(a)*45,62,Math.sin(a)*45,2.5,117,C.red,12,2.5);for(const y of [77,120,164])f.box(Math.cos(a)*46,y,Math.sin(a)*46,4,16,4,C.goldLight);}
  rail(mesh,f,165,121,40);stairs(f,0,-96,31,9,6,6);sign(f,'TOWER OF BUDDHIST INCENSE',0,22,-76,170);f.cone(0,211,0,4,23,C.goldLight,16,0);
  });}
-function seventeen(mesh,item){const f=frame(mesh,item);slab(f,342,129);details(mesh,()=>{f.box(0,7.5,0,338,1,124,'#527f82');});
+function seventeen(mesh,item){const f=frame(mesh,item);slab(f,342,129);
+ // The white plinth ends at y=8. Keep the water top at y=9 so the two
+ // overlapping surfaces cannot fight for the same depth-buffer pixels.
+ details(mesh,()=>{f.box(0,8.5,0,338,1,124,'#527f82');});
  for(let i=-8;i<=8;i++){const x=i*18,h=38-16*Math.abs(i/8),r=6.4,spring=h-r;f.box(x-8,8+spring/2,0,4,spring,40,C.stone);
   for(let j=0;j<10;j++){const a=j/10*Math.PI,b=(j+1)/10*Math.PI;for(const side of [-1,1])f.quad([x+Math.cos(a)*r,8+spring+Math.sin(a)*r,side*20],[x+Math.cos(b)*r,8+spring+Math.sin(b)*r,side*20],[x+Math.cos(b)*r,h+8,side*20],[x+Math.cos(a)*r,h+8,side*20],C.white);}
   f.box(x,h+10,0,18,4,43,C.stone);details(mesh,()=>{for(const side of [-1,1]){f.box(x,h+18,side*20,18,1.7,2,C.white);f.cone(x,h+12,side*20,1.2,9,C.white,8,1.2);f.cone(x,h+21,side*20,2,3,C.white,8,1);}});
