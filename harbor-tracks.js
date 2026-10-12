@@ -163,13 +163,14 @@ function shanghaiSkylineSpiral(){
   line(2000);const upStart=s;arc(360,TAU*2);const upEnd=s;
   line(1600);arc(600,Math.PI/2);line(1500);arc(600,Math.PI/2);
   const descentEnd=s;
-  line(500);arc(350,Math.PI/4);arc(350,-Math.PI/4);line(900);
-  arc(350,-Math.PI/4);arc(350,Math.PI/4);
+  line(500);arc(350,Math.PI/3);line(1150);arc(350,-Math.PI/3);line(300);
+  arc(350,-Math.PI/3);line(1150);arc(350,Math.PI/3);
   line(x-900);arc(600,Math.PI/2);line(1500);arc(600,Math.PI/2);
-  const name='上海云环',nameEn='Shanghai Skyline Spiral',description='绕东方明珠连续 720° 螺旋爬升，俯瞰陆家嘴天际线，再经外滩建筑与技术双 S 弯返回。';
-  const descriptionEn='Climb a 720-degree spiral around the Oriental Pearl, descend past the Lujiazui skyline and tackle paired S bends among Bund landmarks.';
+  const name='上海云环',nameEn='Shanghai Skyline Spiral',description='绕东方明珠连续 720° 螺旋爬升，驶过黄浦江桥，再沿外滩长弯隔江望向陆家嘴天际线。';
+  const descriptionEn='Climb a 720-degree spiral around the Oriental Pearl, cross the Huangpu and follow the Bund promenade toward the Lujiazui skyline.';
   return Object.freeze({...shared,id:'coast-shanghai',city:'coast-shanghai',name,nameEn,description,descriptionEn,
-    width:5600,height:4550,length:s,startDistance:400,checkpoints:Math.ceil(s/240/4)*4,segments:Object.freeze(segments),sections:Object.freeze([]),
+    width:5600,height:4550,length:s,startDistance:400,checkpoints:Math.ceil(s/240/4)*4,segments:Object.freeze(segments),
+    sections:Object.freeze([{type:'bridge',start:11130,end:12930,peak:86,ramp:560}].map(Object.freeze)),
     elevationProfile:Object.freeze([Object.freeze({start:upStart,end:upEnd,from:0,to:420}),Object.freeze({start:upEnd,end:descentEnd,from:420,to:0})]),
     spirals:Object.freeze([Object.freeze({start:upStart,end:upEnd,degrees:720,direction:'up',cx:2900,cy:1660,radius:360})]),
     theme:'shanghai',themeName:'上海天际线',scene:Object.freeze({coast:.03,alpine:.05,city:.92}),

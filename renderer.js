@@ -1,3 +1,4 @@
+import { addShanghaiRiverfront } from './shanghai-riverfront.js';
 import { isCityTheme, citySceneryPlacements, cityLandmarkPlacements, addCityLandmarks, addCityStreetScenery, addCityPavements } from './city-scenery.js';
 import { WEST_END_LANDMARKS, addWestEndLandmark } from './london-west-end.js';
 import { ROYAL_LANDMARKS, addRoyalLandmark } from './london-royal-landmarks.js';
@@ -147,13 +148,14 @@ varying vec4 vColor;
 varying float vEmission;
 uniform vec3 uEye;
 uniform vec3 uFog;
+uniform vec3 uFogRange;
 void main() {
   vec3 n = normalize(vNormal);
   float sun = max(dot(n, normalize(vec3(-0.45, 0.86, 0.35))), 0.0);
   float hemisphere = 0.54 + 0.12 * n.y;
   vec3 color = vColor.rgb * mix(vec3(hemisphere) + vec3(0.52,0.46,0.36)*sun, vec3(1.17), vEmission);
-  float fog = smoothstep(620.0, 2550.0, length(vPosition - uEye));
-  color = mix(color, uFog, fog * 0.9);
+  float fog = smoothstep(uFogRange.x, uFogRange.y, length(vPosition - uEye));
+  color = mix(color, uFog, fog * uFogRange.z);
   gl_FragColor = vec4(color, vColor.a);
 }`;
 const SKY_VERTEX = `attribute vec2 aPosition; varying vec2 vUV; void main(){vUV=aPosition*0.5+0.5;gl_Position=vec4(aPosition,0.999,1.0);}`;
@@ -201,6 +203,7 @@ uniform float uImageAspect;
 uniform float uFrameAspect;
 uniform vec3 uEye;
 uniform vec3 uFog;
+uniform vec3 uFogRange;
 varying vec2 vUV;
 varying vec3 vPosition;
 void main(){
@@ -209,8 +212,8 @@ void main(){
   vec2 uv=(vUV-0.5)*scale+0.5;
   vec3 color=vec3(0.035,0.045,0.05);
   if(uv.x>=0.0&&uv.x<=1.0&&uv.y>=0.0&&uv.y<=1.0)color=texture2D(uPoster,uv).rgb;
-  float fog=smoothstep(620.0,2550.0,length(vPosition-uEye));
-  gl_FragColor=vec4(mix(color,uFog,fog*0.9),1.0);
+  float fog=smoothstep(uFogRange.x,uFogRange.y,length(vPosition-uEye));
+  gl_FragColor=vec4(mix(color,uFog,fog*uFogRange.z),1.0);
 }`;
 
 function program(gl, vertex, fragment) {
@@ -732,9 +735,10 @@ function buildWorld() {
     terrain.quad([x,-.1,z],[x+grid,-.1,z],[x+grid,-.1,z+grid],[x,-.1,z+grid],c,0,[0,1,0]);
   }
   // Ocean begins beyond the southern road shoulder; the circuit remains flat.
-  const london=TRACK.theme==='london',themedCity=isCityTheme(),river=TRACK.river,inland=TRACK.theme==='beijing';
+  const london=TRACK.theme==='london',themedCity=isCityTheme(),river=TRACK.river,inland=TRACK.theme==='beijing'||TRACK.theme==='shanghai';
   if(london)londonPavements(terrain);
   if(themedCity)addCityPavements(terrain);
+  if(TRACK.theme==='shanghai')addShanghaiRiverfront(terrain,water,props);
   const waterStart=river?river.centerZ-river.halfWidth:shoreZ,waterEnd=river?river.centerZ+river.halfWidth:h+2600;
   if(!inland)water.quad([-1800,.12,waterStart],[w+2400,.12,waterStart],[w+2400,.12,waterEnd],[-1800,.12,waterEnd],london||TRACK.theme==='paris'?'#577f88':'#318caa',.2,[0,1,0]);
   for(let i=0;i<(inland?0:85);i++) {
@@ -938,11 +942,11 @@ export class RaceRenderer {
     this.mainProgram=program(gl,VERTEX,FRAGMENT);this.skyProgram=program(gl,SKY_VERTEX,SKY_FRAGMENT);
     this.posterProgram=program(gl,POSTER_VERTEX,POSTER_FRAGMENT);
     this.posterAttributes={position:gl.getAttribLocation(this.posterProgram,'aPosition'),uv:gl.getAttribLocation(this.posterProgram,'aUV')};
-    this.posterUniforms={};for(const name of ['uViewProjection','uPoster','uImageAspect','uFrameAspect','uEye','uFog'])this.posterUniforms[name]=gl.getUniformLocation(this.posterProgram,name);
+    this.posterUniforms={};for(const name of ['uViewProjection','uPoster','uImageAspect','uFrameAspect','uEye','uFog','uFogRange'])this.posterUniforms[name]=gl.getUniformLocation(this.posterProgram,name);
     this.posterMeshes=[];
     this.attributes={};this.uniforms={};
     for(const name of ['aPosition','aNormal','aColor','aEmission'])this.attributes[name]=gl.getAttribLocation(this.mainProgram,name);
-    for(const name of ['uViewProjection','uModel','uEye','uFog'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
+    for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
     this.skyAttributes={position:gl.getAttribLocation(this.skyProgram,'aPosition')};this.skyUniforms={};
     for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon','uLondon'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
     this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
@@ -998,7 +1002,7 @@ export class RaceRenderer {
     const gl=this.gl,u=this.posterUniforms,a=this.posterAttributes;
     for(const loc of Object.values(this.attributes))gl.disableVertexAttribArray(loc);
     gl.useProgram(this.posterProgram);
-    gl.uniformMatrix4fv(u.uViewProjection,false,viewProjection);gl.uniform3fv(u.uEye,camera.eye);gl.uniform3fv(u.uFog,this.activeFog);
+    gl.uniformMatrix4fv(u.uViewProjection,false,viewProjection);gl.uniform3fv(u.uEye,camera.eye);gl.uniform3fv(u.uFog,this.activeFog);gl.uniform3fv(u.uFogRange,this.fogRange);
     gl.activeTexture(gl.TEXTURE0);gl.uniform1i(u.uPoster,0);
     for(const poster of visible){
       const texture=this.textures[poster.textureKey];
@@ -1057,6 +1061,7 @@ export class RaceRenderer {
     gl.drawArrays(gl.TRIANGLES,0,6);gl.disableVertexAttribArray(this.skyAttributes.position);
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.mainProgram);
     this.activeFog=color('fog');gl.uniform3fv(this.uniforms.uFog,this.activeFog);
+    this.fogRange=TRACK.theme==='shanghai'?[1800,6500,.65]:[620,2550,.9];gl.uniform3fv(this.uniforms.uFogRange,this.fogRange);
   }
   render(engine,dt=1/60,now=0) {
     if(!this.available)return;

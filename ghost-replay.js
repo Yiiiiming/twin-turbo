@@ -1,6 +1,10 @@
 // Replays follow the real car's world transform. They never participate in physics.
 export const GHOST_VERSION = 'coast-ghost-v1';
 export const RACE_GHOST_VERSION = 'coast-race-ghost-v1';
+export const isNewGhostCircuit = city => ['coast-austin', 'coast-shanghai'].includes(city);
+export const ghostVersionForCity = (city, laps = 1) => isNewGhostCircuit(city)
+  ? (laps === 3 ? 'coast-race-ghost-v2' : 'coast-ghost-v2')
+  : (laps === 3 ? RACE_GHOST_VERSION : GHOST_VERSION);
 export const GHOST_LIMITS = Object.freeze({ minDurationMs: 25000, maxDurationMs: 900000, maxFrames: 12000, intervalMs: 100 });
 const TAU = Math.PI * 2;
 const round = (n, digits = 3) => Number(n.toFixed(digits));

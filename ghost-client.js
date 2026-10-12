@@ -1,5 +1,5 @@
 import { normalizeName } from './leaderboard.js';
-import { RACE_GHOST_VERSION, validateRaceReplay } from './ghost-replay.js';
+import { RACE_GHOST_VERSION, ghostVersionForCity, isNewGhostCircuit, validateRaceReplay } from './ghost-replay.js';
 
 export const GHOST_VERSION = 'coast-ghost-v1';
 export const GHOST_SLOTS = Object.freeze([
@@ -66,7 +66,7 @@ export class GhostClient {
   get matches() { return this.slotStates[this.activeSlot].matches; }
   get searching() { return this.slotStates[this.activeSlot].searching; }
   get loading() { return this.slotStates[this.activeSlot].loading; }
-  get version() { return this.laps === 3 ? RACE_GHOST_VERSION : GHOST_VERSION; }
+  get version() { return ghostVersionForCity(this.city, this.laps); }
   matchesMode(entry) {
     return validEntry(entry) && (this.laps === 3 ? entry.kind === 'race' && entry.laps === 3
       : (entry.kind === undefined || entry.kind === 'lap') && (entry.laps === undefined || entry.laps === 1));
@@ -201,7 +201,7 @@ export class GhostClient {
       const data = await this.request(`/api/ghosts?${this.query(`&name=${encodeURIComponent(name)}`)}`);
       if (request !== state.request || this.locked) return;
       state.matches = (Array.isArray(data.entries) ? data.entries : []).filter(entry => this.matchesMode(entry))
-        .filter(entry => nameKey(entry.name) === nameKey(name)).slice(0, 8).map(copyEntry);
+        .filter(entry => nameKey(entry.name) === nameKey(name)).slice(0, 20).map(copyEntry);
       state.choice = state.matches[0]?.id || '';
       this.status(state.matches.length ? `已找到记录。点击「${this.slots[slotId] ? '替换' : '加入'}${GHOST_SLOTS[slotId].colorLabel}幽灵」确认。`
         : `还没有「${name}」的${this.laps === 3 ? '完整 3 圈' : '单圈'}幽灵。完成对应比赛后，可以在成绩区保存。`, slotId);
@@ -305,7 +305,7 @@ export class GhostClient {
   async loadPickerBoard() {
     if (this.locked || !this.node('ghost-picker-list')) return;
     const request = ++this.pickerRequest;
-    const title = this.node('ghost-picker-title'); if (title) title.textContent = this.laps === 3 ? '完整 3 圈幽灵榜' : '最快单圈幽灵榜';
+    const title = this.node('ghost-picker-title'); if (title) title.textContent = (isNewGhostCircuit(this.city) ? '新地图 · ' : '') + (this.laps === 3 ? '完整 3 圈幽灵榜' : '最快单圈幽灵榜');
     this.node('ghost-picker-status').textContent = `正在读取可挑战的${this.laps === 3 ? '完整 3 圈' : '单圈'}记录…`;
     this.node('ghost-picker-retry').hidden = true;
     try {

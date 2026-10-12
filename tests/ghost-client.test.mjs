@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GhostClient, GHOST_VERSION, validGhostReplay } from '../ghost-client.js';
-import { RACE_GHOST_VERSION } from '../ghost-replay.js';
+import { RACE_GHOST_VERSION, ghostVersionForCity } from '../ghost-replay.js';
 
 class Classes {
   constructor() { this.names = new Set(); }
@@ -341,12 +341,42 @@ test('Beijing, Austin, Rio, Paris and Shanghai each load only their own single-l
   const h = setup(); h.client.recordsManaged = true; await h.client.init();
   for(const city of ['coast-beijing','coast-austin','coast-rio','coast-paris','coast-shanghai'])for(const laps of [1,3]) {
     h.client.setTrack(city);assert.equal(h.client.city,city);
+    const version=['coast-austin','coast-shanghai'].includes(city)?(laps===3?'coast-race-ghost-v2':'coast-ghost-v2'):(laps===3?RACE_GHOST_VERSION:GHOST_VERSION);
     const value=laps===1?entry('城市车手',`${city}-lap`):raceEntry('城市车手',`${city}-race`);
-    h.queue.push(laps===1?response({city,entries:[value]}):raceResponse({city,entries:[value]}));
+    h.queue.push(response({city,version,entries:[value]}));
     await h.client.openPicker(laps);assert.match(h.requests.at(-1).url,new RegExp(`city=${city}`));
     assert.equal(h.client.pickerButtons.length,2);assert.equal(h.client.pickerButtons[0].entry.id,value.id);
-    h.queue.push(laps===1?response({city,entry:value,replay:replay()}):raceResponse({city,entry:value,replay:raceReplay()}));
+    h.queue.push(response({city,version,entry:value,replay:laps===1?replay():raceReplay()}));
     await h.client.pickerButtons[0].button.dispatch('click');assert.equal(h.client.selections()[0].entry.id,value.id);
     h.client.endRace();
   }
+});
+
+
+test('only revised Austin and Shanghai use new lap/race versions',()=>{
+  for(const city of ['coast','coast-london','coast-rio','coast-beijing','coast-paris']) {
+    assert.equal(ghostVersionForCity(city,1),GHOST_VERSION);assert.equal(ghostVersionForCity(city,3),RACE_GHOST_VERSION);
+  }
+  for(const city of ['coast-austin','coast-shanghai']) {
+    assert.equal(ghostVersionForCity(city,1),'coast-ghost-v2');assert.equal(ghostVersionForCity(city,3),'coast-race-ghost-v2');
+  }
+});
+
+for(const city of ['coast-austin','coast-shanghai'])for(const laps of [1,3])test(`${city} ${laps}-lap picker rejects old paths and lets a normalized nickname select all twenty retained ghosts`,async()=>{
+  const h=setup();h.client.recordsManaged=true;await h.client.init();h.client.setTrack(city);h.client.setLaps(laps);
+  const version=laps===3?'coast-race-ghost-v2':'coast-ghost-v2',oldVersion=laps===3?RACE_GHOST_VERSION:GHOST_VERSION;
+  const values=Array.from({length:21},(_,i)=>laps===3?raceEntry('Alice',`retained-${i}`,126000+i*1000):entry('Alice',`retained-${i}`,42000+i*1000));
+  h.queue.push(response({city,version:oldVersion,entries:values}));await h.client.openPicker(laps);
+  assert.equal(h.client.pickerButtons.length,0);assert.match(h.get('ghost-picker-status').textContent,/版本/);
+  h.get('ghost-name').value='Ａlice';h.queue.push(response({city,version:oldVersion,entries:values}));await h.client.search();
+  assert.equal(h.client.matches.length,0);assert.match(h.get('ghost-status').textContent,/版本/);
+  h.queue.push(response({city,version,entries:values}));await h.client.search();
+  assert.equal(new URL(h.requests.at(-1).url).searchParams.get('version'),version);
+  assert.equal(h.client.matches.length,20);assert.equal(h.get('ghost-choice').children.length,20);
+  h.get('ghost-choice').value=values[19].id;
+  const duration=values[19].timeMs,lapReplay=replay(duration),fullReplay={...raceReplay(),durationMs:duration,lapEndsMs:[42000,84000,duration],frames:Array.from({length:Math.floor(duration/100)+1},(_,i)=>[i*100,1,2,0,3])};
+  h.queue.push(response({city,version:oldVersion,entry:values[19],replay:laps===3?fullReplay:lapReplay}));await h.client.loadSelected();
+  assert.equal(h.client.selections().length,0);assert.match(h.get('ghost-status').textContent,/版本/);
+  h.queue.push(response({city,version,entry:values[19],replay:laps===3?fullReplay:lapReplay}));await h.client.loadSelected();
+  assert.equal(h.client.selections()[0]?.entry.id,values[19].id,'twentieth result is actually loadable, not just displayed');
 });

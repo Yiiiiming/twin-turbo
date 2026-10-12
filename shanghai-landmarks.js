@@ -26,9 +26,9 @@ export function shanghaiLandmarkPlacements(){
  if(TRACK.theme!=='shanghai')return [];
  const plots={
   'shanghai-tower':[7550,1], 'shanghai-swfc':[8750,1], 'jin-mao':[10000,1],
-  'shanghai-customs':[11650,1], 'bund-hsbc':[12800,1], 'peace-hotel':[14350,1],
-  'shanghai-exhibition':[15200,1], 'shanghai-grand-theatre':[16350,1],
-  'shanghai-museum':[17250,1], 'yu-garden':[650,-1], 'wukang-mansion':[1450,-1],
+  'shanghai-customs':[12450,-1], 'bund-hsbc':[12900,-1], 'peace-hotel':[13350,-1],
+  'shanghai-exhibition':[17100,1], 'shanghai-grand-theatre':[17900,1],
+  'shanghai-museum':[18700,1], 'yu-garden':[650,-1], 'wukang-mansion':[1450,-1],
  };
  return SHANGHAI_LANDMARKS.map(meta=>{
   if(meta.kind==='oriental-pearl')return {...meta,x:2900,z:1660,angle:0,elevation:0,s:2565,side:1};

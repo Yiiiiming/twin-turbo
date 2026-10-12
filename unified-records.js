@@ -1,6 +1,6 @@
 import { LEADERBOARD_VERSION, LEADERBOARD_CITIES, normalizeEntries, normalizeName } from './leaderboard.js';
 import { validGhostReplay } from './ghost-client.js';
-import { GHOST_VERSION, RACE_GHOST_VERSION, validateRaceReplay } from './ghost-replay.js';
+import { GHOST_VERSION, RACE_GHOST_VERSION, ghostVersionForCity, validateRaceReplay } from './ghost-replay.js';
 
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 const CITY = 'coast';
@@ -13,7 +13,7 @@ const validGhostEntry = entry => human(entry) && typeof entry.id === 'string' &&
 const validLapEntry = entry => validGhostEntry(entry) && (entry.kind === undefined || entry.kind === 'lap')
   && (entry.laps === undefined || entry.laps === 1);
 const validRaceEntry = entry => validGhostEntry(entry) && entry.kind === 'race' && entry.laps === 3 && entry.timeMs >= 75000;
-const lapCategory = (data, laps = 1, city = CITY) => data?.version === (laps === 3 ? RACE_GHOST_VERSION : GHOST_VERSION) && data?.city === city;
+const lapCategory = (data, laps = 1, city = CITY) => data?.version === ghostVersionForCity(city, laps) && data?.city === city;
 const totalCategory = (data, laps, city = CITY) => data?.version === LEADERBOARD_VERSION && data?.city === city && data?.laps === laps;
 const cleanLaps = (entries, laps = 1) => {
   const seen = new Set();
@@ -29,7 +29,7 @@ const uuid = () => globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx
 });
 const copyReplay = replay => ({ version: 1, ...(replay.kind === 'race' ? { kind: 'race', laps: 3, lapEndsMs: [...replay.lapEndsMs] } : {}),
   durationMs: replay.durationMs, frames: replay.frames.map(frame => [...frame]) });
-const terminal = state => ['none', 'saved', 'not-ranked', 'retained'].includes(state);
+const terminal = state => ['none', 'saved', 'not-ranked', 'retained', 'archived'].includes(state);
 
 /** One record area, one name per human, independently retryable online saves. */
 export class UnifiedRecordsClient {
@@ -77,7 +77,7 @@ export class UnifiedRecordsClient {
     if (!preserveResults) { this.raceCity = city; this.newRace(); this.setRaceActive(false); }
     return this.load();
   }
-  lapQuery(extra = '', laps = 1, city = this.city) { return `city=${encodeURIComponent(city)}&version=${encodeURIComponent(laps === 3 ? RACE_GHOST_VERSION : GHOST_VERSION)}${extra}`; }
+  lapQuery(extra = '', laps = 1, city = this.city) { return `city=${encodeURIComponent(city)}&version=${encodeURIComponent(ghostVersionForCity(city, laps))}${extra}`; }
   async recordGhost(record, laps) {
     const city = this.city, key = record.id, cache = laps === 3 ? this.raceCache : this.lapCache, requests = laps === 3 ? this.raceRequests : this.lapRequests;
     if (cache.has(key)) return cache.get(key);
@@ -210,7 +210,7 @@ export class UnifiedRecordsClient {
       const data = await this.request(part === 'total' ? '/api/records' : '/api/laps', part === 'total'
         ? { id: card.total.id, version: LEADERBOARD_VERSION, city: card.city, laps: card.laps, timeMs: card.timeMs,
           playerId: card.playerId, mode: card.mode, finished: true, name }
-        : { id: card[part].id, version: ghostLaps === 3 ? RACE_GHOST_VERSION : GHOST_VERSION, city: card.city, timeMs: replay.durationMs,
+        : { id: card[part].id, version: ghostVersionForCity(card.city, ghostLaps), city: card.city, timeMs: replay.durationMs,
           playerId: card.playerId, mode: card.mode, name, replay, ...(card.total.state !== 'none' ? { totalRecordId: card.total.id } : {}) });
       if (card.token !== this.raceToken) return;
       if (part === 'total') {
@@ -222,10 +222,10 @@ export class UnifiedRecordsClient {
           || (data.saved && (data.entry.id !== card[part].id || data.entry.timeMs !== replay.durationMs
             || data.entry.playerId !== card.playerId || data.entry.mode !== card.mode
             || (card.total.state !== 'none' && data.entry.totalRecordId !== card.total.id)))) throw new Error('未确认幽灵成绩。');
-        card[part].state = data.saved ? 'saved' : 'retained'; card[part].entry = { ...data.entry, kind: ghostLaps === 3 ? 'race' : 'lap', laps: ghostLaps };
+        card[part].state = data.retained === false ? 'archived' : data.saved ? 'saved' : 'retained'; card[part].entry = { ...data.entry, kind: ghostLaps === 3 ? 'race' : 'lap', laps: ghostLaps };
         if (card.city === this.city) {
           const cache = ghostLaps === 3 ? this.raceCache : this.lapCache, requests = ghostLaps === 3 ? this.raceRequests : this.lapRequests;
-          requests.delete(card[part].id); cache.set(card[part].id, card[part].entry);
+          requests.delete(card[part].id); cache.set(card[part].id, data.retained === false ? null : card[part].entry);
         }
       }
     } catch (error) {
@@ -247,6 +247,7 @@ export class UnifiedRecordsClient {
     if (card.total.state === 'saved') messages.push('整场成绩已保存');
     if (card.total.state === 'not-ranked') messages.push('整场成绩未进前五');
     if (card.lap.state === 'saved') messages.push('最快单圈与幽灵已保存');
+    if (card.lap.state === 'archived' || card.race.state === 'archived') messages.push('幽灵未进入当前地图与圈数的个人前 20，成绩保存不受影响');
     if (card.lap.state === 'retained') messages.push(`已保留更快的单圈与幽灵 ${timeLabel(card.lap.entry.timeMs)}`);
     if (card.race.state === 'saved') messages.push('三圈整场幽灵已保存');
     if (card.race.state === 'retained') messages.push(`已保留更快的三圈幽灵 ${timeLabel(card.race.entry.timeMs)}`);

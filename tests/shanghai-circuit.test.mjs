@@ -27,7 +27,7 @@ const plots=()=>{setTrack('coast-shanghai');return shanghaiLandmarkPlacements();
 test.afterEach(()=>setTrack('coast'));
 
 test('Shanghai closes exactly, has a flat staggered grid, and keeps the compact 240 km/h scale',()=>{
- setTrack('coast-shanghai');assert.ok(TRACK.length>18000&&TRACK.length<19000);assert.equal(Math.round(363*3.6/TRACK.unitsPerMeter),240);
+ setTrack('coast-shanghai');assert.ok(TRACK.length>19000&&TRACK.length<20000);assert.equal(Math.round(363*3.6/TRACK.unitsPerMeter),240);
  assert.equal(TRACK.checkpoints%4,0);assert.equal(TRACK.roadWidth,120);
  for(const grid of TRACK.startGrid){assert.equal(trackPoint(TRACK.startDistance+grid.offset).elevation,0);}
  for(const segment of TRACK.segments){
@@ -35,7 +35,7 @@ test('Shanghai closes exactly, has a flat staggered grid, and keeps the compact 
   assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<.001);assert.ok(Math.abs(a.elevation-b.elevation)<.001);
   assert.ok(Math.abs(mod(a.angle-b.angle+Math.PI,Math.PI*2)-Math.PI)<.001);
  }
- for(let s=0;s<TRACK.length;s+=19){const p=trackPoint(s);assert.ok(Math.abs(p.slope)<.15);assert.ok(p.x>120&&p.y>120&&p.x<TRACK.width-120&&p.y<TRACK.height-120);}
+ for(let s=0;s<TRACK.length;s+=19){const p=trackPoint(s);assert.ok(Math.abs(p.slope)<.24);assert.ok(p.x>120&&p.y>120&&p.x<TRACK.width-120&&p.y<TRACK.height-120);}
 });
 
 test('the Pearl ascent makes two complete turns with safe vertical separation and no projection shortcuts',()=>{
@@ -103,5 +103,20 @@ test('Shanghai production supports, lifted timing gates and lamps clear all chas
    const probe={x:camera.eye[0],y:camera.eye[2],elevation:camera.eye[1]-4,height:8,angle:0,speed:0};
    assert.equal(world.resolveCar(probe),0,`production camera contact at ${s}/${lane}/${speed}`);
   }
+ }
+});
+
+test('Huangpu has two finite banks, a raised crossing and a sustained Bund-to-Pearl driving view',async()=>{
+ const {shanghaiRiverContains,shanghaiRiverClearance}=await import('../shanghai-riverfront.js');setTrack('coast-shanghai');
+ let entries=0,insideBefore=false;
+ for(let s=0;s<TRACK.length;s+=9){const p=trackPoint(s),inside=shanghaiRiverContains(p.x,p.y);
+  if(inside&&!insideBefore)entries++;if(inside)assert.ok(p.elevation>=85.9,'crossing must stay on a raised bridge deck');insideBefore=inside;}
+ assert.equal(entries,1);for(const item of shanghaiLandmarkPlacements())assert.ok(shanghaiRiverClearance(item.x,item.z,item.radius),`${item.kind} overlaps Huangpu`);
+ const pearl=shanghaiLandmarkPlacements()[0];
+ for(let s=12400;s<=13500;s+=50){
+  const p=trackPoint(s),bearing=Math.atan2(pearl.z-p.y,pearl.x-p.x);
+  assert.ok(Math.abs(mod(bearing-p.angle+Math.PI,Math.PI*2)-Math.PI)<Math.PI/6,'Pearl fits forward driving FOV throughout the Bund straight');
+  let crossesWater=false;for(let t=.02;t<1;t+=.02)crossesWater ||= shanghaiRiverContains(p.x+(pearl.x-p.x)*t,p.y+(pearl.z-p.y)*t);
+  assert.ok(crossesWater,'the visible Pearl must be across actual water, not merely beside a decorative lake');
  }
 });

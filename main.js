@@ -143,7 +143,7 @@ function resize() {
 }
 new ResizeObserver(resize).observe(canvas);
 // Start on compact London; retired prototype links do not change the selection.
-engine.selectTrack('coast-london');
+engine.selectTrack('coast-shanghai');
 ghostClient.setTrack(TRACK.id);
 renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
 engine.setObstacles(renderer.obstacles || []);
@@ -194,7 +194,7 @@ for(const [index,track]of Object.values(TRACKS).entries()) {
   const scene=['neon','london','beijing','austin','paris'].includes(track.theme)?'city':['pines','ridge'].includes(track.theme)?'alpine':'coast';
   button.style.setProperty('--card-scene',`url('${globalThis.TWIN_SCENE_ART?.[scene] || `./assets/${scene}.png`}')`);
   button.style.setProperty('--card-position',`${35+index*6}% 60%`);
-  const number=document.createElement('small');number.className='track-card-number';number.textContent=String(index+1).padStart(2,'0');button.appendChild(number);
+  const number=document.createElement('small');number.className='track-card-number';number.textContent=String(index+1).padStart(2,'0')+(['coast-austin','coast-shanghai'].includes(track.id)?' · NEW':'');button.appendChild(number);
   const preview=document.createElementNS('http://www.w3.org/2000/svg','svg');preview.classList.add('track-card-preview');preview.setAttribute('aria-hidden','true');
   const outline=circuitOutline(track);preview.setAttribute('viewBox',outline.viewBox);
   const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',outline.path);path.setAttribute('fill','none');preview.appendChild(path);button.appendChild(preview);

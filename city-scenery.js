@@ -1,3 +1,4 @@
+import { shanghaiRiverClearance } from './shanghai-riverfront.js';
 /** Compact city districts: native geometry shared by rendering and collisions. */
 import { TRACK, trackPoint, projectTrack } from './engine.js';
 import { addBeijingGreatWall, beijingWallClearance } from './beijing-great-wall.js';
@@ -55,6 +56,8 @@ export function citySceneryPlacements() {
   const p=trackPoint(s,side*(TRACK.roadWidth/2+radius+35+random()*20));
   if(p.elevation>5||!clearOfRiver(p.x,p.y,radius)||projectTrack(p.x,p.y).distance<TRACK.roadWidth/2+radius+18)continue;
   if(TRACK.theme==='beijing'&&!beijingWallClearance(p.x,p.y,radius))continue;
+  if(TRACK.theme==='shanghai'&&side===1&&s>=12100&&s<=14100)continue;
+  if(TRACK.theme==='shanghai'&&!shanghaiRiverClearance(p.x,p.y,radius))continue;
   if(landmarks.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+25)||items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+7))continue;
   // Haussmann blocks keep the even cornice line Paris streets are known for.
   const height=TRACK.theme==='beijing'?38+random()*22:TRACK.theme==='paris'?64+random()*14:58+random()*45;
