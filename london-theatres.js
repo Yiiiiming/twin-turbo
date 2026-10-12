@@ -17,13 +17,21 @@ export const LONDON_THEATRES=Object.freeze([
   {kind:'prince-edward-theatre',label:'Prince Edward Theatre',radius:112,width:196,depth:116,height:165},
 ].map(Object.freeze));
 
-/** Local façade surfaces; raster artwork covers the fallback illustration only.
- * Local +X is screen left when viewed from the street (-Z). */
-export const THEATRE_POSTERS=Object.freeze([
-  {key:'lion',kind:'lyceum-theatre',file:'lion-king.jpg',x:-9,y:73,z:-50.7,width:55,height:47},
-  {key:'mormon',kind:'savoy-theatre',file:'book-of-mormon.jpg',x:-26,y:84,z:-34,width:62,height:48},
-  {key:'wrong',kind:'prince-edward-theatre',file:'play-that-goes-wrong.jpg',x:-37,y:91,z:-39,width:53,height:57},
+/** Architectural advertising panels, kept above doors and inside each theatre's
+ * existing plot. Official landscape artwork now fills a matching 16:9 frame;
+ * contain rendering still preserves any replacement artwork's own aspect ratio.
+ */
+export const LONDON_THEATRE_ADS=Object.freeze([
+  {key:'phantom',kind:'his-majestys-theatre',x:-57,y:80,z:-47,width:54,height:72.5},
+  {key:'frozen',kind:'theatre-royal-drury-lane',x:0,y:85,z:-56,width:68,height:44},
+  {key:'lion',kind:'lyceum-theatre',file:'lion-king.jpg',x:-9,y:73,z:-51.7,width:86,height:48.375},
+  {key:'mis',kind:'sondheim-theatre',x:-13,y:80,z:-48.5,width:52,height:70},
+  {key:'wicked',kind:'apollo-victoria',x:0,y:77,z:-50,width:112,height:63},
+  {key:'hamilton',kind:'victoria-palace',x:0,y:90,z:-51.2,width:66,height:74},
+  {key:'mormon',kind:'savoy-theatre',file:'book-of-mormon.jpg',x:-26,y:91,z:-35,width:104,height:58.5},
+  {key:'wrong',kind:'prince-edward-theatre',file:'play-that-goes-wrong.jpg',x:-37,y:92,z:-39,width:96,height:54},
 ].map(Object.freeze));
+export const THEATRE_POSTERS=Object.freeze(LONDON_THEATRE_ADS.filter(poster=>poster.file));
 
 export function theatrePosterSurfaces(landmarks){
   return THEATRE_POSTERS.flatMap(poster=>{
@@ -100,12 +108,12 @@ function showPanel(f,x,y,z,w,h,color){
 // Original playbill compositions, not reproductions of a show's official artwork.
 // These advertise a fictional game programme; they do not assert real residencies.
 function musicalPoster(f,x,y,z,w,h,show){
- const schemes={phantom:['#162c49','#bd5b55'],frozen:['#244f7c','#b8dfdb'],lion:['#e9b341','#30281e'],mis:['#263e62','#bd665b'],wicked:['#204c38','#acd389'],hamilton:['#946735','#edce81'],mormon:['#467eaf','#f4e8c4'],wrong:['#683745','#f2cc98']};
+ const schemes={phantom:['#162c49','#f0dfbe'],frozen:['#244f7c','#b8dfdb'],lion:['#e9b341','#30281e'],mis:['#263e62','#f0dfbe'],wicked:['#204c38','#acd389'],hamilton:['#946735','#edce81'],mormon:['#467eaf','#f4e8c4'],wrong:['#683745','#f2cc98']};
  const [bg,ink]=schemes[show],left=x-w/2,base=y-h/2,p=(u,v)=>[left+u*w,base+v*h,z-.45];
  panel(f,x,y,z,w+3,h+3,gold);panel(f,x,y,z-.1,w,h,bg,.04);
  panel(f,x,base+h*.91,z-.2,w*.86,.55,ink);word(f,'WEST END',x,base+h*.92,z-.3,h*.047,w*.73,ink,.25);
  const tri=(a,b,c,col=ink)=>f.tri(p(...a),p(...b),p(...c),col,.1);
- const disk=(u,v,r,col=ink)=>frontDisk(f,left+u*w,base+v*h,z-.4,r*w,col,.12,20);
+ const disk=(u,v,r,col=ink)=>frontDisk(f,left+u*w,base+v*h,z-.4,r*Math.min(w,h),col,.12,20);
  if(show==='mormon'){
   tri([.05,.49],[.29,.83],[.55,.49],'#dfdfc6');tri([.35,.49],[.69,.81],[.96,.49],'#a5c0c2');
   panel(f,x,base+h*.58,z-.5,w*.31,h*.23,'#f0eee1');tri([.45,.71],[.55,.71],[.5,.54],'#243342');
@@ -138,6 +146,16 @@ function musicalPoster(f,x,y,z,w,h,show){
  titles.forEach((line,i)=>word(f,line,x,base+h*(.36-i*.11),z-.8,h*.075,w*.88,ink,.27));
  word(f,'ON STAGE',x,base+h*.045,z-.8,h*.041,w*.65,ink,.2);
 }
+function theatreBillboard(f,key){
+ const {x,y,z,width:w,height:h}=LONDON_THEATRE_ADS.find(poster=>poster.key===key);
+ // A slim dimensional lightbox gives larger artwork a believable attachment.
+ // The frame is behind the fallback illustration and raster plane; no coplanar
+ // surfaces or broad boxes in front of the entrance or carriageway.
+ f.box(x,y,z+1.2,w+5,h+5,1.8,'#514a3a');
+ musicalPoster(f,x,y,z,w,h,key);
+ for(const dx of [-1,1])f.box(x+dx*(w/2+2),y,z-.25,1.5,h+4,1.5,gold);
+ f.box(x,y+h/2+2,z-.25,w+5,1.5,1.5,gold);
+}
 function doors(f,x,z,count,spacing,trim=gold){
   for(let i=0;i<count;i++){const dx=x+(i-(count-1)/2)*spacing;pane(f,dx,18,z,spacing-5,24,trim,'#647b79');panel(f,dx+3,18,z-.4,.55,7,ivory,.25);}
 }
@@ -158,7 +176,7 @@ function hisMajestys(mesh,item){
   f.cone(-57,199,-14,4,7,gold,16,3);f.cone(-57,206,-14,1.4,6,gold,12,0);
   balustrade(f,19,117,-45,114);for(const x of [-17,20,57])f.box(x,103,-45,2.5,25,3,ivory);
   canopy(f,0,35,-44,173,23,'#273d39',gold);word(f,'HIS MAJESTYS THEATRE',0,27,-56,6.1,157,'#f4dc9f',.4);
-  doors(f,0,-42.4,7,23);musicalPoster(f,-57,80,-47,38,51,'phantom');
+  doors(f,0,-42.4,7,23);theatreBillboard(f,'phantom');
  });
 }
 
@@ -172,7 +190,7 @@ function druryLane(mesh,item){
   for(const x of [-77,-52,52,77])archLite(f,x,8,-42.3,17,29,ivory,'#647a74');
   for(const x of [-30,-10,10,30])shaft(f,x,6,-44,43,3.7);
   cornice(f,0,50,-40,83,28,ivory);balustrade(f,0,61,-53,82);doors(f,0,-42.5,3,19);
-  word(f,'THEATRE ROYAL',0,99,-43.1,5.4,152,'#786749');word(f,'DRURY LANE',0,48,-55.7,4.7,71,'#746046');
+  panel(f,0,121,-45,164,9,ivory);word(f,'THEATRE ROYAL',0,118.6,-45.4,5.4,152,'#786749');word(f,'DRURY LANE',0,48,-55.7,4.7,71,'#746046');
   // Long Regency side arcade is visible while the driver passes the plot.
   for(const z of [-20,2,24,44]){
    f.box(90,29,z,5,45,5,ivory);f.box(91,17,z,2,23,13,glass);
@@ -180,7 +198,7 @@ function druryLane(mesh,item){
   f.box(90,54,9,8,5,86,ivory);f.box(90,63,9,7,3,86,ivory);
   for(let x=-86;x<=86;x+=13)f.box(x,136,-39,2.4,5,4,ivory);
   for(const x of [-66,66]){showPanel(f,x,48,-45,20,26,'#356957');}
-  musicalPoster(f,0,81,-43,43,35,'frozen');
+  theatreBillboard(f,'frozen');
  });
 }
 
@@ -204,9 +222,9 @@ function lyceum(mesh,item){
   showPanel(f,77,65,-34.5,23,27,'#a57435');
   // The playbill hangs from the entablature in front of the columns, so its
   // title remains visible from a moving car instead of disappearing behind them.
-  f.box(-9,73,-50,58,49,1,'#936d33');
-  for(const x of [-31,13])f.box(x,98,-50,1.1,8,1.1,gold);
-  musicalPoster(f,-9,73,-50.7,55,47,'lion');
+  f.box(-9,73,-50,91,53,1,'#936d33');
+  for(const x of [-43,25])f.box(x,98,-50,1.1,8,1.1,gold);
+  theatreBillboard(f,'lion');
  });
 }
 
@@ -226,7 +244,7 @@ function sondheim(mesh,item){
   f.box(-12,125,2,149,4,88,steel);f.box(66,126,1,29,3,100,'#b2977c');
   doors(f,-6,-45.1,6,22,steel);canopy(f,-9,34,-43,158,22,dark,'#a9b19f');
   word(f,'SONDHEIM THEATRE',-9,26,-54.3,7,144,'#f0d487',.5);
-  for(const x of [-58,32])showPanel(f,x,79,-48.2,27,41,'#303b55');musicalPoster(f,-13,79,-48.5,37,50,'mis');
+  for(const x of [-58,32])showPanel(f,x,79,-48.2,27,41,'#303b55');theatreBillboard(f,'mis');
   // The entrance's golden light reads separately from the blue glass grid.
   panel(f,-6,15,-45.5,132,2,'#f0c786',.45);f.box(78,77,-48,5,66,8,'#a96b50');
  });
@@ -249,7 +267,7 @@ function apolloVictoria(mesh,item){
    f.box(x,139,-1,39,5,98,trim);f.box(x,144,-1,29,4,90,pale);
    panel(f,x,102,-52,14,64,dark);[...'APOLLO'].forEach((c,i)=>word(f,c,x,125-i*9.4,-52.3,6.5,9,'#d9e1ae',.35));
   }
-  f.box(0,69,-48,99,49,3,dark);musicalPoster(f,0,69,-49.6,84,46,'wicked');word(f,'VICTORIA',0,102,-42,7,81,'#566945');
+  f.box(0,77,-48,117,68,3,dark);theatreBillboard(f,'wicked');f.box(0,116,-41,116,14,4,pale);word(f,'VICTORIA',0,113.5,-43.3,7,81,'#566945');
   doors(f,0,-44,7,23,trim);canopy(f,0,37,-46,179,16,'#3a6656',gold);
  });
 }
@@ -277,7 +295,7 @@ function victoriaPalace(mesh,item){
   for(const x of [-77,77]){f.cone(x,145,-29,4,8,ivory,16,2);f.cone(x,153,-29,2,4,ivory,16,0);}
   canopy(f,0,37,-46,150,22,'#476155',gold);word(f,'VICTORIA PALACE',0,28,-57.5,6.3,139,'#f7dfa0',.45);doors(f,0,-43,5,25);
   for(const x of [-61,61])showPanel(f,x,86,-46.2,22,37,'#426657');
-  musicalPoster(f,0,88,-45,49,55,'hamilton');
+  theatreBillboard(f,'hamilton');
  });
 }
 
@@ -295,7 +313,7 @@ function savoy(mesh,item){
   panel(f,51,88,-47,26,74,'#315952');for(const x of [35,67])f.box(x,88,-47.5,2,80,2,gold);
   [...'SAVOY'].forEach((c,i)=>word(f,c,51,113-i*13,-47.4,9.4,13,'#f0d8a1',.35));
   word(f,'THEATRE',51,43,-48,4.3,37,brown);for(const x of [-78,76])f.box(x,73,-35,3,84,4,'#c4af8f');
-  musicalPoster(f,-26,84,-34,62,48,'mormon');
+  theatreBillboard(f,'mormon');
  });
 }
 
@@ -315,7 +333,7 @@ function princeEdward(mesh,item){
   pane(f,67,107,-42.2,17,28,trim);panel(f,67,70,-44,19,41,dark);
   [...'PRINCE'].forEach((c,i)=>word(f,c,67,86-i*5.9,-44.3,4.5,7,'#e5c49d',.2));
   canopy(f,-12,41,-44,162,24,'#702f36',gold);word(f,'PRINCE EDWARD',-12,32,-56.5,7,148,'#f5d5a4',.4);
-  doors(f,-16,-34.4,6,24,trim);musicalPoster(f,-37,91,-39,53,57,'wrong');
+  doors(f,-16,-34.4,6,24,trim);theatreBillboard(f,'wrong');
   f.box(-12,144,15,134,13,76,brick);f.box(-12,153,15,106,6,65,terra);
   for(const x of [-62,-12,38])f.box(x,154,-18,9,14,9,terra);
  });

@@ -10,7 +10,7 @@ At the finish, each human driver enters one nickname directly in the results pan
 
 ## Circuits and controls
 
-The first six circuits are Shanghai Skyline Spiral, London Riverside, Rio Coastal Rhythm, Austin River Run, Beijing Imperial Run and Paris Seine Loop. Austin includes the UT Tower and a roadside football squad. Paris includes the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf. The original seven harbor, forest, city and spiral circuits follow the city courses.
+The first six circuits are Shanghai Skyline Spiral, London Riverside, Rio Coastal Rhythm, Austin River Run, Beijing Imperial Run and Paris Seine Loop. Austin includes the UT Tower and a roadside football squad. Paris includes the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf. Six harbor, forest, city and spiral circuits follow the city courses; Lighthouse Grand Prix has been retired.
 
 London adds four detailed roadside landmarks along its existing route: the Royal Opera House and glazed Floral Hall, the red terracotta Palace Theatre, the classical London Palladium, and Piccadilly Circus with curved illuminated panels and the Shaftesbury Memorial Fountain. These are compact architectural interpretations for the game, not a geographically exact reconstruction; track geometry, checkpoints, elevation and physics are unchanged.
 
@@ -75,6 +75,10 @@ Shanghai now crosses a bounded Huangpu River and follows a 1,150-unit northwest-
 
 Final combined release validation: all 364 frontend checks and 51 backend checks passed. Visual review covered the three official theatre posters, the Bund from the normal chase camera, Sixth Street, the new Austin buildings, the 22-player formation and the real-time scoreboard from both the approach road and close-up views. Austin’s route fingerprint is unchanged; Shanghai is the only revised circuit geometry in this update.
 
-## 2026-10-12: Extended Bund and circuit retirement
+## Extended Bund, route freeze and circuit retirement — 2026-10-12
 
-Shanghai now has a 3,000-unit continuous Bund straight, six Pudong skyline groups and fifteen detailed named landmarks, with extra architecture on both sides of the last sector. The Pearl 720-degree spiral is unchanged. Shanghai ghost paths use v3; older paths are not offered. Lighthouse Grand Prix has been removed from the game and all score/ghost categories. Its source definition is recoverable in macOS Trash and its online records were moved atomically to the private database recycle bin. All remaining routes are frozen unless the owner explicitly authorizes a specific change.
+Shanghai has a 3,000-unit Bund straight, six additional Pudong skyline groups and fifteen named landmarks. The Pearl 720-degree spiral stays unchanged; extra late-sector architecture now lines both sides. Shanghai ghosts use v3 and Austin v2. Lighthouse Grand Prix is removed from all selection and score/ghost categories; its route definition is recoverable in macOS Trash and its online data in the private database recycle bin. All remaining routes are frozen under AGENTS.md and the checked-in route-lock baseline; scenery work must not change the road geometry.
+
+## London expansion and larger theatre artwork
+
+London adds ten roadside landmarks: the Tower of London, National Gallery, Trafalgar Square, St Pancras, Tate Modern, the Gherkin, the Shard, Battersea Power Station, Royal Albert Hall and Natural History Museum. All eight theatre advertisements are larger; The Book of Mormon, The Play That Goes Wrong and The Lion King retain authentic locally hosted artwork in proportional frames. These additions preserve the exact road layout, elevation and checkpoints. Complete London geometry measures 37.22 MB, within the existing 40 MB limit. All ten landmarks and eight advertisements were inspected from detail and driving cameras; both AI cars finish one and three laps without rescue.

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "frozenOn": "2026-10-12",
+  "numericPrecision": 9,
+  "policy": "Read-only accepted route baseline. Changes require new explicit user authorization for the specific map; see AGENTS.md.",
+  "authorizationHistory": [
+    {
+      "date": "2026-10-12",
+      "scope": "all existing routes",
+      "authorization": "User froze all map routes after the accepted Shanghai and Austin work; future route edits require explicit approval for the specific map."
+    },
+    {
+      "date": "2026-10-12",
+      "scope": "coast-shanghai",
+      "authorization": "Accepted extension of the Bund to a 3000-unit riverfront section, preserving the Oriental Pearl 720-degree ascent; this authorization is now consumed."
+    },
+    {
+      "date": "2026-10-12",
+      "scope": "coast-grand",
+      "authorization": "User explicitly deleted Lighthouse Grand Prix and its data; route excluded from the frozen catalog."
+    }
+  ],
+  "previousReleaseComparison": {
+    "source": "twin-turbo-shanghai-release-20261012",
+    "unchangedMaps": [
+      "coast",
+      "coast-austin",
+      "coast-bay",
+      "coast-beijing",
+      "coast-london",
+      "coast-marina",
+      "coast-neon",
+      "coast-paris",
+      "coast-pines",
+      "coast-ridge",
+      "coast-rio"
+    ],
+    "authorizedExceptions": [
+      "coast-shanghai",
+      "coast-grand"
+    ]
+  },
+  "routes": {
+    "coast": {
+      "geometrySha256": "9421ee02fb718c163526559641608d761f8e840fa9fc51d3493ca8a3f1b48596",
+      "drivingSha256": "4cf2da90bebbd1041be0ca8fbd04c0f6ace18ebb1533d05c50d9a9381757123e"
+    },
+    "coast-austin": {
+      "geometrySha256": "09b473ed9c8f461df8e2a0439a1e903ca15ede8a328cf397c3f15a396843419d",
+      "drivingSha256": "afaa63f5ebe85050798a12089e7b8b5dedfb281b2bc318af7be63d15372a91a7"
+    },
+    "coast-bay": {
+      "geometrySha256": "7d4c0769a16d667c8e2fb6ce0df6f7be24016886343a3b8b8399ece5a97fe665",
+      "drivingSha256": "e545ceef660cb68dbe137bedccac691c3c6ebb8ec69c56b1d7c684d5fa72f502"
+    },
+    "coast-beijing": {
+      "geometrySha256": "468e209926419b865e221d54936e9824387ae402d5fe4afcab7a5718681794a4",
+      "drivingSha256": "63db4cc22aeb4bb3c5938174cfbf191ed6936e140748978988f7d7d66ee721fb"
+    },
+    "coast-london": {
+      "geometrySha256": "ec4f795343c6cd96dafa9b96167b5ec054e18fb25765ccb99b9037d34ec76f3e",
+      "drivingSha256": "988a54a983ddb8460d27a25354c92b2b270c5ff1c61f4e648268a867e9d7ae67"
+    },
+    "coast-marina": {
+      "geometrySha256": "019065162b5c09a4730e130a1bef05c61b74221d7e7986c3f64d110d5d7645ef",
+      "drivingSha256": "9eb61882ccdf1329fe68b09aa3cddbec6cc5e94e23624d9accce043f877bff64"
+    },
+    "coast-neon": {
+      "geometrySha256": "71efc24ec605a271ca16444ce7f78ed7425585c5c7298eec5d5a716ee6cf1880",
+      "drivingSha256": "f15518d3abd4d6f944a9245dca8c2b167539151ad9550f7fbe3695850cd5ac49"
+    },
+    "coast-paris": {
+      "geometrySha256": "1826ccb370fadad8637ae38b206f75fc62c2fb86671d8c3c0b62fc293ff2ee71",
+      "drivingSha256": "622b22607f61d7fd355df407a0854134da15686c98ea9a0e0f53cc6884045120"
+    },
+    "coast-pines": {
+      "geometrySha256": "85ad4838b54feca78523f1ff9f4c158a53c60bf94f1c57709970ff2fa973431e",
+      "drivingSha256": "7585157d1ea41fcbc704b8af32661794628aff5edf17711c9b86169b8c4d0f23"
+    },
+    "coast-ridge": {
+      "geometrySha256": "432b2a3f4f49ccb9d35faef8518334ae4042ed1882874aa516aa7bb0d377ca60",
+      "drivingSha256": "d2d8da6530dcbb2df7ad3480d1930f4f1b8cd9f1f21a140efe32fa3003cc03a2"
+    },
+    "coast-rio": {
+      "geometrySha256": "7622a39ca6c86c9e86ec65a85cbdd273e638a4303bc54ef9a710dc0520850acb",
+      "drivingSha256": "bdac2bc678523449b5123ac066d531b26963429dd78408f5a63960f7302e4ada"
+    },
+    "coast-shanghai": {
+      "geometrySha256": "6d2cddab28c4a0837033dbf853327e5dfc432535ceb1d15e59028ae04ea17c9f",
+      "drivingSha256": "e86d33b65b57669cc8976d99eab5dea2fef30efa1e12f9d9656176e5dee06834"
+    }
+  }
+}

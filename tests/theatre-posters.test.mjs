@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setTrack, RaceEngine } from '../engine.js';
-import { THEATRE_POSTERS, theatrePosterSurfaces } from '../london-theatres.js';
-import { RaceRenderer, londonLandmarkPlacements, lookAt, multiply, perspective } from '../renderer.js';
+import { setTrack, trackPoint, RaceEngine } from '../engine.js';
+import { THEATRE_POSTERS, LONDON_THEATRE_ADS, LONDON_THEATRES, theatrePosterSurfaces } from '../london-theatres.js';
+import { RaceRenderer, londonLandmarkPlacements, lookAt, multiply, perspective, updateChaseCamera } from '../renderer.js';
 
 function mockGL(){
  const calls=[],gl={calls};let id=0,activeProgram,boundBuffer;
@@ -68,4 +68,29 @@ test('stale image callbacks cannot upload into a restored WebGL texture state',t
  renderer._loadTexture('poster:lion','./second.jpg');const second=renderer.textures['poster:lion'];
  images[0].onload();assert.equal(first.ready,0);assert.equal(second.ready,0);
  images[1].onload();assert.equal(second.ready,1);assert.equal(second.aspect,2/3);
+});
+
+
+test('all eight enlarged billboards clear entrances and stay inside their original building plots',()=>{
+ const originals={phantom:[38,51],frozen:[43,35],lion:[55,47],mis:[37,50],wicked:[84,46],hamilton:[49,55],mormon:[62,48],wrong:[53,57]};
+ assert.equal(LONDON_THEATRE_ADS.length,8);
+ for(const ad of LONDON_THEATRE_ADS){
+  const building=LONDON_THEATRES.find(item=>item.kind===ad.kind),[oldW,oldH]=originals[ad.key];assert.ok(ad.width>=oldW*1.3,ad.key+' did not gain visibility');assert.ok(ad.width*ad.height>oldW*oldH*1.5,ad.key+' panel area');
+  assert.ok(ad.y-ad.height/2-2.5>40,ad.key+' covers an entrance');assert.ok(ad.y+ad.height/2+2.5<=building.height,ad.key+' floats above architecture');
+  for(const sign of [-1,1])assert.ok(Math.hypot(ad.x+sign*(ad.width/2+2.5),ad.z-1.1)<building.radius,ad.key+' outside collision-clear plot');
+ }
+ for(const ad of THEATRE_POSTERS)assert.equal(ad.width/ad.height,16/9,'official landscape artwork fills its frame without being cropped or stretched');
+});
+test('official artwork occupies substantially more screen area from the real approach camera',t=>{
+ setTrack('coast-london');t.after(()=>setTrack('coast'));
+ const originals={lion:{x:-9,y:73,z:-50.7,width:55,height:47},mormon:{x:-26,y:84,z:-34,width:62,height:48},wrong:{x:-37,y:91,z:-39,width:53,height:57}};
+ const area=(ad,item,vp)=>{const c=Math.cos(item.angle),s=Math.sin(item.angle),h=Math.min(ad.height,ad.width/(16/9)),w=h*16/9;const points=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([dx,dy])=>project(vp,[item.x+c*(ad.x+dx*w/2)-s*(ad.z-1.1),ad.y+dy*h/2,item.z+s*(ad.x+dx*w/2)+c*(ad.z-1.1)]));return Math.abs(points.reduce((sum,p,i)=>sum+p[0]*points[(i+1)%4][1]-p[1]*points[(i+1)%4][0],0))/2;};
+ for(const ad of THEATRE_POSTERS){const item=londonLandmarkPlacements().find(i=>i.kind===ad.kind),camera=updateChaseCamera({...trackPoint(item.s-140),speed:363},null),vp=multiply(perspective(camera.fov,16/9),lookAt(camera.eye,camera.target));const gain=area(ad,item,vp)/area(originals[ad.key],item,vp);assert.ok(gain>2,ad.key+' needs at least twice the apparent artwork area');t.diagnostic(ad.key+' visible artwork area: '+gain.toFixed(2)+'× original');}
+});
+
+
+test('large illustrated panels remain ahead of the existing balcony and column capitals',()=>{
+ // Victoria Palace balcony has a front at -48, capitals at -47.8;
+ // Drury Lane balustrade reaches -55. Panels need a stable positive gap.
+ const limit={hamilton:-49.5,frozen:-55.5};for(const [key,front]of Object.entries(limit)){const panel=LONDON_THEATRE_ADS.find(ad=>ad.key===key);assert.ok(panel.z<front,key+' illustration is obscured by facade ornament');}
 });

@@ -5,6 +5,7 @@ import { WEST_END_LANDMARKS, addWestEndLandmark } from './london-west-end.js';
 import { ROYAL_LANDMARKS, addRoyalLandmark } from './london-royal-landmarks.js';
 import { RIVERSIDE_LANDMARKS, addRiversideLandmark } from './london-riverside-landmarks.js';
 import { LONDON_THEATRES, addLondonTheatre, THEATRE_POSTERS, theatrePosterSurfaces } from './london-theatres.js';
+import { LONDON_NEW_LANDMARKS, londonNewLandmarkPlacements, addLondonNewLandmark } from './london-new-landmarks.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
@@ -374,6 +375,7 @@ export function londonLandmarkPlacements() {
     const [s,side]=plots[landmark.kind],p=trackPoint(s,side*(landmark.radius+94));
     items.push({...landmark,s,side,x:p.x,z:p.y,angle:p.angle+(side<0?Math.PI:0)});
   }
+  items.push(...londonNewLandmarkPlacements(items));
   return items;
 }
 function londonSceneryPlacements() {
@@ -388,6 +390,20 @@ function londonSceneryPlacements() {
     // Inner bends compress road-relative spacing: protect full roofs and crowns.
     if(items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+8))continue;
     items.push({kind:tree?'london-tree':'terrace',x:p.x,z:p.y,angle:p.angle,side,radius,width,depth,height:tree?78:72+rng()*50,variant:index%5});
+  }
+  // Wide architectural landmarks leave narrow legitimate infill plots between
+  // them. Keep the surrounding streets lived-in without shrinking clearances
+  // or replacing another landmark; every infill roof passes the same geometry
+  // checks as a regular terrace.
+  for(let quarter=0;quarter<4;quarter++){
+    let count=items.filter(item=>item.kind==='terrace'&&Math.floor(projectTrack(item.x,item.z).s/TRACK.length*4)===quarter).length;
+    for(let s=quarter*TRACK.length/4+42;s<(quarter+1)*TRACK.length/4&&count<12;s+=36)for(const side of [-1,1]){
+      if(count>=12)break;
+      const width=52,depth=46,radius=Math.hypot(width+8,depth+8)/2,p=trackPoint(s,side*150);
+      if(p.elevation>5||Math.abs(p.y-TRACK.river.centerZ)<TRACK.river.halfWidth+radius+28||projectTrack(p.x,p.y).distance<radius+76)continue;
+      if(landmarks.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+35)||items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+8))continue;
+      items.push({kind:'terrace',x:p.x,z:p.y,angle:p.angle,side,radius,width,depth,height:78+(count%3)*11,variant:count%5});count++;
+    }
   }
   return items;
 }
@@ -516,6 +532,7 @@ function addLondonLandmarks(mesh) {
     else if(ROYAL_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRoyalLandmark(mesh,item);
     else if(RIVERSIDE_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRiversideLandmark(mesh,item);
     else if(LONDON_THEATRES.some(landmark=>landmark.kind===item.kind))addLondonTheatre(mesh,item);
+    else if(LONDON_NEW_LANDMARKS.some(landmark=>landmark.kind===item.kind))addLondonNewLandmark(mesh,item);
   }
   // River embankments stop outside every road approach, never across a bridge.
   for(const side of [-1,1])for(let x=-750;x<TRACK.width+750;x+=76){
@@ -593,7 +610,7 @@ export function cornerMarkers() {
 
 /** Local +Z is the driver's right: an outer mast's arm must extend toward -side. */
 export function lampGeometry(distance,side=1) {
-  const skyline=TRACK.theme==='shanghai',lampLift=skyline?50:0;
+  const skyline=TRACK.theme==='shanghai',lampLift=skyline?50:TRACK.theme==='london'?36:0;
   const q=trackPoint(distance,side*(TRACK.roadWidth/2+(skyline?85:27)));
   const right=[-Math.sin(q.angle),Math.cos(q.angle)];
   const inward=(reach,height)=>[q.x-right[0]*side*reach,q.elevation+height,q.y-right[1]*side*reach];

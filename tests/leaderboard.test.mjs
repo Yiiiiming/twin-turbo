@@ -181,3 +181,8 @@ test('one-lap sprint boards stay separate from three-lap and historical five-lap
     assert.deepEqual(normalizeEntries(source, 3, city).map(value => value.id), ['three']);
   }
 });
+
+test('retired Lighthouse Grand Prix cannot enter any ranking category',()=>{
+ assert.equal(normalizeCity('coast-grand'),null);
+ assert.deepEqual(normalizeEntries([{id:'retired-score',name:'Driver',timeMs:42000,laps:1,city:'coast-grand',playerId:1,mode:'local',createdAt:1}],1,'coast-grand'),[]);
+});
