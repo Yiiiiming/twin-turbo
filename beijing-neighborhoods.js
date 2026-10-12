@@ -27,7 +27,9 @@ export function beijingNeighborhoodPlacements(landmarks=[]){
  const result=[],count=Math.ceil(TRACK.length/116),step=TRACK.length/count;
  const accepts=(p,radius)=>projectTrack(p.x,p.y).distance>=TRACK.roadWidth/2+radius+18
   &&beijingWallClearance(p.x,p.y,radius)
-  &&landmarks.every(other=>Math.hypot(other.x-p.x,other.z-p.y)>=other.radius+radius+25)
+  // Leave a small forecourt at China Zun: a house immediately before the tower
+  // hid its flared base along the opening-straight approach.
+  &&landmarks.every(other=>Math.hypot(other.x-p.x,other.z-p.y)>=other.radius+radius+(other.kind==='beijing-china-zun'?95:25))
   &&result.every(other=>Math.hypot(other.x-p.x,other.z-p.y)>=other.radius+radius+7)
   &&!blocksLandmarkView(p.x,p.y,radius,landmarks);
  for(let index=0;index<count;index++)for(const side of [-1,1]){

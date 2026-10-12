@@ -39,16 +39,19 @@ export const BEIJING_REFINEMENTS=Object.freeze([
 // A single promenade plan includes the original three landmarks. Small changes
 // stay inside each plot's slot; failed plots never migrate into another district.
 export const BEIJING_DISTRICTS=Object.freeze([
- {id:'old-city',label:'城门与胡同',kinds:['beijing-paifang','beijing-zhengyangmen','palace-gate','beijing-national-museum','beijing-ncpa']},
+ {id:'old-city',label:'古都与天际线',kinds:['beijing-paifang','beijing-zhengyangmen','beijing-china-zun','beijing-national-museum','beijing-ncpa']},
  {id:'culture',label:'京城文脉',kinds:['temple-of-heaven','beijing-confucius','beijing-yonghe','beijing-drum-tower','beijing-bell-tower']},
  {id:'gardens',label:'园林长城',kinds:['beijing-miaoying','beijing-jingshan','beijing-beihai-dagoba','beijing-fragrant-tower','beijing-seventeen-arch']},
- {id:'modern',label:'现代北京',kinds:['beijing-water-cube','beijing-birds-nest','beijing-cctv','beijing-china-zun']},
+ {id:'modern',label:'现代建筑与城楼',kinds:['beijing-water-cube','beijing-birds-nest','beijing-cctv','palace-gate']},
  {id:'civic',label:'城市街区',kinds:['beijing-exhibition-center','beijing-planetarium','beijing-capital-museum','beijing-railway-station']},
 ].map(d=>Object.freeze({...d,kinds:Object.freeze(d.kinds)})));
 
 export function beijingLandmarkPlacements(existing=[]){
  if(TRACK.theme!=='beijing')return [];
  const result=[],metadata=[...BEIJING_LANDMARKS,...BEIJING_REFINEMENTS];
+ // China Zun anchors the opening straight: the long approach reveals its full
+ // silhouette before the chase camera passes below its crown. The late curved
+ // slot never showed the whole tower, even though the model was still present.
  const plan=BEIJING_DISTRICTS.flatMap(d=>d.kinds.map(kind=>({kind,district:d.id})));
  const circularGap=(a,b)=>{const delta=Math.abs(a-b)%TRACK.length;return Math.min(delta,TRACK.length-delta);};
  for(const [index,plot]of plan.entries()){
