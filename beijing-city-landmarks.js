@@ -29,31 +29,47 @@ export const BEIJING_LANDMARKS=Object.freeze([
  ['beijing-miaoying','妙应寺 · 白塔',134,251,'https://english.beijing.gov.cn/beijinginfo/facts/religion/202005/t20200518_1900210.html'],
  ['beijing-capital-museum','首都博物馆',158,157,'https://english.beijing.gov.cn/travellinginbeijing/museums/'],
  ['beijing-planetarium','北京天文馆',151,128,'https://english.beijing.gov.cn/beijinginfo/culture/culturaltreasures/cityofmuseums/list/202604/t20260427_4617304.html'],
-].map(([kind,label,radius,height,source],i)=>Object.freeze({kind,label,radius,height,source,fraction:.025+i*.048,side:i%2?1:-1})));
+].map(([kind,label,radius,height,source])=>Object.freeze({kind,label,radius,height,source})));
 export const BEIJING_REFINEMENTS=Object.freeze([
  {kind:'temple-of-heaven',label:'天坛 · 祈年殿',radius:116,height:246,source:'https://english.visitbeijing.com.cn/article/47ONy6AX0b3'},
  {kind:'palace-gate',label:'天安门城楼',radius:163,height:157,source:AXIS},
  {kind:'beijing-paifang',label:'北京彩绘牌楼',radius:120,height:134,source:AXIS},
 ].map(Object.freeze));
 
+// A single promenade plan includes the original three landmarks. Small changes
+// stay inside each plot's slot; failed plots never migrate into another district.
+export const BEIJING_DISTRICTS=Object.freeze([
+ {id:'old-city',label:'城门与胡同',kinds:['beijing-paifang','beijing-zhengyangmen','palace-gate','beijing-national-museum','beijing-ncpa']},
+ {id:'culture',label:'京城文脉',kinds:['temple-of-heaven','beijing-confucius','beijing-yonghe','beijing-drum-tower','beijing-bell-tower']},
+ {id:'gardens',label:'园林长城',kinds:['beijing-miaoying','beijing-jingshan','beijing-beihai-dagoba','beijing-fragrant-tower','beijing-seventeen-arch']},
+ {id:'modern',label:'现代北京',kinds:['beijing-water-cube','beijing-birds-nest','beijing-cctv','beijing-china-zun']},
+ {id:'civic',label:'城市街区',kinds:['beijing-exhibition-center','beijing-planetarium','beijing-capital-museum','beijing-railway-station']},
+].map(d=>Object.freeze({...d,kinds:Object.freeze(d.kinds)})));
+
 export function beijingLandmarkPlacements(existing=[]){
  if(TRACK.theme!=='beijing')return [];
- const result=[];
- for(const meta of BEIJING_LANDMARKS){let chosen;
-  search: for(const shift of [0,90,-90,180,-180,300,-300,450,-450,600,-600,800,-800,1050,-1050,1400,-1400,1800,-1800]){
-   for(const side of [meta.side,-meta.side])for(const extra of [0,45,90]){
-    const s=TRACK.startDistance+meta.fraction*TRACK.length+shift,p=trackPoint(s,side*(TRACK.roadWidth/2+meta.radius+36+extra));
-    if(p.elevation>2||projectTrack(p.x,p.y).distance<TRACK.roadWidth/2+meta.radius+30||!beijingWallClearance(p.x,p.y,meta.radius+10))continue;
-    if([...existing,...result].some(q=>Math.hypot(p.x-q.x,p.y-q.z)<meta.radius+q.radius+34))continue;
-    chosen=Object.freeze({...meta,x:p.x,z:p.y,s,side,angle:p.angle+(side<0?Math.PI:0),elevation:0});break search;
-   }
-   if(chosen)break;
+ const result=[],metadata=[...BEIJING_LANDMARKS,...BEIJING_REFINEMENTS];
+ const plan=BEIJING_DISTRICTS.flatMap(d=>d.kinds.map(kind=>({kind,district:d.id})));
+ const circularGap=(a,b)=>{const delta=Math.abs(a-b)%TRACK.length;return Math.min(delta,TRACK.length-delta);};
+ for(const [index,plot]of plan.entries()){
+  if(existing.some(item=>item.kind===plot.kind))continue;
+  const meta=metadata.find(m=>m.kind===plot.kind),fraction=(index+.5)/plan.length,preferredSide=index%2?1:-1;
+  let chosen;
+  // Ground-level gardens remain visible from the 48-unit raised road. The
+  // surrounding terrain is flat, so a road elevation is not a building veto.
+  search: for(const shift of [0,-45,45,-90,90])for(const side of [preferredSide,-preferredSide])for(const setback of [76,112,40]){
+   const s=TRACK.startDistance+fraction*TRACK.length+shift,p=trackPoint(s,side*(TRACK.roadWidth/2+meta.radius+setback));
+   if(projectTrack(p.x,p.y).distance<TRACK.roadWidth/2+meta.radius+30||!beijingWallClearance(p.x,p.y,meta.radius+10))continue;
+   if([...existing,...result].some(q=>circularGap(s,q.s)<480||Math.hypot(p.x-q.x,p.y-q.z)<meta.radius+q.radius+80))continue;
+   const refined=BEIJING_REFINEMENTS.some(m=>m.kind===meta.kind);
+   chosen=Object.freeze({...meta,...plot,fraction,x:p.x,z:p.y,s,side,angle:p.angle+(!refined&&side<0?Math.PI:0),elevation:0});break search;
   }
-  if(!chosen)throw new Error(`Beijing: no road / Great Wall clear plot for ${meta.kind}`);
+  if(!chosen)throw new Error(`Beijing: no clear plot inside district slot for ${meta.kind}`);
   result.push(chosen);
  }
  return Object.freeze(result);
 }
+
 const C={red:'#9c3e31',darkRed:'#633b31',gold:'#bb9344',goldLight:'#ddba69',blue:'#235a86',green:'#35635c',stone:'#d6d2bc',white:'#ece8d5',brick:'#858a80',glass:'#527b87'};
 const rect=(f,x,y,z,w,h,color)=>f.quad([x-w/2,y-h/2,z],[x+w/2,y-h/2,z],[x+w/2,y+h/2,z],[x-w/2,y+h/2,z],color);
 function line(mesh,f,a,b,w,c){

@@ -1,6 +1,7 @@
 import { shanghaiRiverClearance } from './shanghai-riverfront.js';
 /** Compact city districts: native geometry shared by rendering and collisions. */
 import { TRACK, trackPoint, projectTrack } from './engine.js';
+import { beijingNeighborhoodPlacements, addBeijingNeighborhood } from './beijing-neighborhoods.js';
 import { addBeijingGreatWall, beijingWallClearance } from './beijing-great-wall.js';
 import { BEIJING_LANDMARKS, BEIJING_REFINEMENTS, beijingLandmarkPlacements, addBeijingCityLandmark } from './beijing-city-landmarks.js';
 import { SHANGHAI_LANDMARKS, shanghaiLandmarkPlacements, addShanghaiLandmark } from './shanghai-landmarks.js';
@@ -16,7 +17,6 @@ const point=(item,x,y,z)=>[item.x+Math.cos(item.angle)*x-Math.sin(item.angle)*z,
 const boxAt=(mesh,item,x,y,z,w,h,d,color,glow=0)=>mesh.box(...point(item,x,y,z),w,h,d,color,item.angle,glow);
 const clearOfRiver=(x,z,radius)=>!TRACK.river||Math.abs(z-TRACK.river.centerZ)>TRACK.river.halfWidth+radius+24;
 const profiles={
- beijing:[['temple-of-heaven',.20,116,-1],['palace-gate',.51,163,1],['beijing-paifang',.79,120,-1]],
  austin:[['texas-capitol',.20,172,-1],['ut-tower',.37,75,-1],['football-team',.40,390,1],['music-guitar',.57,106,1],['austin-music-hall',.80,136,-1]],
  rio:[['christ-redeemer',.19,111,-1],['sugarloaf',.50,238,1],['lapa-aqueduct',.79,147,-1]],
  paris:[['eiffel-tower',.20,124,1],['arc-de-triomphe',.50,96,1],['louvre-pyramid',.72,150,-1]],
@@ -27,6 +27,7 @@ export function cityLandmarkPlacements() {
  if(!isCityTheme())return [];
  if(TRACK.theme==='shanghai')return shanghaiLandmarkPlacements();
  if(placementCache.has(TRACK))return placementCache.get(TRACK);
+ if(TRACK.theme==='beijing'){const plots=beijingLandmarkPlacements();placementCache.set(TRACK,plots);return plots;}
  const result=[];
  for(const [kind,fraction,radius,preferredSide]of profiles[TRACK.theme]){
   let found;
@@ -49,12 +50,12 @@ export function cityLandmarkPlacements() {
   }
  }
  if(TRACK.theme==='austin'){result.push(...sixthStreetPlacements());result.push(...austinLandmarkPlacements(result));}
- if(TRACK.theme==='beijing')result.push(...beijingLandmarkPlacements(result));
  const frozen=Object.freeze(result);placementCache.set(TRACK,frozen);return frozen;
 }
 export function citySceneryPlacements() {
  if(!isCityTheme())return [];
  if(sceneryCache.has(TRACK))return sceneryCache.get(TRACK);
+ if(TRACK.theme==='beijing'){const items=beijingNeighborhoodPlacements(cityLandmarkPlacements());sceneryCache.set(TRACK,items);return items;}
  const random=seedRandom({beijing:20751,austin:49178,rio:61937,paris:33871,shanghai:52789}[TRACK.theme]),items=[],landmarks=cityLandmarkPlacements();
  for(let s=110,index=0;s<TRACK.length;s+=110,index++)for(const side of [-1,1]){
   const tree=index%5===0,kind=tree?(TRACK.theme==='rio'?'rio-palm':'city-tree'):{beijing:'hutong',austin:'music-street',paris:'haussmann',shanghai:'shikumen'}[TRACK.theme]||'rio-house';
@@ -481,6 +482,7 @@ function tree(mesh,item){
  }
 }
 export function addCityStreetScenery(mesh,item){
+ if(item.kind.startsWith('beijing-')){addBeijingNeighborhood(mesh,item);return;}
  if(['hutong','music-street','rio-house'].includes(item.kind))streetBuilding(mesh,item);
  else if(item.kind==='haussmann')haussmann(mesh,item);
  else if(item.kind==='shikumen')shikumen(mesh,item);else tree(mesh,item);
