@@ -48,6 +48,23 @@ function dome(f, cx, cz, profile, color, sides = 64) {
   }
 }
 
+// The west-tower bell openings are planar recessed infills, not the shared
+// glazed-window box. That box's rear face was only 0.05 units from the tower
+// wall, and its mullions cut through the separate louvres. Give each visible
+// layer a clear depth: wall -83.5, opening -86, stone surround -87.5, louvres -89.
+function westTowerOpening(f,x,trim,shade) {
+  const bottom=149,spring=168,r=8,openingZ=-86,surroundZ=-87.5;
+  face(f,x,(bottom+spring)/2,openingZ,16,spring-bottom,'#3b4846');
+  for(let i=0;i<24;i++){
+    const a=i/24*Math.PI,b=(i+1)/24*Math.PI;
+    f.tri([x,spring,openingZ],[x+Math.cos(b)*r,spring+Math.sin(b)*r,openingZ],[x+Math.cos(a)*r,spring+Math.sin(a)*r,openingZ],'#3b4846');
+    f.quad([x+Math.cos(a)*r,spring+Math.sin(a)*r,surroundZ],[x+Math.cos(b)*r,spring+Math.sin(b)*r,surroundZ],[x+Math.cos(b)*(r+2),spring+Math.sin(b)*(r+2),surroundZ],[x+Math.cos(a)*(r+2),spring+Math.sin(a)*(r+2),surroundZ],trim);
+  }
+  for(const side of [-1,1])face(f,x+side*9,(bottom+spring)/2,surroundZ,2,spring-bottom,trim);
+  f.box(x,bottom-1,-87,21,2.4,3,trim);
+  for(let y=154;y<171;y+=4)f.box(x,y,-88,12,1.5,2,shade);
+}
+
 function stPauls(mesh, item) {
   const f = frame(mesh, item), stone = '#d7d4c6', trim = '#ede7d6', shade = '#b9b49f', glass = '#435252', lead = '#7a8a87', gold = '#d1b463';
   // A cruciform body, two west towers and a deep colonnaded west front.
@@ -93,8 +110,7 @@ function stPauls(mesh, item) {
 
     for (const x of [-83, 83]) {
       cornice(f, x, 135, -60, 42, 50, trim);
-      arch(f, x, 149, -84.1, 16, 27, trim, '#3b4846');
-      for (let y = 154; y < 171; y += 4) f.box(x, y, -85.1, 12, 1.5, 1.5, shade);
+      westTowerOpening(f, x, trim, shade);
       cornice(f, x, 181, -60, 45, 52, trim);
       for (const dx of [-12, 12]) for (const dz of [-13, 13]) f.cone(x + dx, 187, -60 + dz, 3.1, 27, trim, 12, 2.6);
       f.cone(x, 188, -60, 10, 27, shade, 24, 10);

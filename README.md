@@ -59,3 +59,7 @@ Beijing gains a continuous rising and falling Great Wall ridge around the entire
 ## October 12 city expansion validation
 
 338 frontend checks cover the thirteen circuits, score and ghost isolation, UI mode selection, geometry and driving. The shared record service passes 49 checks. New London theatre geometry stays within the existing 40 MB scene budget; Beijing measures 23.60 MB and Shanghai about 19.9 MB. Shanghai production AI completes one and three laps without rescue (53–56 second laps), with height-aware projection across the spiral decks and clear full-route car/chase-camera probes. All 20 new theatre/Shanghai models and the Beijing wall were inspected in the browser.
+
+## October 12 London poster and window update
+
+The Book of Mormon, The Play That Goes Wrong and The Lion King now use real promotional artwork from their official theatre operators, preserved at its original aspect ratio. See assets/posters/README.md for sources. The same files are embedded in the offline edition. St Paul’s two upper belfry windows use separated planar glazing, stone frames and louvres to eliminate overlapping depth surfaces. Every circuit layout remains unchanged in this release.

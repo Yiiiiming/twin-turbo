@@ -1,7 +1,8 @@
 /** Eight compact West End interpretations, all with their street frontage at -Z.
  * Their characteristic elevations follow the venue/heritage references below;
  * these are purpose-built game models, not geographic or measured replicas.
- * No show artwork, textures or third-party meshes are included.
+ * Selected playbills use locally packaged official show artwork; the other
+ * illustrated signs remain original geometry. No third-party meshes are used.
  */
 import { frame, details, beam, word, frontDisk, cornice, pediment, canopy } from './london-west-end.js';
 
@@ -15,6 +16,25 @@ export const LONDON_THEATRES=Object.freeze([
   {kind:'savoy-theatre',label:'Savoy Theatre',radius:102,width:176,depth:106,height:134},
   {kind:'prince-edward-theatre',label:'Prince Edward Theatre',radius:112,width:196,depth:116,height:165},
 ].map(Object.freeze));
+
+/** Local façade surfaces; raster artwork covers the fallback illustration only.
+ * Local +X is screen left when viewed from the street (-Z). */
+export const THEATRE_POSTERS=Object.freeze([
+  {key:'lion',kind:'lyceum-theatre',file:'lion-king.jpg',x:-9,y:73,z:-50.7,width:55,height:47},
+  {key:'mormon',kind:'savoy-theatre',file:'book-of-mormon.jpg',x:-26,y:84,z:-34,width:62,height:48},
+  {key:'wrong',kind:'prince-edward-theatre',file:'play-that-goes-wrong.jpg',x:-37,y:91,z:-39,width:53,height:57},
+].map(Object.freeze));
+
+export function theatrePosterSurfaces(landmarks){
+  return THEATRE_POSTERS.flatMap(poster=>{
+    const item=landmarks.find(item=>item.kind===poster.kind);if(!item)return [];
+    const f=frame(null,item),{x,y,z,width:w,height:h}=poster;
+    // Slightly ahead of all fallback lettering, still within the existing frame.
+    const corner=(dx,dy,u,v)=>[...f.p(x+dx*w/2,y+dy*h/2,z-1.1),u,v];
+    const a=corner(1,-1,0,0),b=corner(1,1,0,1),c=corner(-1,1,1,1),d=corner(-1,-1,1,0);
+    return [{...poster,vertices:new Float32Array([...a,...b,...c,...a,...c,...d])}];
+  });
+}
 
 export const LONDON_THEATRE_REFERENCES=Object.freeze([
   'https://historicengland.org.uk/listing/the-list/list-entry/1357090',

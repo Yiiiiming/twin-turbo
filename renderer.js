@@ -2,7 +2,7 @@ import { isCityTheme, citySceneryPlacements, cityLandmarkPlacements, addCityLand
 import { WEST_END_LANDMARKS, addWestEndLandmark } from './london-west-end.js';
 import { ROYAL_LANDMARKS, addRoyalLandmark } from './london-royal-landmarks.js';
 import { RIVERSIDE_LANDMARKS, addRiversideLandmark } from './london-riverside-landmarks.js';
-import { LONDON_THEATRES, addLondonTheatre } from './london-theatres.js';
+import { LONDON_THEATRES, addLondonTheatre, THEATRE_POSTERS, theatrePosterSurfaces } from './london-theatres.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
@@ -185,6 +185,32 @@ void main(){
   image=mix(image,vec3(luminance)*vec3(.84,.98,1.13),uLondon*.64);
   float landscape = smoothstep(0.03,0.3,vUV.y);
   gl_FragColor=vec4(mix(uHorizon,image,landscape),1.0);
+}`;
+
+const POSTER_VERTEX=`
+attribute vec3 aPosition;
+attribute vec2 aUV;
+uniform mat4 uViewProjection;
+varying vec2 vUV;
+varying vec3 vPosition;
+void main(){vUV=aUV;vPosition=aPosition;gl_Position=uViewProjection*vec4(aPosition,1.0);}`;
+const POSTER_FRAGMENT=`
+precision mediump float;
+uniform sampler2D uPoster;
+uniform float uImageAspect;
+uniform float uFrameAspect;
+uniform vec3 uEye;
+uniform vec3 uFog;
+varying vec2 vUV;
+varying vec3 vPosition;
+void main(){
+  // Full artwork is retained, with dark matting when its aspect differs.
+  vec2 scale=vec2(max(uFrameAspect/uImageAspect,1.0),max(uImageAspect/uFrameAspect,1.0));
+  vec2 uv=(vUV-0.5)*scale+0.5;
+  vec3 color=vec3(0.035,0.045,0.05);
+  if(uv.x>=0.0&&uv.x<=1.0&&uv.y>=0.0&&uv.y<=1.0)color=texture2D(uPoster,uv).rgb;
+  float fog=smoothstep(620.0,2550.0,length(vPosition-uEye));
+  gl_FragColor=vec4(mix(color,uFog,fog*0.9),1.0);
 }`;
 
 function program(gl, vertex, fragment) {
@@ -897,6 +923,7 @@ export function sceneWeights(x,y) {
 export class RaceRenderer {
   constructor(canvas,{sceneUrls={}}={}) {
     this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};this.obstacles=[];this.ghostPoses=[];this.singlePlayer=false;
+    this.posterUrls=Object.fromEntries(THEATRE_POSTERS.map(p=>[p.key,globalThis.__TWIN_TURBO_POSTERS__?.[p.key]||`./assets/posters/${p.file}`]));
     this.sceneUrls={coast:'./assets/coast.png',alpine:'./assets/alpine.png',city:'./assets/city.png',clouds:'./assets/cloud-sky.jpg',...sceneUrls};
     try {
       const gl=canvas.getContext('webgl',{alpha:false,antialias:true,depth:true,powerPreference:'high-performance'})||canvas.getContext('experimental-webgl',{alpha:false,antialias:true,depth:true});
@@ -909,6 +936,10 @@ export class RaceRenderer {
   _initialize() {
     const gl=this.gl;
     this.mainProgram=program(gl,VERTEX,FRAGMENT);this.skyProgram=program(gl,SKY_VERTEX,SKY_FRAGMENT);
+    this.posterProgram=program(gl,POSTER_VERTEX,POSTER_FRAGMENT);
+    this.posterAttributes={position:gl.getAttribLocation(this.posterProgram,'aPosition'),uv:gl.getAttribLocation(this.posterProgram,'aUV')};
+    this.posterUniforms={};for(const name of ['uViewProjection','uPoster','uImageAspect','uFrameAspect','uEye','uFog'])this.posterUniforms[name]=gl.getUniformLocation(this.posterProgram,name);
+    this.posterMeshes=[];
     this.attributes={};this.uniforms={};
     for(const name of ['aPosition','aNormal','aColor','aEmission'])this.attributes[name]=gl.getAttribLocation(this.mainProgram,name);
     for(const name of ['uViewProjection','uModel','uEye','uFog'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
@@ -922,6 +953,7 @@ export class RaceRenderer {
     this.worldMatrix=identity();
     this.textures={};
     for(const [name,url] of Object.entries(this.sceneUrls))this._loadTexture(name,url);
+    this._buildPosters();
     gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);gl.clearColor(.5,.68,.76,1);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   }
@@ -931,7 +963,7 @@ export class RaceRenderer {
     for(const [key,builder] of Object.entries({terrain:world.terrain,road:buildRoad(),water:world.water,props:world.props})) {
       const previous=this.meshes[key];this.meshes[key]=upload(gl,builder);if(previous?.buffer)gl.deleteBuffer?.(previous.buffer);
     }
-    this.obstacles=world.obstacles;this.trackId=TRACK.id;this.ghostPoses=[];
+    this.obstacles=world.obstacles;this.trackId=TRACK.id;this.ghostPoses=[];this._buildPosters();
     if(engine){engine.setObstacles(this.obstacles);this.resetCameras(engine);}else this.cameras=[null,null];
     return this;
   }
@@ -946,9 +978,37 @@ export class RaceRenderer {
     if(/^https?:/.test(url))image.crossOrigin='anonymous';
     image.onload=()=>{
       if(this.textures[name]!==state)return;
-      try{gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);state.ready=1;}catch{state.ready=0;}
+      try{gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);state.aspect=(image.naturalWidth||image.width||1)/(image.naturalHeight||image.height||1);state.ready=1;}catch{state.ready=0;}
     };
     image.onerror=()=>{state.ready=0;};image.src=url;
+  }
+  _buildPosters() {
+    const gl=this.gl;
+    for(const mesh of this.posterMeshes||[])gl.deleteBuffer?.(mesh.buffer);
+    this.posterMeshes=theatrePosterSurfaces(londonLandmarkPlacements()).map(poster=>{
+      const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,poster.vertices,gl.STATIC_DRAW);
+      const textureKey=`poster:${poster.key}`;
+      if(!this.textures[textureKey])this._loadTexture(textureKey,this.posterUrls[poster.key]);
+      return {...poster,buffer,textureKey};
+    });
+  }
+  _posters(viewProjection,camera) {
+    const visible=this.posterMeshes.filter(p=>this.textures[p.textureKey]?.ready);
+    if(!visible.length)return;
+    const gl=this.gl,u=this.posterUniforms,a=this.posterAttributes;
+    for(const loc of Object.values(this.attributes))gl.disableVertexAttribArray(loc);
+    gl.useProgram(this.posterProgram);
+    gl.uniformMatrix4fv(u.uViewProjection,false,viewProjection);gl.uniform3fv(u.uEye,camera.eye);gl.uniform3fv(u.uFog,this.activeFog);
+    gl.activeTexture(gl.TEXTURE0);gl.uniform1i(u.uPoster,0);
+    for(const poster of visible){
+      const texture=this.textures[poster.textureKey];
+      gl.bindTexture(gl.TEXTURE_2D,texture.texture);gl.uniform1f(u.uImageAspect,texture.aspect||1);gl.uniform1f(u.uFrameAspect,poster.width/poster.height);
+      gl.bindBuffer(gl.ARRAY_BUFFER,poster.buffer);
+      gl.enableVertexAttribArray(a.position);gl.vertexAttribPointer(a.position,3,gl.FLOAT,false,20,0);
+      gl.enableVertexAttribArray(a.uv);gl.vertexAttribPointer(a.uv,2,gl.FLOAT,false,20,12);
+      gl.drawArrays(gl.TRIANGLES,0,6);
+    }
+    gl.disableVertexAttribArray(a.position);gl.disableVertexAttribArray(a.uv);gl.useProgram(this.mainProgram);
   }
   setSinglePlayer(enabled) {
     const singlePlayer=Boolean(enabled);
@@ -996,7 +1056,7 @@ export class RaceRenderer {
     gl.uniform1f(u.uHeading,camera.angle);gl.uniform1f(u.uAspect,aspect);gl.uniform3fv(u.uZenith,color('zenith'));gl.uniform3fv(u.uHorizon,color('horizon'));
     gl.drawArrays(gl.TRIANGLES,0,6);gl.disableVertexAttribArray(this.skyAttributes.position);
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.mainProgram);
-    gl.uniform3fv(this.uniforms.uFog,color('fog'));
+    this.activeFog=color('fog');gl.uniform3fv(this.uniforms.uFog,this.activeFog);
   }
   render(engine,dt=1/60,now=0) {
     if(!this.available)return;
@@ -1011,9 +1071,11 @@ export class RaceRenderer {
       const camera=this.cameras[i]=updateChaseCamera(car,this.cameras[i],dt);
       const aspect=width/h;
       this._sky(camera,sceneWeights(car.x,car.y),aspect);
-      gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,multiply(perspective(camera.fov,aspect),lookAt(camera.eye,camera.target)));
+      const viewProjection=multiply(perspective(camera.fov,aspect),lookAt(camera.eye,camera.target));
+      gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,viewProjection);
       gl.uniform3fv(this.uniforms.uEye,camera.eye);
       this._mesh(this.meshes.terrain);this._mesh(this.meshes.water);this._mesh(this.meshes.road);this._mesh(this.meshes.props);
+      this._posters(viewProjection,camera);
       gl.enable(gl.BLEND);gl.depthMask(false);
       for(const vehicle of engine.cars)this._mesh(this.meshes.shadow,modelMatrix(vehicle.x,(vehicle.elevation||0)+1.3,vehicle.y,vehicle.angle,0,Math.atan(vehicle.slope||0)));
       gl.depthMask(true);gl.disable(gl.BLEND);

@@ -44,12 +44,21 @@ for name, filename in (('coast', 'coast.png'), ('alpine', 'alpine.png'), ('city'
     embedded[name] = f'data:{mime};base64,' + base64.b64encode(asset.read_bytes()).decode('ascii')
     offline_css = offline_css.replace(f"url('./assets/{filename}')", f'var(--scene-{name})')
 
+posters = {}
+poster_directory = web_directory / 'assets' / 'posters'
+poster_directory.mkdir(exist_ok=True)
+for key, filename in (('mormon', 'book-of-mormon.jpg'), ('wrong', 'play-that-goes-wrong.jpg'), ('lion', 'lion-king.jpg')):
+    asset = ROOT / 'assets' / 'posters' / filename
+    shutil.copy2(asset, poster_directory / filename)
+    posters[key] = 'data:image/jpeg;base64,' + base64.b64encode(asset.read_bytes()).decode('ascii')
+
 for name in ('THREE-LICENSE.txt', 'THIRD-PARTY-LICENSES.txt'):
     shutil.copy2(ROOT / 'vendor' / name, web_directory / name)
 (web_directory / 'index.html').write_text(edition(css))
 destination = ROOT / 'Twin Turbo.html'
 prelude = 'globalThis.TWIN_SCENE_ART=' + json.dumps(embedded) + ';\n'
 prelude += 'for(const [name,url] of Object.entries(TWIN_SCENE_ART)) document.documentElement.style.setProperty("--scene-"+name,`url("${url}")`);\n'
+prelude += 'globalThis.__TWIN_TURBO_POSTERS__=' + json.dumps(posters) + ';\n'
 destination.write_text(edition(offline_css, prelude))
 print(f'Built: {destination.name} ({destination.stat().st_size:,} bytes)')
 print('Built: dist/index.html + dist/assets/ (GitHub Pages edition)')
