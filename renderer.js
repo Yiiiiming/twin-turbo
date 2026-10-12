@@ -1,5 +1,7 @@
 import { isCityTheme, citySceneryPlacements, cityLandmarkPlacements, addCityLandmarks, addCityStreetScenery, addCityPavements } from './city-scenery.js';
 import { WEST_END_LANDMARKS, addWestEndLandmark } from './london-west-end.js';
+import { ROYAL_LANDMARKS, addRoyalLandmark } from './london-royal-landmarks.js';
+import { RIVERSIDE_LANDMARKS, addRiversideLandmark } from './london-riverside-landmarks.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
@@ -329,8 +331,11 @@ export function londonLandmarkPlacements() {
   for(const [s,lane] of [[3100,-135],[10700,-145],[13600,140]])add('london-bus',s,lane,43);
   // Curated roadside plots; changing the scenery never changes the racing line.
   const plots = {'palace-theatre':[1900,-1],'london-palladium':[3500,-1],
-    'royal-opera-house':[5500,1],'piccadilly-circus':[11300,1]};
-  for(const landmark of WEST_END_LANDMARKS){
+    'royal-opera-house':[5500,1],'piccadilly-circus':[11300,1],
+    'british-museum':[4400,-1],'st-pauls-cathedral':[6500,-1],
+    'westminster-abbey':[10000,-1],'shakespeares-globe':[12700,1],
+    'buckingham-palace':[15500,-1]};
+  for(const landmark of [...WEST_END_LANDMARKS,...ROYAL_LANDMARKS,...RIVERSIDE_LANDMARKS]){
     const [s,side]=plots[landmark.kind],p=trackPoint(s,side*(landmark.radius+94));
     items.push({...landmark,s,side,x:p.x,z:p.y,angle:p.angle+(side<0?Math.PI:0)});
   }
@@ -473,6 +478,8 @@ function addLondonLandmarks(mesh) {
     else if(item.kind==='london-eye')londonEye(mesh,item);
     else if(item.kind==='london-bus')londonBus(mesh,item);
     else if(WEST_END_LANDMARKS.some(landmark=>landmark.kind===item.kind))addWestEndLandmark(mesh,item);
+    else if(ROYAL_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRoyalLandmark(mesh,item);
+    else if(RIVERSIDE_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRiversideLandmark(mesh,item);
   }
   // River embankments stop outside every road approach, never across a bridge.
   for(const side of [-1,1])for(let x=-750;x<TRACK.width+750;x+=76){

@@ -118,18 +118,27 @@ test('London has two real river bridges, solid nearby landmarks, and clear car/c
   }
   for(let s=bridge.s-bridge.halfSpan-600;s<bridge.s+bridge.halfSpan+600;s+=9)assert.ok(Math.abs(trackPoint(s).slope)<=.226);
  }
- const scenery=sceneryPlacements();assert.ok(scenery.filter(item=>item.kind==='terrace').length>110);
+ const scenery=sceneryPlacements(),terraces=scenery.filter(item=>item.kind==='terrace'),landmarks=harborLandmarkPlacements();
+ // Large landmarks deliberately replace several narrow terrace plots. Measure
+ // built frontage instead of requiring the old number of generic buildings.
+ const frontage=[...terraces,...landmarks].reduce((sum,item)=>sum+(item.width||0),0);
+ assert.ok(frontage>9500,'London retains dense roadside architecture after clearing landmark plots');
+ for(let quarter=0;quarter<4;quarter++)assert.ok(terraces.filter(item=>
+  Math.floor(projectTrack(item.x,item.z).s/TRACK.length*4)===quarter).length>=15,
+  `London quarter ${quarter+1} still needs a surrounding streetscape`);
  for(let i=0;i<scenery.length;i++)for(let j=i+1;j<scenery.length;j++)assert.ok(
   Math.hypot(scenery[i].x-scenery[j].x,scenery[i].z-scenery[j].z)>=scenery[i].radius+scenery[j].radius+8,
   'street-side roofs and tree crowns do not intersect on inside bends');
- const engine=new RaceEngine({obstacles:sceneObstacles()}),landmarks=harborLandmarkPlacements();
+ const engine=new RaceEngine({obstacles:sceneObstacles()});
  assert.equal(landmarks.filter(item=>item.kind==='tower-bridge-tower').length,4);
  assert.equal(landmarks.filter(item=>item.kind==='london-bus').length,3);
  for(const kind of ['big-ben','london-eye'])assert.ok(landmarks.some(item=>item.kind===kind));
  for(const item of landmarks){
   const nearest=projectTrack(item.x,item.z);assert.ok(nearest.distance<350,'landmarks must be close enough to see from the chase camera');
   if(item.kind==='london-eye')continue; // Open wheel interior is intentionally not a solid cylinder.
-  const car={x:item.x,y:item.z,elevation:0,angle:item.angle,speed:0,height:25};
+  // The Globe's center is a real open-air courtyard; test its solid outer wall.
+  const wall=item.kind==='shakespeares-globe'?103:0;
+  const car={x:item.x+Math.sin(item.angle)*wall,y:item.z-Math.cos(item.angle)*wall,elevation:0,angle:item.angle,speed:0,height:25};
   assert.ok(engine.obstacleWorld.resolveCar(car)>0,`${item.kind} needs physical collision`);
  }
  for(const bridge of TRACK.bridges)for(let s=bridge.s-bridge.halfSpan-100;s<bridge.s+bridge.halfSpan+100;s+=13){

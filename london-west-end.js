@@ -5,6 +5,8 @@
  * listed-building entries 1066339 (Palace), 1210130 (Palladium), 1265625 (fountain).
  */
 const TAU=Math.PI*2;
+// Shared architectural details keep later landmarks consistent with this set.
+export { frame, details, beam, word, frontDisk, arch, window, cornice, pediment, column, canopy };
 export const WEST_END_LANDMARKS=Object.freeze([
   Object.freeze({kind:'royal-opera-house',label:'Royal Opera House',radius:145,width:246,depth:146,height:176}),
   Object.freeze({kind:'palace-theatre',label:'Palace Theatre',radius:128,width:218,depth:120,height:226}),
