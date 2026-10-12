@@ -143,4 +143,38 @@ function parisSeineLoop(){
     metadata:Object.freeze({...base.metadata,landmarks:['Eiffel Tower','Arc de Triomphe','Louvre Pyramid','Pont Alexandre III','Pont Neuf'],
       courseStyle:'Compact Paris-inspired racing circuit; not a geographic road reconstruction.'})});
 }
-export const HARBOR_TRACKS = Object.freeze([...profiles.map(rounded),twinHelix(),londonRiverside(),rounded(cityProfiles[0]),austinRiverRun(),rounded(cityProfiles[1]),parisSeineLoop()]);
+/** A compact two-turn ascent around the Oriental Pearl, followed by a
+ * broad descending skyline loop and a paired waterfront-style chicane. */
+function shanghaiSkylineSpiral(){
+  let x=900,y=1300,heading=0,s=0;
+  const segments=[];
+  const line=length=>{const x2=x+Math.cos(heading)*length,y2=y+Math.sin(heading)*length;
+    segments.push(Object.freeze({kind:'line',x1:x,y1:y,x2,y2,angle:heading,length,s}));x=x2;y=y2;s+=length;};
+  const arc=(radius,sweep)=>{
+    const direction=Math.sign(sweep),cx=x-Math.sin(heading)*direction*radius,cy=y+Math.cos(heading)*direction*radius;
+    let startAngle=Math.atan2(y-cy,x-cx),remaining=sweep;
+    // Quarter arcs plus height-aware route projection distinguish overlapping decks.
+    while(Math.abs(remaining)>1e-8){const part=direction*Math.min(Math.PI/2,Math.abs(remaining)),length=radius*Math.abs(part);
+      segments.push(Object.freeze({kind:'arc',cx,cy,radius,startAngle,sweep:part,direction,length,s}));
+      s+=length;startAngle+=part;remaining-=part;
+    }
+    x=cx+Math.cos(startAngle)*radius;y=cy+Math.sin(startAngle)*radius;heading+=sweep;
+  };
+  line(2000);const upStart=s;arc(360,TAU*2);const upEnd=s;
+  line(1600);arc(600,Math.PI/2);line(1500);arc(600,Math.PI/2);
+  const descentEnd=s;
+  line(500);arc(350,Math.PI/4);arc(350,-Math.PI/4);line(900);
+  arc(350,-Math.PI/4);arc(350,Math.PI/4);
+  line(x-900);arc(600,Math.PI/2);line(1500);arc(600,Math.PI/2);
+  const name='上海云环',nameEn='Shanghai Skyline Spiral',description='绕东方明珠连续 720° 螺旋爬升，俯瞰陆家嘴天际线，再经外滩建筑与技术双 S 弯返回。';
+  const descriptionEn='Climb a 720-degree spiral around the Oriental Pearl, descend past the Lujiazui skyline and tackle paired S bends among Bund landmarks.';
+  return Object.freeze({...shared,id:'coast-shanghai',city:'coast-shanghai',name,nameEn,description,descriptionEn,
+    width:5600,height:4550,length:s,startDistance:400,checkpoints:Math.ceil(s/240/4)*4,segments:Object.freeze(segments),sections:Object.freeze([]),
+    elevationProfile:Object.freeze([Object.freeze({start:upStart,end:upEnd,from:0,to:420}),Object.freeze({start:upEnd,end:descentEnd,from:420,to:0})]),
+    spirals:Object.freeze([Object.freeze({start:upStart,end:upEnd,degrees:720,direction:'up',cx:2900,cy:1660,radius:360})]),
+    theme:'shanghai',themeName:'上海天际线',scene:Object.freeze({coast:.03,alpine:.05,city:.92}),
+    metadata:Object.freeze({nameEn,description,descriptionEn,themeName:'上海天际线',suggestedLapSeconds:58,difficulty:'expert',elevationGain:420,
+      landmarks:['Oriental Pearl','Shanghai Tower','Shanghai World Financial Center','Jin Mao Tower','Customs House','HSBC Building','Peace Hotel','Shanghai Exhibition Centre','Shanghai Grand Theatre','Shanghai Museum','Yu Garden','Wukang Mansion'],
+      courseStyle:'Compact Shanghai-inspired racing circuit; not a geographic road reconstruction.'})});
+}
+export const HARBOR_TRACKS = Object.freeze([...profiles.map(rounded),twinHelix(),londonRiverside(),rounded(cityProfiles[0]),austinRiverRun(),rounded(cityProfiles[1]),parisSeineLoop(),shanghaiSkylineSpiral()]);

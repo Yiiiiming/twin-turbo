@@ -1,6 +1,6 @@
 # Twin Turbo
 
-A compact arcade racer with twelve circuits. Choose Chinese or English, race the AI in one full-width view or a friend in split screen, and challenge up to two saved ghosts.
+A compact arcade racer with thirteen circuits. Choose Chinese or English, race the AI in one full-width view or a friend in split screen, and challenge up to two saved ghosts.
 
 The opening selection is London Riverside, one lap, against the AI. Its fastest-lap leaderboard and ghost picker use the same London circuit.
 
@@ -10,7 +10,7 @@ At the finish, each human driver enters one nickname directly in the results pan
 
 ## Circuits and controls
 
-The first five circuits are London Riverside, Rio Coastal Rhythm, Austin River Run, Beijing Imperial Run and Paris Seine Loop. Austin includes the UT Tower and a roadside football squad. Paris includes the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf. The original seven harbor, forest, city and spiral circuits follow the city courses.
+The first six circuits are London Riverside, Rio Coastal Rhythm, Austin River Run, Beijing Imperial Run, Paris Seine Loop and Shanghai Skyline Spiral. Austin includes the UT Tower and a roadside football squad. Paris includes the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf. The original seven harbor, forest, city and spiral circuits follow the city courses.
 
 London adds four detailed roadside landmarks along its existing route: the Royal Opera House and glazed Floral Hall, the red terracotta Palace Theatre, the classical London Palladium, and Piccadilly Circus with curved illuminated panels and the Shaftesbury Memorial Fountain. These are compact architectural interpretations for the game, not a geographically exact reconstruction; track geometry, checkpoints, elevation and physics are unchanged.
 
@@ -49,3 +49,13 @@ The five-landmark extension passed 31 focused geometry, renderer and London driv
 The London landmarks / Paris leaderboard update passed 93 focused frontend checks, covering all twelve circuits' AI one- and three-lap completion, city selection, record isolation and the new landmark geometry. London's sampled route and elevation fingerprint is unchanged; the new buildings clear the driving corridor and chase camera. All four additions were visually checked in the browser in close-up and driving views. The shared record service passed 47 checks, and live read-only requests verified Paris race and ghost boards without inserting test scores.
 
 The four city skies use an original generated cloud-only image; other circuits retain their existing scenery. Landmark design references include [UT Austin's Tower history](https://news.utexas.edu/2018/10/04/whats-the-story-behind-the-tower/), [Beijing's Temple of Heaven architecture](https://english.visitbeijing.com.cn/article/47ONy6AX0b3), [Austin's downtown guide](https://www.austintexas.org/explore/entertainment-districts/downtown/), and [Visit Brasil's Rio guide](https://www.visitbrasil.com/en/location/rio-de-janeiro-en/).
+
+Shanghai is circuit **6**: twelve distinct landmarks, a 720° ascending spiral around the Oriental Pearl, a descending skyline run and paired technical S bends. It retains the same 240 km/h cruising scale and all existing one/three-lap, AI, local two-player, dual-ghost and independent leaderboard modes. The route is a compact architectural interpretation, not a geographic recreation.
+
+London now adds eight further theatres: His Majesty’s, Theatre Royal Drury Lane, Lyceum, Sondheim, Apollo Victoria, Victoria Palace, Savoy and Prince Edward. Their individually designed show advertisements feature Phantom, Frozen, The Lion King, Les Misérables, Wicked, Hamilton, The Book of Mormon and The Play That Goes Wrong. The game programme is illustrative and does not assert current real-world theatre residencies.
+
+Beijing gains a continuous rising and falling Great Wall ridge around the entire circuit, with 225 wall segments and 18 watchtowers. The original road layout and checkpoint timing remain unchanged.
+
+## October 12 city expansion validation
+
+338 frontend checks cover the thirteen circuits, score and ghost isolation, UI mode selection, geometry and driving. The shared record service passes 49 checks. New London theatre geometry stays within the existing 40 MB scene budget; Beijing measures 23.60 MB and Shanghai about 19.9 MB. Shanghai production AI completes one and three laps without rescue (53–56 second laps), with height-aware projection across the spiral decks and clear full-route car/chase-camera probes. All 20 new theatre/Shanghai models and the Beijing wall were inspected in the browser.

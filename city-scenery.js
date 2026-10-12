@@ -1,8 +1,10 @@
 /** Compact city districts: native geometry shared by rendering and collisions. */
 import { TRACK, trackPoint, projectTrack } from './engine.js';
+import { addBeijingGreatWall, beijingWallClearance } from './beijing-great-wall.js';
+import { SHANGHAI_LANDMARKS, shanghaiLandmarkPlacements, addShanghaiLandmark } from './shanghai-landmarks.js';
 import { addAustinCampus } from './austin-campus.js';
 const TAU=Math.PI*2;
-const THEMES=new Set(['beijing','austin','rio','paris']);
+const THEMES=new Set(['beijing','austin','rio','paris','shanghai']);
 export const isCityTheme=()=>THEMES.has(TRACK.theme);
 const seedRandom=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 const point=(item,x,y,z)=>[item.x+Math.cos(item.angle)*x-Math.sin(item.angle)*z,y,item.z+Math.sin(item.angle)*x+Math.cos(item.angle)*z];
@@ -18,6 +20,7 @@ const placementCache=new WeakMap(),sceneryCache=new WeakMap();
 
 export function cityLandmarkPlacements() {
  if(!isCityTheme())return [];
+ if(TRACK.theme==='shanghai')return shanghaiLandmarkPlacements();
  if(placementCache.has(TRACK))return placementCache.get(TRACK);
  const result=[];
  for(const [kind,fraction,radius,preferredSide]of profiles[TRACK.theme]){
@@ -45,12 +48,13 @@ export function cityLandmarkPlacements() {
 export function citySceneryPlacements() {
  if(!isCityTheme())return [];
  if(sceneryCache.has(TRACK))return sceneryCache.get(TRACK);
- const random=seedRandom({beijing:20751,austin:49178,rio:61937,paris:33871}[TRACK.theme]),items=[],landmarks=cityLandmarkPlacements();
+ const random=seedRandom({beijing:20751,austin:49178,rio:61937,paris:33871,shanghai:52789}[TRACK.theme]),items=[],landmarks=cityLandmarkPlacements();
  for(let s=110,index=0;s<TRACK.length;s+=110,index++)for(const side of [-1,1]){
-  const tree=index%5===0,kind=tree?(TRACK.theme==='rio'?'rio-palm':'city-tree'):{beijing:'hutong',austin:'music-street',paris:'haussmann'}[TRACK.theme]||'rio-house';
+  const tree=index%5===0,kind=tree?(TRACK.theme==='rio'?'rio-palm':'city-tree'):{beijing:'hutong',austin:'music-street',paris:'haussmann',shanghai:'shikumen'}[TRACK.theme]||'rio-house';
   const width=tree?24:58+random()*30,depth=tree?24:46+random()*20,radius=tree?36:Math.hypot(width+16,depth+16)/2;
   const p=trackPoint(s,side*(TRACK.roadWidth/2+radius+35+random()*20));
   if(p.elevation>5||!clearOfRiver(p.x,p.y,radius)||projectTrack(p.x,p.y).distance<TRACK.roadWidth/2+radius+18)continue;
+  if(TRACK.theme==='beijing'&&!beijingWallClearance(p.x,p.y,radius))continue;
   if(landmarks.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+25)||items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+7))continue;
   // Haussmann blocks keep the even cornice line Paris streets are known for.
   const height=TRACK.theme==='beijing'?38+random()*22:TRACK.theme==='paris'?64+random()*14:58+random()*45;
@@ -376,11 +380,13 @@ export function addCityLandmark(mesh,item){
  const draw={'temple-of-heaven':temple,'palace-gate':palaceGate,'beijing-paifang':paifang,'texas-capitol':capitol,'music-guitar':guitar,'austin-music-hall':musicHall,'christ-redeemer':christ,sugarloaf,'lapa-aqueduct':lapa,
   'eiffel-tower':eiffel,'arc-de-triomphe':arcDeTriomphe,'louvre-pyramid':louvre,'paris-bridge-pylon':bridgePylon};
  if(item.kind==='ut-tower'||item.kind==='football-team')addAustinCampus(mesh,item.kind==='football-team'&&item.side<0?{...item,angle:item.angle+Math.PI}:item);
+ else if(SHANGHAI_LANDMARKS.some(landmark=>landmark.kind===item.kind))addShanghaiLandmark(mesh,item);
  else draw[item.kind]?.(mesh,item);
 }
 export function addCityLandmarks(mesh){
  if(!isCityTheme())return;
  for(const item of cityLandmarkPlacements())addCityLandmark(mesh,item);
+ if(TRACK.theme==='beijing')addBeijingGreatWall(mesh);
  if(TRACK.theme==='paris'){parisBridges(mesh);parisQuays(mesh);}
  if(TRACK.theme==='austin'){
   archBridge(mesh);
@@ -435,6 +441,23 @@ function haussmann(mesh,item){
  for(const x of [-w*.3,w*.3])boxAt(mesh,item,x,h+17,0,5,7,4,'#b5866a');
  if(variant%3===0)mesh.quad(point(item,-w*.42,16,front),point(item,w*.42,16,front),point(item,w*.42,11,front+out*8),point(item,-w*.42,11,front+out*8),variant%2?'#a8423b':'#2f5d4a');
 }
+function shikumen(mesh,item){
+ const{width:w,depth:d,side,variant}=item,h=Math.min(item.height,78),front=-side*(d/2+1),out=-side;
+ const brick=['#8f6b5a','#947969','#786b62','#a58470','#7a6861','#887568'][variant],stone='#cec4b1',glass='#315761';
+ boxAt(mesh,item,0,h/2,0,w,h,d,brick);boxAt(mesh,item,0,3,0,w+5,6,d+5,'#a3ada8');
+ for(const y of [h*.4,h*.7,h+1])boxAt(mesh,item,0,y,0,w+5,2.2,d+5,stone);
+ boxAt(mesh,item,0,h+6,0,w*.92,8,d*.9,'#455760');
+ for(const x of [-w*.31,0,w*.31])for(const y of [h*.52,h*.82]){
+  boxAt(mesh,item,x,y,front,11,15,1.2,stone);boxAt(mesh,item,x,y,front+out*.8,8,12,1,glass);
+  boxAt(mesh,item,x,y,front+out*1.5,.8,12,.7,'#a6b9b6');
+ }
+ // Stone-framed lane-house doorway and a stepped, projecting lintel.
+ boxAt(mesh,item,0,12,front,17,24,1.8,'#293f40');
+ for(const x of [-10,10])boxAt(mesh,item,x,14,front+out,4,28,3,stone);
+ boxAt(mesh,item,0,28,front+out,26,4,4,stone);boxAt(mesh,item,0,32,front+out,18,4,3,stone);
+ for(const x of [-w*.32,w*.32]){boxAt(mesh,item,x,13,front+out,12,18,2,glass);boxAt(mesh,item,x,24,front+out*3,18,3,6,variant%2?'#334f47':'#714d44');}
+ for(const x of [-w*.35,w*.35])boxAt(mesh,item,x,h+13,0,5,10,5,brick);
+}
 function tree(mesh,item){
  const{x,z,kind}=item;
  mesh.cone(x,0,z,3.5,kind==='rio-palm'?65:42,'#81715e',12,2.5);
@@ -446,7 +469,8 @@ function tree(mesh,item){
 }
 export function addCityStreetScenery(mesh,item){
  if(['hutong','music-street','rio-house'].includes(item.kind))streetBuilding(mesh,item);
- else if(item.kind==='haussmann')haussmann(mesh,item);else tree(mesh,item);
+ else if(item.kind==='haussmann')haussmann(mesh,item);
+ else if(item.kind==='shikumen')shikumen(mesh,item);else tree(mesh,item);
 }
 export function addCityPavements(mesh){
  if(!isCityTheme())return;
@@ -456,7 +480,7 @@ export function addCityPavements(mesh){
   for(let band=0;band<5;band++){
    const a=trackPoint(s,side*(69+band*9)),b=trackPoint(s+24,side*(69+band*9)),c=trackPoint(s+24,side*(78+band*9)),d=trackPoint(s,side*(78+band*9));
    if(!clearOfRiver(a.x,a.y,2)||!clearOfRiver(c.x,c.y,2))continue;
-   let color={beijing:'#a9aaa0',austin:'#b5ab92',paris:'#c6bfaa'}[TRACK.theme]||'#d4d0b8';
+   let color={beijing:'#a9aaa0',austin:'#b5ab92',paris:'#c6bfaa',shanghai:'#b7c3c0'}[TRACK.theme]||'#d4d0b8';
    mesh.quad([a.x,.5,a.y],[b.x,.5,b.y],[c.x,.5,c.y],[d.x,.5,d.y],color,0,[0,1,0]);
   }
  }

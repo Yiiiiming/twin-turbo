@@ -9,8 +9,8 @@ const angleDifference=(a,b)=>Math.abs(mod(a-b+Math.PI,Math.PI*2)-Math.PI);
 
 test.afterEach(()=>setTrack('coast'));
 
-test('eleven distinct compact courses close with continuous headings and enough racing width',()=>{
- assert.equal(tracks.length,11);const shapes=new Set();
+test('twelve distinct compact courses close with continuous headings and enough racing width',()=>{
+ assert.equal(tracks.length,12);const shapes=new Set();
  for(const track of tracks){
   setTrack(track.id);assert.ok(track.length>=15000&&track.length<=20000);assert.equal(track.roadWidth,120);
   assert.ok(track.startDistance>100);assert.ok(track.nameEn&&track.descriptionEn);
@@ -29,7 +29,7 @@ test('eleven distinct compact courses close with continuous headings and enough 
    assert.ok(Math.abs(mod(projected.s-row.distance+track.length/2,track.length)-track.length/2)<.001,`${track.id} projection skipped a layer`);
   }
  }
- assert.equal(shapes.size,11,'courses cannot be cosmetic mirrors of one layout');
+ assert.equal(shapes.size,12,'courses cannot be cosmetic mirrors of one layout');
 });
 
 test('the ridge has two genuine 1080-degree helices with safe floor separation and correct route projection',()=>{
@@ -102,8 +102,8 @@ for(const track of Object.values(TRACKS))test(`${track.id}: both drivers finish 
  }
 });
 
-test('all twelve maps share the same 240 km/h cruising and 341 km/h boost speedometer scale',()=>{
- assert.equal(Object.keys(TRACKS).length,12);
+test('all thirteen maps share the same 240 km/h cruising and 341 km/h boost speedometer scale',()=>{
+ assert.equal(Object.keys(TRACKS).length,13);
  for(const track of Object.values(TRACKS)){
   const scale=track.unitsPerMeter?3.6/track.unitsPerMeter:.66;
   assert.equal(Math.round(363*scale),240,track.id);assert.equal(Math.round(517*scale),341,track.id);
@@ -123,9 +123,16 @@ test('London has two real river bridges, solid nearby landmarks, and clear car/c
  // built frontage instead of requiring the old number of generic buildings.
  const frontage=[...terraces,...landmarks].reduce((sum,item)=>sum+(item.width||0),0);
  assert.ok(frontage>9500,'London retains dense roadside architecture after clearing landmark plots');
- for(let quarter=0;quarter<4;quarter++)assert.ok(terraces.filter(item=>
-  Math.floor(projectTrack(item.x,item.z).s/TRACK.length*4)===quarter).length>=15,
-  `London quarter ${quarter+1} still needs a surrounding streetscape`);
+ for(let quarter=0;quarter<4;quarter++){
+  const inQuarter=item=>Math.floor(projectTrack(item.x,item.z).s/TRACK.length*4)===quarter;
+  const neighborhood=terraces.filter(inQuarter),monuments=landmarks.filter(item=>item.width>=100&&inQuarter(item));
+  // Eight named theatres replace the little terrace plots in their clearances.
+  // Keep real neighborhood context and street frontage in every quarter, rather
+  // than penalizing a broad, detailed theatre for replacing several narrow boxes.
+  assert.ok(neighborhood.length>=12,`London quarter ${quarter+1} still needs surrounding terraces`);
+  assert.ok([...neighborhood,...monuments].reduce((sum,item)=>sum+(item.width||0),0)>1700,
+   `London quarter ${quarter+1} needs continuous architectural frontage`);
+ }
  for(let i=0;i<scenery.length;i++)for(let j=i+1;j<scenery.length;j++)assert.ok(
   Math.hypot(scenery[i].x-scenery[j].x,scenery[i].z-scenery[j].z)>=scenery[i].radius+scenery[j].radius+8,
   'street-side roofs and tree crowns do not intersect on inside bends');
@@ -152,7 +159,7 @@ test('London has two real river bridges, solid nearby landmarks, and clear car/c
 });
 
 test('London uploads finite detailed geometry and distinct gentle ground palettes for the original seven maps',()=>{
- assert.equal(new Set(Object.values(TERRAIN_PALETTES)).size,12);
+ assert.equal(new Set(Object.values(TERRAIN_PALETTES)).size,13);
  setTrack('coast-london');const gl=fakeGL(),renderer=new RaceRenderer({width:1440,height:820,getContext:()=>gl,addEventListener(){}});
  assert.equal(renderer.available,true,renderer.error);let floats=0;
  for(const buffer of gl.buffers.values()) {floats+=buffer.length;for(const value of buffer)assert.ok(Number.isFinite(value));}

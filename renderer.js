@@ -2,6 +2,7 @@ import { isCityTheme, citySceneryPlacements, cityLandmarkPlacements, addCityLand
 import { WEST_END_LANDMARKS, addWestEndLandmark } from './london-west-end.js';
 import { ROYAL_LANDMARKS, addRoyalLandmark } from './london-royal-landmarks.js';
 import { RIVERSIDE_LANDMARKS, addRiversideLandmark } from './london-riverside-landmarks.js';
+import { LONDON_THEATRES, addLondonTheatre } from './london-theatres.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
@@ -298,7 +299,7 @@ function building(mesh,x,z,w,d,h,rng) {
 /** Smooth, coordinated terrain palettes keep asphalt and curbs easy to read. */
 export const TERRAIN_PALETTES=Object.freeze({
   coast:'#857766','coast-bay':'#91aa9b','coast-pines':'#2f5445','coast-neon':'#30394f',
-  'coast-marina':'#8d6456','coast-grand':'#958556','coast-ridge':'#637881','coast-london':'#72817b','coast-beijing':'#8d947d','coast-austin':'#929476','coast-rio':'#b6bd8e','coast-paris':'#7e8f7d',
+  'coast-marina':'#8d6456','coast-grand':'#958556','coast-ridge':'#637881','coast-london':'#72817b','coast-beijing':'#8d947d','coast-austin':'#929476','coast-rio':'#b6bd8e','coast-paris':'#7e8f7d','coast-shanghai':'#71898b',
 });
 const localPoint=(x,z,angle,forward,up,lateral)=>[x+Math.cos(angle)*forward-Math.sin(angle)*lateral,up,z+Math.sin(angle)*forward+Math.cos(angle)*lateral];
 
@@ -334,8 +335,12 @@ export function londonLandmarkPlacements() {
     'royal-opera-house':[5500,1],'piccadilly-circus':[11300,1],
     'british-museum':[4400,-1],'st-pauls-cathedral':[6500,-1],
     'westminster-abbey':[10000,-1],'shakespeares-globe':[12700,1],
-    'buckingham-palace':[15500,-1]};
-  for(const landmark of [...WEST_END_LANDMARKS,...ROYAL_LANDMARKS,...RIVERSIDE_LANDMARKS]){
+    'buckingham-palace':[15500,-1],
+    'his-majestys-theatre':[1850,1],'theatre-royal-drury-lane':[2600,-1],
+    'lyceum-theatre':[5100,-1],'sondheim-theatre':[7500,-1],
+    'apollo-victoria':[9700,1],'victoria-palace':[11800,-1],
+    'savoy-theatre':[13900,-1],'prince-edward-theatre':[14900,-1]};
+  for(const landmark of [...WEST_END_LANDMARKS,...ROYAL_LANDMARKS,...RIVERSIDE_LANDMARKS,...LONDON_THEATRES]){
     const [s,side]=plots[landmark.kind],p=trackPoint(s,side*(landmark.radius+94));
     items.push({...landmark,s,side,x:p.x,z:p.y,angle:p.angle+(side<0?Math.PI:0)});
   }
@@ -480,6 +485,7 @@ function addLondonLandmarks(mesh) {
     else if(WEST_END_LANDMARKS.some(landmark=>landmark.kind===item.kind))addWestEndLandmark(mesh,item);
     else if(ROYAL_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRoyalLandmark(mesh,item);
     else if(RIVERSIDE_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRiversideLandmark(mesh,item);
+    else if(LONDON_THEATRES.some(landmark=>landmark.kind===item.kind))addLondonTheatre(mesh,item);
   }
   // River embankments stop outside every road approach, never across a bridge.
   for(const side of [-1,1])for(let x=-750;x<TRACK.width+750;x+=76){
@@ -557,14 +563,15 @@ export function cornerMarkers() {
 
 /** Local +Z is the driver's right: an outer mast's arm must extend toward -side. */
 export function lampGeometry(distance,side=1) {
-  const q=trackPoint(distance,side*(TRACK.roadWidth/2+27));
+  const skyline=TRACK.theme==='shanghai',lampLift=skyline?50:0;
+  const q=trackPoint(distance,side*(TRACK.roadWidth/2+(skyline?85:27)));
   const right=[-Math.sin(q.angle),Math.cos(q.angle)];
   const inward=(reach,height)=>[q.x-right[0]*side*reach,q.elevation+height,q.y-right[1]*side*reach];
   return {s:distance,side,angle:q.angle,
-    mast:{position:[q.x,q.elevation+37,q.y],size:[3,74,3]},
-    arm:{position:inward(22,73),size:[3,3,46]},
-    head:{position:inward(43,71),size:[9,4,12]},
-    lens:{position:inward(43,68.6),size:[8,.7,10]},
+    mast:{position:[q.x,q.elevation+(74+lampLift)/2,q.y],size:[3,74+lampLift,3]},
+    arm:{position:inward(22,73+lampLift),size:[3,3,46]},
+    head:{position:inward(43,71+lampLift),size:[9,4,12]},
+    lens:{position:inward(43,68.6+lampLift),size:[8,.7,10]},
   };
 }
 
@@ -612,18 +619,18 @@ function addTimingGates(mesh) {
     3:[[0,21,14,2],[6,16,2,10],[0,11,14,2],[6,6,2,10],[0,1,14,2]],
   };
   for (const gate of timingGateGeometry().filter(gate=>!gate.finish)) {
-    const {center,halfSpan}=gate;
+    const {center,halfSpan}=gate,gateLift=TRACK.theme==='shanghai'?24:0;
     // Only slim supports touch the ground. The shared scene builder gives them
     // colliders; every overhead component clears the car by more than 60 units.
     for(const post of gate.posts) {
       mesh.box(post.x,post.elevation+4,post.y,10,8,10,'#243f4b',center.angle);
-      mesh.box(post.x,post.elevation+50,post.y,5,100,5,'#354e5a',center.angle);
+      mesh.box(post.x,post.elevation+50+gateLift/2,post.y,5,100+gateLift,5,'#354e5a',center.angle);
       mesh.box(post.x,post.elevation+60,post.y,5.6,51,5.6,'#93dccc',center.angle,.5);
     }
-    mesh.box(center.x,center.elevation+102,center.y,7,8,halfSpan*2+9,'#213842',center.angle);
-    mesh.box(center.x,center.elevation+98,center.y,7.4,1.8,halfSpan*2,'#a9e5cc',center.angle,.8);
+    mesh.box(center.x,center.elevation+102+gateLift,center.y,7,8,halfSpan*2+9,'#213842',center.angle);
+    mesh.box(center.x,center.elevation+98+gateLift,center.y,7.4,1.8,halfSpan*2,'#a9e5cc',center.angle,.8);
     const face=(forward,height,lateral)=>[
-      center.x+Math.cos(center.angle)*forward-Math.sin(center.angle)*lateral,center.elevation+height,
+      center.x+Math.cos(center.angle)*forward-Math.sin(center.angle)*lateral,center.elevation+height+gateLift,
       center.y+Math.sin(center.angle)*forward+Math.cos(center.angle)*lateral];
     mesh.box(...face(-1,111,0),9,29,46,'#18313f',center.angle);
     for(const [lateral,height,width,tall] of digits[gate.index]) {
@@ -758,8 +765,16 @@ function buildWorld() {
         props.box(q.x,q.elevation+13,q.y,3,26,3,'#9aaeb5');
         for(const lift of [11,25])props.box((q.x+r.x)/2,(q.elevation+r.elevation)/2+lift,(q.y+r.y)/2,
           Math.hypot(r.x-q.x,r.y-q.y)+2,4,3,lift===25?'#b2d4d6':'#6e8b96',Math.atan2(r.y-q.y,r.x-q.x));
-        if(i%5===0&&q.elevation>70&&projectTrack(q.x,q.y).distance>TRACK.roadWidth/2+10)
-          props.box(q.x,q.elevation/2-4,q.y,10,q.elevation-8,10,'#425b67');
+        if(i%5===0&&q.elevation>70&&projectTrack(q.x,q.y).distance>TRACK.roadWidth/2+10){
+          if(TRACK.theme==='shanghai'){
+            // Set piers outside the curved chase-camera sweep. A cantilever
+            // cap carries the deck; overlapping helix floors retain clearance.
+            const support=trackPoint(s,side*(TRACK.roadWidth/2+115));
+            props.box(support.x,q.elevation/2-4,support.y,12,q.elevation-8,12,'#425b67');
+            const dx=q.x-support.x,dz=q.y-support.y;
+            props.box((q.x+support.x)/2,q.elevation-8,(q.y+support.y)/2,Math.hypot(dx,dz)+13,9,13,'#587581',Math.atan2(dz,dx));
+          }else props.box(q.x,q.elevation/2-4,q.y,10,q.elevation-8,10,'#425b67');
+        }
       }
     }
   }
