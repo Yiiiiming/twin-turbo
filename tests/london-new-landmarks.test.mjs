@@ -53,7 +53,7 @@ function fakeGL() {
 
 
 test('ten London additions preserve the exact route and every pre-existing landmark',()=>{
- setTrack('coast-london');const hash=createHash('sha256').update(JSON.stringify({track:TRACK,samples:Array.from({length:1661},(_,i)=>trackPoint(i*10))})).digest('hex');assert.equal(hash,'17bacb9b4fbcd7c8d603caf6d3a751ddf2bef00139593151c5114650c86f52be');assert.equal(kinds.size,10);assert.equal(additions().length,10);
+ setTrack('coast-london');const hash=createHash('sha256').update(JSON.stringify({track:TRACK,samples:Array.from({length:1661},(_,i)=>trackPoint(i*10))})).digest('hex');assert.equal(hash,'757fc0db6fe66dd89f80d116da07f7eb284f5e3962c84564f039517b9c679096');assert.equal(kinds.size,10);assert.equal(additions().length,10);
  for(const item of additions())assert.ok(!basePlots().some(old=>old.kind===item.kind));
 });
 test('ten varied models have detailed finite geometry within their reserved rotated plots',()=>{

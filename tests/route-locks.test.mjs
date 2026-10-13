@@ -9,7 +9,7 @@ const manifestText=readFileSync(new URL('./fixtures/route-locks.json',import.met
 const locks=JSON.parse(manifestText);
 // This separate anchor makes a silent fixture refresh fail too. There is no
 // UPDATE_SNAPSHOTS bypass. See AGENTS.md before changing either baseline.
-const MANIFEST_SHA256='9d0b45504cc0d97d50343af33aa39190e616f369136c546b1ea7e9efb3cd65de';
+const MANIFEST_SHA256='c3f902e7c4978e7010994e938c49b917c57f92a5a26d430880af021495019eeb';
 const approvalMessage='Routes are frozen by the user. Restore an unintended change; do not refresh this baseline to make a test pass. A specific map requires new explicit route approval (AGENTS.md).';
 
 test.afterEach(()=>setTrack('coast'));
@@ -26,4 +26,17 @@ for(const [id,expected]of Object.entries(locks.routes))test(`${id}: accepted rou
  assert.ok(TRACKS[id],approvalMessage);setTrack(id);
  assert.equal(routeDigest(routeDefinition(TRACKS[id])),expected.geometrySha256,`${id}: ${approvalMessage}`);
  assert.equal(routeDigest(routeDrivingSamples(TRACKS[id],trackPoint)),expected.drivingSha256,`${id}: driving interpolation changed. ${approvalMessage}`);
+});
+
+// 2026-10-13: the user's explicit handicap removal authorizes only this P2
+// grid field. Reconstructing the prior grid must still reproduce every prior
+// route and driving hash, including the old spawn coordinate.
+const gridAuthorization=locks.authorizationHistory.find(item=>item.date==='2026-10-13'&&item.change?.field==='startGrid[1].offset');
+for(const [id,previous]of Object.entries(gridAuthorization.previousRouteLocks))test(`${id}: handicap removal changes only the authorized P2 start offset`,()=>{
+ setTrack(id);const track=TRACKS[id],definition=routeDefinition(track);
+ assert.deepEqual(track.startGrid,[{lane:-18,offset:-30},{lane:22,offset:-30}]);
+ definition.startGrid[1].offset=gridAuthorization.change.from;
+ assert.equal(routeDigest(definition),previous.geometrySha256,'Unrelated route field changed during handicap removal');
+ const priorGrid={...track,startGrid:track.startGrid.map((slot,index)=>({...slot,offset:index===1?gridAuthorization.change.from:slot.offset}))};
+ assert.equal(routeDigest(routeDrivingSamples(priorGrid,trackPoint)),previous.drivingSha256,'Driving surface changed during handicap removal');
 });

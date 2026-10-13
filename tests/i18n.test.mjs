@@ -34,7 +34,7 @@ test('race, AI controls, both ghost distances and independent standings have com
     ['领先紫色幽灵 −0.15 秒','Ahead of Purple ghost −0.15s'],
     ['第 2 圈 · 计时点 03','Lap 2 · Checkpoint 03'],
     ['你驾驶橙色赛车，与 AI 较量。WASD 或方向键均可驾驶。','Drive the Orange car against AI. Use WASD or Arrow keys.'],
-    ['选择赛道','Choose a circuit'],['已找到记录。点击「加入紫色幽灵」确认。','Record found. Click “Add purple ghost” to confirm.'],
+    ['选择赛道','Choose a circuit'],['返回主菜单','Back to main menu'],['已找到记录。点击「加入紫色幽灵」确认。','Record found. Click “Add purple ghost” to confirm.'],
   ];
   for(const [source,expected]of strings)assert.equal(translateText(source),expected);
   for(const source of [

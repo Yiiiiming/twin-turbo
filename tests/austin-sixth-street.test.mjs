@@ -6,7 +6,7 @@ import { cityLandmarkPlacements,citySceneryPlacements } from '../city-scenery.js
 import { SIXTH_STREET_VENUES,sixthStreetPlacements } from '../austin-sixth-street.js';
 test.afterEach(()=>setTrack('coast'));
 test('Sixth Street preserves the Austin route, elevation, start grid and ghost coordinates',()=>{
- setTrack('coast-austin');assert.equal(createHash('sha256').update(JSON.stringify({track:TRACK,samples:Array.from({length:1681},(_,i)=>trackPoint(i*10))})).digest('hex'),'9867ecf59634957c97cd7ff64c14347e9799092e5c90e6ee52b41170e772c272');
+ setTrack('coast-austin');assert.equal(createHash('sha256').update(JSON.stringify({track:TRACK,samples:Array.from({length:1681},(_,i)=>trackPoint(i*10))})).digest('hex'),'b880108622e1b109edf5afcb45a85d8d0f2a3733e8d0d616fb2dab46e9ab12de');
 });
 test('five real venues line both sides of one compact straight, facing drivers with clear roadside plots',()=>{
  setTrack('coast-austin');const plots=sixthStreetPlacements(),all=cityLandmarkPlacements(),scenery=citySceneryPlacements();

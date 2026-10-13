@@ -16,6 +16,8 @@ export const ROYAL_LANDMARKS=Object.freeze([
  Object.freeze({kind:'british-museum',label:'British Museum',radius:160,width:282,depth:138,height:158}),
 ]);
 
+// Attached masonry, glass and relief lines use two-triangle surfaces.
+const face=(f,x,y,z,w,h,c)=>f.quad([x-w/2,y-h/2,z],[x-w/2,y+h/2,z],[x+w/2,y+h/2,z],[x+w/2,y-h/2,z],c);
 function balustrade(f,x,y,z,width,stone){
  f.box(x,y,z,width,2.6,3.6,stone);f.box(x,y+12,z,width+1,2.2,4,stone);
  const count=Math.floor(width/6);
@@ -29,12 +31,12 @@ function reliefPerson(mesh,f,x,y,z,scale,color,pose=0){
  beam(mesh,f.p(x+1.4*scale,y+7*scale,z),f.p(x+4*scale,y+(pose?11:4)*scale,z),1.2*scale,color);
 }
 function buckingham(mesh,item){
- const f=frame(mesh,item),stone='#d5cebc',trim='#eee7d5',shade='#b9af98',glass='#41545b',iron='#283637',gold='#d3b777';
+ const f=frame(mesh,item),stone='#a29882',trim='#c3b08b',shade='#756b59',glass='#33494e',iron='#283637',gold='#b48d4d';
  // Three subtly projected risalits give the broad, low East Front its rhythm.
- f.box(0,4,4,276,8,110,'#a49f8c');f.box(0,54,13,268,94,88,stone);
+ f.box(0,4,4,276,8,110,'#777865');f.box(0,54,13,268,94,88,stone);
  for(const x of [-111,0,111])f.box(x,54,6,x===0?74:48,96,105,stone);
  // A closed royal forecourt is solid at car height; ornament is decorative.
- f.box(0,4.5,-61,274,9,14,'#a8a28f');
+ f.box(0,4.5,-61,274,9,14,'#85826b');
  for(const x of [-130,-65,65,130])f.box(x,14,-61,8,27,8,stone);
  details(mesh,()=>{
   // Stone rustication and carefully inset sash windows, rather than a flat grid.
@@ -44,6 +46,11 @@ function buckingham(mesh,item){
    for(const y of [21,54,81])window(f,x,y,front,10,y===54?19:15,trim,glass);
    if(yWithinFacade(x))pediment(f,x,66,front-2.5,15,4,2,trim,shade);
   }
+  // Rusticated corner stones and the red-lined ceremonial balcony doors give
+  // the East Front its own readable rhythm within the darker stone palette.
+  for(const x of [-132,-90,-35,35,90,132])for(let y=13;y<=86;y+=11)face(f,x,y,-49.4,5,y%2?8:7,y%3?'#8e856e':'#b5a27c');
+  for(const x of [-18,0,18]){face(f,x,57,-49.7,12,22,'#4d3531');face(f,x,57,-50,7,20,'#4c6160');face(f,x,57,-50.2,.7,20,gold);face(f,x,58,-50.2,7,.7,gold);}
+  for(const x of [-15,-5,5,15]){f.quad([x-2,54,-64],[x,58,-64],[x+2,54,-64],[x,51,-64],gold);}
   // Giant pilasters, capitals and entablature of Aston Webb's Portland front.
   for(const x of [-134,-88,-38,-12,12,38,88,134]){
    const z=Math.abs(x)>=88?-47:-47.3;f.box(x,64,z,4.4,59,2.8,trim);f.box(x,37,z,6,4,4,shade);f.box(x,91,z,7,4,4,trim);
@@ -116,9 +123,9 @@ function pinacle(f,x,bottom,z,height,stone){
  f.box(x,bottom+height*.34,z,4,height*.68,4,stone);f.cone(x,bottom+height*.67,z,3.5,height*.33,stone,4,0);
 }
 function abbey(mesh,item){
- const f=frame(mesh,item),stone='#d4cebd',trim='#ebe4cf',shade='#afa792',glass='#415765',roof='#5c6869';
+ const f=frame(mesh,item),stone='#a39b84',trim='#c0b493',shade='#716b5a',glass='#344b55',roof='#303e47';
  // Long nave and low aisles, with west towers markedly taller than the centre.
- f.box(0,4,8,150,8,202,'#a6a18e');f.box(0,62,14,84,113,183,stone);
+ f.box(0,4,8,150,8,202,'#7c7b66');f.box(0,62,14,84,113,183,stone);
  for(const side of [-1,1])f.box(side*55,37,22,36,64,163,stone);
  for(const side of [-1,1])f.box(side*59,107,-61,43,206,47,stone);
  f.box(0,52,-69,76,96,40,stone);
@@ -145,6 +152,13 @@ function abbey(mesh,item){
   for(const x of [-12,12])for(const y of [14,29])f.box(x,y,-96,11,11,.7,'#605342');
   pediment(f,0,54,-96,71,25,11,trim,shade);reliefPerson(mesh,f,0,61,-97,1.1,trim,1);
   f.box(0,141,-86,79,5,12,trim);for(let x=-34;x<=34;x+=8)f.box(x,148,-86,4,10,5,trim);
+  // Amber, oxidised teal and wine glass distinguish the west window's
+  // traceried panes from the broad stone wall; narrow lead lines stay visible.
+  for(const x of [-21,-10.5,0,10.5,21])for(const y of [79,89,99]){
+   const c=['#8d6240','#476965','#6f454e'][(Math.round((x+21)/10.5)+Math.round(y/10))%3];
+   f.quad([x-2.5,y,-94.1],[x,y+3.5,-94.1],[x+2.5,y,-94.1],[x,y-3.5,-94.1],c);
+  }
+  for(const side of [-1,1])for(const z of [-60,-25,10,45,80])f.quad([side*3,157,z],[side*41,124.6,z],[side*41,124.6,z+1],[side*3,157,z+1],'#53645f');
   // The two Hawksmoor towers: banded stages, tall louvres, crenellated crown.
   for(const side of [-1,1]){
    const x=side*59;
@@ -189,9 +203,9 @@ function abbey(mesh,item){
 }
 
 function museum(mesh,item){
- const f=frame(mesh,item),stone='#cbbd9f',trim='#e6dac0',shade='#aa9878',glass='#41555a';
- f.box(0,3,0,276,6,127,'#aaa18c');f.box(0,58,19,268,105,86,stone);
- f.box(0,6,-51,139,6,28,'#c3b69b');f.box(0,10,-48,132,3,28,trim);
+ const f=frame(mesh,item),stone='#a18e6b',trim='#c8b28b',shade='#706047',glass='#30474b';
+ f.box(0,3,0,276,6,127,'#7d7562');f.box(0,58,19,268,105,86,stone);
+ f.box(0,6,-51,139,6,28,'#a39474');f.box(0,10,-48,132,3,28,trim);
  // Central eight-column portico plus colonnaded wings and side returns.
  const portico=[-52.5,-37.5,-22.5,-7.5,7.5,22.5,37.5,52.5];
  const wing=[-125,-111,-97,-83,83,97,111,125];
@@ -211,8 +225,12 @@ function museum(mesh,item){
    }
   }
   f.box(0,109,0,272,13,126,stone);cornice(f,0,119,0,274,126,trim);
-  f.box(0,108,-53.5,126,15,8,stone);word(f,'THE BRITISH MUSEUM',0,106,-57.7,5.6,115,'#7b6b4c',.04);
+  f.box(0,108,-53.5,126,15,8,stone);word(f,'THE BRITISH MUSEUM',0,106,-64.2,5.6,115,'#564f3e',.04);
   cornice(f,0,119,-46,130,30,trim);pediment(f,0,125,-64,137,32,39,trim,shade);
+  // A Greek-key frieze crosses the two side entablatures and frames the
+  // inscription. Its carved strips sit forward of the solid cornice backing.
+  for(const side of [-1,1])for(let a=74;a<=122;a+=12){const x=side*a;face(f,x,110.3,-64.2,10,1,'#75634a');face(f,x-4.5,108.5,-64.2,1,4,'#75634a');face(f,x+3,108,-64.2,1,3,'#75634a');face(f,x,107,-64.2,6,1,'#75634a');}
+  for(const side of [-1,1])for(const y of [21,36,51])face(f,side*93,y,-25.7,61,.65,'#7e735b');
   // The Progress of Civilisation is suggested with dimensional draped figures,
   // a central raised figure and instruments, not a featureless triangle.
   for(const [x,size] of [[-48,.45],[-36,.7],[-24,1],[-12,1.15],[0,1.65],[12,1.15],[24,1],[36,.7],[48,.45]])reliefPerson(mesh,f,x,128,-65,size,trim,x===0?1:0);
@@ -221,14 +239,14 @@ function museum(mesh,item){
    f.cone(side*39,127,-65,2,6,trim,16,2);
   }
   for(let x=-132;x<=132;x+=6)f.box(x,115,-64,2.7,3,3,shade);
-  f.box(0,128,21,262,9,84,'#7a786b');f.box(0,133,21,260,2,84,trim);
+  f.box(0,128,21,262,9,84,'#3e4e49');f.box(0,133,21,260,2,84,trim);
   // Glass hint of the Great Court at the rear, with a smooth lattice roof.
   const cx=0,cz=27,rx=67,rz=31,base=134;
   for(let ring=0;ring<6;ring++){
    const t0=ring/6*Math.PI/2,t1=(ring+1)/6*Math.PI/2;
    for(let j=0;j<40;j++){
     const a=j/40*TAU,b=(j+1)/40*TAU,p=(t,q)=>[cx+Math.cos(q)*rx*Math.cos(t),base+Math.sin(t)*20,cz+Math.sin(q)*rz*Math.cos(t)];
-    f.quad(p(t0,a),p(t0,b),p(t1,b),p(t1,a),'#95aaa5');
+    f.quad(p(t0,a),p(t0,b),p(t1,b),p(t1,a),'#5d817d');
    }
   }
   for(let j=0;j<16;j++)for(let i=0;i<10;i++){

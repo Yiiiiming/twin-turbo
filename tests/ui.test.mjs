@@ -385,6 +385,30 @@ test('start and Space open preparation before countdown, with an explicit no-gho
   assert.equal(ui.engine.state, 'countdown'); assert.equal(ui.engine.time, 0);
 });
 
+test('restart preparation can return to the main menu without launching or retaining a paused race', async t => {
+  const ui = await loadUI(t);
+  ui.trackCards.get('coast-london').button.click();
+  ui.launch(); ui.advance(3.1); ui.key('KeyW'); ui.advance(.2);
+  ui.click('restart'); ui.frame();
+  assert.equal(ui.engine.state, 'paused');
+  assert.equal(ui.nodes.get('race-setup-dialog').open, true);
+  ui.click('setup-menu'); ui.frame();
+  assert.equal(ui.nodes.get('race-setup-dialog').open, false);
+  assert.equal(ui.engine.state, 'menu');
+  assert.equal(ui.engine.time, 0);
+  assert.equal(ui.keys.size, 0);
+  assert.equal(ui.ghostClient.locked, false, 'closing the dialog must not reactivate ghosts');
+  assert.equal(ui.nodes.get('pause-panel').classList.contains('hidden'), true);
+  assert.equal(ui.nodes.get('menu').classList.contains('hidden'), false);
+  assert.equal(ui.document.activeElement, ui.nodes.get('start'));
+  assert.equal(TRACK.id, 'coast-london', 'keep the selected circuit');
+  assert.ok([...ui.trackCards.values()].every(({button}) => !button.disabled));
+  ui.advance(.2); assert.equal(ui.engine.state, 'menu');
+  ui.click('start'); ui.click('setup-menu'); ui.frame();
+  assert.equal(ui.engine.state, 'menu', 'the same action also works before the first launch');
+  assert.equal(ui.nodes.get('race-setup-dialog').open, false);
+});
+
 test('custom bindings reject conflicts and reserved keys, then drive the real player with the new key', async t => {
   const ui = await loadUI(t);
   const bind = (player, action) => ui.document.querySelectorAll('[data-bind-player][data-bind-action]')

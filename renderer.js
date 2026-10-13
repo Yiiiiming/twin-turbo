@@ -1,11 +1,14 @@
 import { austinScoreboardSurface, paintAustinScoreboard } from './austin-football.js';
 import { addShanghaiRiverfront } from './shanghai-riverfront.js';
 import { isCityTheme, citySceneryPlacements, cityLandmarkPlacements, addCityLandmarks, addCityStreetScenery, addCityPavements } from './city-scenery.js';
-import { WEST_END_LANDMARKS, addWestEndLandmark } from './london-west-end.js';
+import { WEST_END_LANDMARKS, addWestEndLandmark, details as architecturalDetails } from './london-west-end.js';
+import { londonDetailMesh } from './london-detail-mesh.js';
 import { ROYAL_LANDMARKS, addRoyalLandmark } from './london-royal-landmarks.js';
 import { RIVERSIDE_LANDMARKS, addRiversideLandmark } from './london-riverside-landmarks.js';
 import { LONDON_THEATRES, addLondonTheatre, THEATRE_POSTERS, theatrePosterSurfaces } from './london-theatres.js';
 import { LONDON_NEW_LANDMARKS, londonNewLandmarkPlacements, addLondonNewLandmark } from './london-new-landmarks.js';
+import { LONDON_SECOND_LANDMARKS, addLondonSecondLandmark } from './london-second-landmarks.js';
+import { londonSecondLandmarkPlacements } from './london-second-layout.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
@@ -376,6 +379,7 @@ export function londonLandmarkPlacements() {
     items.push({...landmark,s,side,x:p.x,z:p.y,angle:p.angle+(side<0?Math.PI:0)});
   }
   items.push(...londonNewLandmarkPlacements(items));
+  items.push(...londonSecondLandmarkPlacements(items));
   return items;
 }
 function londonSceneryPlacements() {
@@ -397,9 +401,9 @@ function londonSceneryPlacements() {
   // checks as a regular terrace.
   for(let quarter=0;quarter<4;quarter++){
     let count=items.filter(item=>item.kind==='terrace'&&Math.floor(projectTrack(item.x,item.z).s/TRACK.length*4)===quarter).length;
-    for(let s=quarter*TRACK.length/4+42;s<(quarter+1)*TRACK.length/4&&count<12;s+=36)for(const side of [-1,1]){
+    for(const setback of [150,188,225,275,330])for(let s=quarter*TRACK.length/4+42;s<(quarter+1)*TRACK.length/4&&count<12;s+=36)for(const side of [-1,1]){
       if(count>=12)break;
-      const width=52,depth=46,radius=Math.hypot(width+8,depth+8)/2,p=trackPoint(s,side*150);
+      const width=52,depth=46,radius=Math.hypot(width+8,depth+8)/2,p=trackPoint(s,side*setback);
       if(p.elevation>5||Math.abs(p.y-TRACK.river.centerZ)<TRACK.river.halfWidth+radius+28||projectTrack(p.x,p.y).distance<radius+76)continue;
       if(landmarks.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+35)||items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+8))continue;
       items.push({kind:'terrace',x:p.x,z:p.y,angle:p.angle,side,radius,width,depth,height:78+(count%3)*11,variant:count%5});count++;
@@ -408,8 +412,9 @@ function londonSceneryPlacements() {
   return items;
 }
 function englishTerrace(mesh,item) {
+  mesh=londonDetailMesh(mesh);
   const {x,z,width:w,depth:d,height:h,angle,variant,side}=item;
-  const colors=['#a05f4e','#bb8c70','#95775e','#a86d56','#b6ac91'],stone='#d5cbb4',slate='#3a4652',glass='#344a54';
+  const colors=['#784739','#654d43','#6e6550','#844b3b','#4d6058'],stone='#ad9b7d',slate='#303e47',glass='#283f48';
   const box=(f,y,l,sx,sy,sz,color)=>mesh.box(...localPoint(x,z,angle,f,y,l),sx,sy,sz,color,angle);
   box(0,h/2,0,w,h,d,colors[variant]);box(0,h-3,0,w+6,6,d+6,stone);box(0,3,0,w+5,6,d+5,'#9c9c8e');
   // Real pitched roofs, chimney pots and varied masonry replace repeated cuboids.
@@ -418,16 +423,29 @@ function englishTerrace(mesh,item) {
   for(const end of [-1,1])mesh.triangle(p(end*w/2,h,-d/2),p(end*w/2,h,d/2),p(end*w/2,ridge,0),colors[variant]);
   for(const chimney of [-1,1]){box(chimney*w*.3,h+17,side*d*.15,8,24,9,colors[variant]);for(const pot of [-2,2])box(chimney*w*.3+pot,h+32,side*d*.15,2.7,8,3,'#755347');}
   const front=-side*(d/2+.8),rows=Math.max(2,Math.floor((h-25)/24)),cols=Math.max(3,Math.round(w/20));
+  architecturalDetails(mesh,()=>{
   box(0,14,front,w*.9,24,1.4,variant%2?'#284848':'#314353');box(0,29,front,w*.94,5,2.2,stone);
   for(let col=0;col<cols;col++){
     const f=-w*.39+col*w*.78/(cols-1);box(f,14,front-side*.8,11,17,1.3,glass);
     for(let row=0;row<rows;row++){
-      const y=44+row*23;box(f,y,front,12,17,2,stone);box(f,y,front-side*1.3,8.5,13.5,1.3,glass);
+      const y=44+row*23;box(f,y,front,12,17,2,stone);box(f,y,front-side*1.3,8.5,13.5,1.3,(col+row+variant)%7===0?'#957d51':glass);
       box(f,y,front-side*2.1,.8,13.5,.8,stone);box(f,y,front-side*2.1,8.5,.8,.8,stone);
       box(f,y-9,front-side*1.3,15,2,4,stone);
     }
   }
-  for(let y=36;y<h-9;y+=12)box(0,y,front+side*.3,w,.45,.8,variant%2?'#9e7966':'#8d594e');
+  for(let y=36;y<h-9;y+=12)box(0,y,front+side*.3,w,.45,.8,variant%2?'#806b56':'#623f36');
+  // Fine iron balconettes, recessed door panels and slate seams add a close
+  // reading to ordinary streets while keeping the main brick body solid.
+  for(const f of [-w*.35,0,w*.35]){
+    box(f,36,front-side*3,17,1,2,'#283b3a');
+    for(const dx of [-6,-3,0,3,6])box(f+dx,33,front-side*3,.6,6,.7,'#283b3a');
+  }
+  box(w*.28,11,front-side*.9,10,20,1,'#263d36');
+  for(const y of [7,15])box(w*.28,y,front-side*1.5,7,5,.4,'#426053');
+  box(w*.28-3,12,front-side*1.9,.8,2,.5,'#bd9559');
+  for(const f of [-w*.44,w*.44])box(f,h*.48,front-side*.4,1.3,h-12,1.3,'#34433d');
+  for(let f=-w/2+8;f<w/2;f+=11)for(const roofSide of [-1,1])mesh.quad(p(f-.35,h+.4,roofSide*(d/2+2)),p(f+.35,h+.4,roofSide*(d/2+2)),p(f+.35,ridge+.4,0),p(f-.35,ridge+.4,0),'#4b5b60');
+  });
 }
 function londonTree(mesh,item) {
   mesh.cone(item.x,0,item.z,4,46,'#736658',12,3);
@@ -436,7 +454,7 @@ function londonTree(mesh,item) {
 }
 function londonBus(mesh,item) {
   const {x,z,angle}=item,box=(f,y,l,sx,sy,sz,color)=>mesh.box(...localPoint(x,z,angle,f,y,l),sx,sy,sz,color,angle);
-  box(0,8,0,71,7,25,'#242d30');box(0,29,0,73,39,27,'#bd343d');box(0,49,0,70,3,26,'#da4b4d');
+  box(0,8,0,71,7,25,'#242d30');box(0,29,0,73,39,27,'#a32936');box(0,49,0,70,3,26,'#c44747');
   for(const side of [-1,1]){
     for(const f of [-23,22])box(f,7,side*14,12,12,4,'#202830');
     for(let f=-27;f<31;f+=12)for(const y of [23,40])box(f,y,side*13.8,10,11,1,'#283e48');
@@ -446,10 +464,20 @@ function londonBus(mesh,item) {
   box(37,39,0,1,13,22,'#30434e');box(37,23,0,1,13,22,'#30434e');box(37.6,48,0,1,5,22,'#223234');
   for(const side of [-1,1]){box(38,13,side*9,1,3,4,'#f3dfa7');box(-37,13,side*9,1,3,3,'#ec7766');}
   for(const l of [-7,-3,1,6])box(38.3,48,l,1,2,l===6?3:2,'#f1d79a');
+  architecturalDetails(mesh,()=>{
+    for(const side of [-1,1]){
+      box(0,17,side*14.5,68,1,1,'#702e34');box(0,46,side*14.5,68,1,1,'#d69a73');
+      for(const f of [-23,22])box(f,7,side*16.2,5,5,.6,'#79827c');
+      box(29,20,side*14.8,1,26,.6,'#732b33');box(34,20,side*14.8,1,26,.6,'#732b33');
+      for(const f of [-27,-15,-3,9,21])for(const y of [23,40])box(f,y,side*14.5,.5,11,.5,'#65777a');
+    }
+    box(37.8,6,0,1.2,2,25,'#89968e');box(-37.8,6,0,1.2,2,25,'#89968e');
+    for(const l of [-4,0,4])box(38.4,18,l,.6,5,.55,'#798786');
+  });
 }
 function bigBen(mesh,item) {
-  const {x,z,angle}=item,stone='#d1bb8c',trim='#e4d3aa',dark='#46534e',box=(f,y,l,sx,sy,sz,color)=>mesh.box(...localPoint(x,z,angle,f,y,l),sx,sy,sz,color,angle);
-  box(0,7,0,86,14,86,'#b4ae94');box(0,119,0,62,224,62,stone);
+  const {x,z,angle}=item,stone='#aa9470',trim='#c9b387',dark='#31433e',box=(f,y,l,sx,sy,sz,color)=>mesh.box(...localPoint(x,z,angle,f,y,l),sx,sy,sz,color,angle);
+  box(0,7,0,86,14,86,'#8e8876');box(0,119,0,62,224,62,stone);
   for(const f of [-1,1])for(const l of [-1,1])box(f*29,123,l*29,8,232,8,trim);
   for(const y of [28,75,121,164,207,253])box(0,y,0,y===253?77:69,7,y===253?77:69,trim);
   box(0,231,0,71,42,71,stone);
@@ -471,26 +499,44 @@ function bigBen(mesh,item) {
   box(0,264,0,58,17,58,dark);for(const f of [-1,1])for(const l of [-1,1]){
     const p=localPoint(x,z,angle,f*31,256,l*31);mesh.cone(p[0],p[1],p[2],7,33,trim,4,1,angle+Math.PI/4);
   }
-  mesh.cone(x,272,z,43,74,'#3b514b',4,4,angle+Math.PI/4);mesh.cone(x,346,z,4,34,'#c2a55b',12,0);
+  mesh.cone(x,272,z,43,74,'#2e4543',4,4,angle+Math.PI/4);mesh.cone(x,346,z,4,34,'#c2a55b',12,0);
+  architecturalDetails(mesh,()=>{
+    for(let face=0;face<4;face++){
+      const a=angle+face*Math.PI/2,p=(u,y,d)=>localPoint(x,z,a,u,y,d);
+      const strip=(u,y,d,w,h,color)=>mesh.box(...p(u,y,d),w,h,.55,color,a);
+      for(const y of [49,96,142,183])for(const u of [-20,-10,0,10,20]){
+        mesh.triangle(p(u-1.6,y+14,32.25),p(u,y+19,32.25),p(u+1.6,y+14,32.25),dark);
+        strip(u-2.5,y+1,32.6,.8,33,trim);strip(u+2.5,y+1,32.6,.8,33,trim);
+      }
+      for(let y=20;y<207;y+=9)strip(0,y,31.7,53,.5,'#8d7a5f');
+      for(const u of [-25,-15,-5,5,15,25])strip(u,259,36,2,6,'#796d53');
+      for(const u of [-19,-9,0,9,19])strip(u,265,29.5,2,12,'#ab956c');
+      for(const y of [293,316,335]){const width=(346-y)/74*54;strip(0,y,(346-y)/74*30.5,width,1,'#74816c');}
+    }
+  });
 }
 function londonEye(mesh,item) {
   const {x,z}=item,angle=item.angle+Math.PI/2,radius=191,hubHeight=222,right=[Math.cos(angle),0,Math.sin(angle)],normal=[-Math.sin(angle),0,Math.cos(angle)];
   const p=(a,depth=0,r=radius)=>[x+right[0]*Math.cos(a)*r+normal[0]*depth,hubHeight+Math.sin(a)*r,z+right[2]*Math.cos(a)*r+normal[2]*depth];
-  for(const depth of [-8,8])for(let i=0;i<112;i++)beam(mesh,p(i/112*TAU,depth),p((i+1)/112*TAU,depth),3,'#e1e9df');
+  for(const depth of [-8,8])for(let i=0;i<112;i++)beam(mesh,p(i/112*TAU,depth),p((i+1)/112*TAU,depth),3,'#b4c2ba');
   const hub=[x,hubHeight,z];
   for(let i=0;i<32;i++){
     const a=i/32*TAU;beam(mesh,hub,p(a),1.1,'#bbc9ca');
-    const q=p(a,0,radius+5);mesh.box(q[0],q[1],q[2],17,11,24,'#a1c3ca',angle);mesh.box(q[0],q[1]-5,q[2],18,2,25,'#e2e8dc',angle);
+    const q=p(a,0,radius+5);mesh.box(q[0],q[1],q[2],17,11,24,'#66858c',angle);mesh.box(q[0],q[1]-5,q[2],18,2,25,'#94a69d',angle);
+    architecturalDetails(mesh,()=>{for(const side of [-1,1]){
+      for(const u of [-6,0,6])mesh.box(...localPoint(q[0],q[2],angle,u,q[1],side*12.4),.7,10,.6,'#435b60',angle);
+      mesh.box(...localPoint(q[0],q[2],angle,0,q[1]+4.8,side*12.4),17,.8,.6,'#bec8b7',angle);
+    }});
     beam(mesh,p(a,-8),p(a,8),2,'#d7e3dc');
   }
   for(const side of [-1,1]){
     const foot=[x+right[0]*side*95+normal[0]*38,7,z+right[2]*side*95+normal[2]*38];
-    mesh.box(foot[0],5,foot[2],38,10,32,'#acb8b1',angle);beam(mesh,foot,hub,12,'#dbe4dd');
+    mesh.box(foot[0],5,foot[2],38,10,32,'#7d8982',angle);beam(mesh,foot,hub,12,'#b4c2ba');
   }
   beam(mesh,[x-normal[0]*16,hubHeight,z-normal[2]*16],[x+normal[0]*22,hubHeight,z+normal[2]*22],17,'#d9e0d8');
 }
 function towerBridge(mesh) {
-  const bridge=TRACK.bridges[0],deck=bridge.deckHeight,stone='#c7c7b0',trim='#e0dac2',blue='#5c9caf';
+  const bridge=TRACK.bridges[0],deck=bridge.deckHeight,stone='#a2a28f',trim='#c4bfa5',blue='#376c80';
   for(const item of londonLandmarkPlacements().filter(i=>i.kind==='tower-bridge-tower')){
     const {x,z,angle}=item,box=(f,y,l,sx,sy,sz,color)=>mesh.box(...localPoint(x,z,angle,f,y,l),sx,sy,sz,color,angle);
     box(0,(deck+148)/2,0,52,deck+148,54,stone);box(0,deck+148,0,62,10,63,trim);
@@ -503,10 +549,27 @@ function towerBridge(mesh) {
       const p=localPoint(x,z,angle,f*24,deck+168,l*25);mesh.cone(p[0],p[1],p[2],8,23,'#52768b',4,0,angle+Math.PI/4);
     }
     mesh.cone(x,deck+153,z,37,50,'#4c6e82',4,3,angle+Math.PI/4);mesh.cone(x,deck+203,z,2,15,'#bdb78e',10,0);
+    architecturalDetails(mesh,()=>{
+      for(let face=0;face<4;face++){
+        const a=angle+face*Math.PI/2,p=(u,y,d)=>localPoint(x,z,a,u,deck+y,d);
+        for(const u of [-13,13]){
+          mesh.triangle(p(u-3.5,113.5,28.9),p(u,121,28.9),p(u+3.5,113.5,28.9),'#405866');
+          for(const dx of [-4.7,4.7])mesh.box(...p(u+dx,100,29.1),1.2,33,.7,trim,a);
+          mesh.box(...p(u,97,29.5),.8,31,.6,trim,a);mesh.box(...p(u,87,29.5),7,.8,.6,trim,a);
+        }
+        for(let y=9;y<132;y+=11)mesh.box(...p(0,y,27.6),48,.5,.5,'#858a7b',a);
+        for(const u of [-20,-10,0,10,20])mesh.box(...p(u,143,31.7),3,5,.6,'#747c73',a);
+      }
+    });
   }
   for(const station of [-240,240]){
     const q=trackPoint(bridge.s+station);mesh.box(q.x,deck+168,q.y,38,19,282,trim,q.angle);
     mesh.box(q.x,deck+179,q.y,40,3,283,blue,q.angle);
+    architecturalDetails(mesh,()=>{for(const face of [-1,1])for(let l=-89;l<=89;l+=22){
+      const p=(y,v)=>localPoint(q.x,q.y,q.angle,face*19.7,deck+y,v);
+      mesh.quad(p(161,l-8),p(162,l-9),p(175,l+8),p(174,l+9),blue);
+      mesh.quad(p(174,l-9),p(175,l-8),p(162,l+9),p(161,l+8),blue);
+    }});
     for(const side of [-1,1])for(let i=0;i<4;i++){
       const p=trackPoint(bridge.s+station,side*(65+i*13));mesh.box(p.x,deck+153+i*3,p.y,38,5,13,trim,q.angle);
     }
@@ -523,6 +586,7 @@ function towerBridge(mesh) {
   }
 }
 function addLondonLandmarks(mesh) {
+  mesh=londonDetailMesh(mesh);
   towerBridge(mesh);
   for(const item of londonLandmarkPlacements()){
     if(item.kind==='big-ben')bigBen(mesh,item);
@@ -533,12 +597,13 @@ function addLondonLandmarks(mesh) {
     else if(RIVERSIDE_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRiversideLandmark(mesh,item);
     else if(LONDON_THEATRES.some(landmark=>landmark.kind===item.kind))addLondonTheatre(mesh,item);
     else if(LONDON_NEW_LANDMARKS.some(landmark=>landmark.kind===item.kind))addLondonNewLandmark(mesh,item);
+    else if(LONDON_SECOND_LANDMARKS.some(landmark=>landmark.kind===item.kind))addLondonSecondLandmark(mesh,item);
   }
   // River embankments stop outside every road approach, never across a bridge.
   for(const side of [-1,1])for(let x=-750;x<TRACK.width+750;x+=76){
     const z=TRACK.river.centerZ+side*(TRACK.river.halfWidth+8);
     if(projectTrack(x,z).distance<140)continue;
-    mesh.box(x,9,z,76,18,12,'#a7b0a2');mesh.box(x,19,z,78,3,15,'#c4caba');
+    mesh.box(x,9,z,76,18,12,'#858d7e');mesh.box(x,19,z,78,3,15,'#a9af9b');
     for(const offset of [-30,0,30])mesh.box(x+offset,28,z,1.8,18,1.8,'#405251');
     mesh.box(x,37,z,76,2,2,'#4e6462');
   }

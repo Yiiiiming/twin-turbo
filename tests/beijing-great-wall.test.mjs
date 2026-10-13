@@ -23,7 +23,7 @@ const makeMesh=()=>{const mesh=new Mesh();addBeijingGreatWall(mesh);return mesh;
 test('the Great Wall leaves Beijing road geometry, elevation, grid and checkpoints exactly unchanged',()=>{
   setTrack('coast-beijing');
   const fingerprint=JSON.stringify({length:TRACK.length,roadWidth:TRACK.roadWidth,startDistance:TRACK.startDistance,startGrid:TRACK.startGrid,checkpoints:TRACK.checkpoints,sections:TRACK.sections,segments:TRACK.segments,samples:Array.from({length:1621},(_,i)=>trackPoint(i*10))});
-  assert.equal(createHash('sha256').update(fingerprint).digest('hex'),'7d29661d641e7e8e16fc9f8495c6cf1a3babbcb8d27ec4a7fe21b95e2f1da25c');
+  assert.equal(createHash('sha256').update(fingerprint).digest('hex'),'1d7dd63da97648a21bc54e3b2432ff53d55c0bc6b0a51eede686b1f04e8932b1');
 });
 
 test('one continuous winding ridge spans every quarter of the complete Beijing circuit',()=>{

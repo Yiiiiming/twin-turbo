@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, TRACK, registerTrack, setTrack, trackPoint, GRID_HANDICAP_SECONDS } from '../engine.js';
+import { RaceEngine, TRACK, registerTrack, setTrack, trackPoint } from '../engine.js';
 
 const original = TRACK;
 const segments = [
@@ -34,14 +34,13 @@ function cruise(grade, options = {}, keys = ['KeyW'], seconds = 3, hz = 60) {
   const run = scenario(grade, options); advance(run, seconds, keys, hz); return run;
 }
 
-test('flat road retains the 240 display-speed baseline, original acceleration, boost and handicap', () => {
+test('flat road retains the 240 display-speed baseline, identical acceleration and boost', () => {
   const run = scenario('flat'); advance(run, .1);
   near(run.car.speed, 258.5 * .1);
   advance(run, 1.4); near(run.car.speed, 363);
   assert.equal(Math.round(run.car.speed * .66), 240);
   advance(run, .1, ['KeyW', 'ShiftLeft']); near(run.car.speed, 363 + 484 * .1);
   advance(run, .3, ['KeyW', 'ShiftLeft']); near(run.car.speed, 517);
-  assert.equal(GRID_HANDICAP_SECONDS, .15);
 });
 
 test('equal throttle produces sustained uphill slowing and downhill gains within twenty percent', () => {

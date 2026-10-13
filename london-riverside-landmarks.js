@@ -66,9 +66,9 @@ function westTowerOpening(f,x,trim,shade) {
 }
 
 function stPauls(mesh, item) {
-  const f = frame(mesh, item), stone = '#d7d4c6', trim = '#ede7d6', shade = '#b9b49f', glass = '#435252', lead = '#7a8a87', gold = '#d1b463';
+  const f = frame(mesh, item), stone = '#9f9d87', trim = '#c2b592', shade = '#716f5b', glass = '#344c49', lead = '#36584f', gold = '#b48d4d';
   // A cruciform body, two west towers and a deep colonnaded west front.
-  f.box(0, 4, 15, 228, 8, 180, '#a9a99b');
+  f.box(0, 4, 15, 228, 8, 180, '#7f8373');
   f.box(0, 57, 20, 118, 104, 158, stone);
   f.box(0, 52, 20, 220, 94, 56, stone);
   f.box(0, 67, -61, 209, 118, 49, stone);
@@ -79,7 +79,7 @@ function stPauls(mesh, item) {
     for (let i = 0; i < 5; i++) f.box(0, 1 + i * 1.8, -103 + i * 3, 172 - i * 3, 2, 31 - i * 3, i % 2 ? trim : stone);
     cornice(f, 0, 109, 20, 123, 162, trim);
     cornice(f, 0, 102, 20, 222, 59, trim);
-    f.box(0, 120, 23, 105, 13, 146, '#66736f');
+    f.box(0, 120, 23, 105, 13, 146, '#394f48');
     // Aedicules and buttressed side bays continue around both long elevations.
     for (const side of [-1, 1]) {
       const sideFrame = frame(mesh, { ...item, x: f.p(side * 60, 0, 0)[0], z: f.p(side * 60, 0, 0)[2], angle: (item.angle || 0) + side * Math.PI / 2 });
@@ -138,6 +138,13 @@ function stPauls(mesh, item) {
       const a = i / 24 * TAU, x = Math.cos(a) * 52, z = cz + Math.sin(a) * 52;
       f.cone(x, 147, z, 3.8, 3, trim, 12, 3.8); f.cone(x, 150, z, 2.8, 33, trim, 12, 2.4); f.cone(x, 183, z, 3.8, 4, trim, 12, 3.8);
     }
+    // Dark arched drum niches sit between the columns, with warm stone heads.
+    // The drum reads as an open peristyle rather than a white solid cylinder.
+    for(let i=0;i<24;i++){
+      const a=(i+.5)/24*TAU,q=f.p(Math.cos(a)*47,0,cz+Math.sin(a)*47),nf=frame(mesh,{...item,x:q[0],z:q[2],angle:(item.angle||0)+a+Math.PI/2});
+      face(nf,0,163,-.2,7,23,'#354a43');face(nf,0,176,-.3,9,2,'#b29f77');
+    }
+    for(const x of [-83,83])for(const y of [25,42,59,77,94])face(f,x,y,-84.2,37,.7,'#7b7964');
     f.cone(0, 187, cz, 58, 5, trim, 64, 58);
     f.cone(0, 192, cz, 53, 8, stone, 64, 53);
     const profile = [[200, 52.5]];
@@ -147,7 +154,7 @@ function stPauls(mesh, item) {
       const a = i / 24 * TAU;
       for (let j = 1; j < profile.length; j++) {
         const [y0, r0] = profile[j - 1], [y1, r1] = profile[j];
-        slimBeam(mesh, f.p(Math.cos(a) * (r0 + .35), y0, cz + Math.sin(a) * (r0 + .35)), f.p(Math.cos(a) * (r1 + .35), y1, cz + Math.sin(a) * (r1 + .35)), .65, '#a5afaa');
+        slimBeam(mesh, f.p(Math.cos(a) * (r0 + .35), y0, cz + Math.sin(a) * (r0 + .35)), f.p(Math.cos(a) * (r1 + .35), y1, cz + Math.sin(a) * (r1 + .35)), .65, '#74918a');
       }
     }
     f.cone(0, 272, cz, 13.5, 4, trim, 48, 13.5);
@@ -162,7 +169,7 @@ function stPauls(mesh, item) {
 }
 
 function globe(mesh, item) {
-  const f = frame(mesh, item), plaster = '#e6dfc9', oak = '#624731', oakLight = '#8d6b46', shadow = '#403a2c', thatch = '#b4a068';
+  const f = frame(mesh, item), plaster = '#baaf90', oak = '#483726', oakLight = '#76593a', shadow = '#2e3028', thatch = '#8f784c';
   const n = 20, step = TAU / n, point = (a, r, y) => [Math.sin(a) * r, y, -Math.cos(a) * r];
   const bayFrame = (a, r = 103) => { const p = f.p(...point(a, r, 0)); return frame(mesh, { ...item, x: p[0], z: p[2], angle: (item.angle || 0) + a }); };
   // Twenty solid wall bays surround an actually open courtyard. The courtyard
@@ -175,8 +182,8 @@ function globe(mesh, item) {
   f.box(0, 48, 71, 68, 80, 9, plaster);
   for (const x of [-27, 27]) f.cone(x, 16, 32, 3.2, 61, '#a87a56', 24, 2.9);
   details(mesh, () => {
-    mesh.disk(...f.p(0, .35, 0), 110, 110, '#adac94', 80, item.angle || 0);
-    mesh.disk(...f.p(0, .55, 0), 75, 75, '#bfa982', 60, item.angle || 0);
+    mesh.disk(...f.p(0, .35, 0), 110, 110, '#8d9179', 80, item.angle || 0);
+    mesh.disk(...f.p(0, .55, 0), 75, 75, '#a18a62', 60, item.angle || 0);
     for (let i = 0; i < n; i++) {
       const a = (i - .5) * step, b = (i + .5) * step, center = i * step, g = bayFrame(center), bayWidth = 31.8;
       for (const y of [5, 27, 49, 70]) {
@@ -189,6 +196,8 @@ function globe(mesh, item) {
         for (const sign of [-1, 1]) slimBeam(mesh, g.p(sign * 1.5, y - 9, -6.6), g.p(sign * 14, y + 9, -6.6), 1.7, oak);
         if (i % 3 !== 0 || y === 38) {
           face(g,0,y,-7,8.5,12,shadow);face(g,0,y,-7.5,.9,12,oakLight);face(g,0,y,-7.5,8.5,.9,oakLight);
+          // Leaded diamonds catch a little green reflection inside each bay.
+          g.quad([-3,y,-7.7],[0,y+4,-7.7],[3,y,-7.7],[0,y-4,-7.7],i%2?'#607462':'#777951');
         }
       }
       const inner = bayFrame(center, 78);
@@ -202,14 +211,14 @@ function globe(mesh, item) {
         const seat = bayFrame(center, 94);seat.box(0, y, 0, 28, 2, 8, oakLight);
       }
       // Pitched water-reed thatch forms a hollow annulus, not a capped cone.
-      f.quad(point(a, 115, 72), point(a, 97, 94), point(b, 97, 94), point(b, 115, 72), i % 2 ? '#b9a46c' : thatch);
-      f.quad(point(a, 97, 94), point(a, 74, 78), point(b, 74, 78), point(b, 97, 94), '#a48e59');
+      f.quad(point(a, 115, 72), point(a, 97, 94), point(b, 97, 94), point(b, 115, 72), i % 2 ? '#9e8753' : thatch);
+      f.quad(point(a, 97, 94), point(a, 74, 78), point(b, 74, 78), point(b, 97, 94), '#806941');
       f.quad(point(a, 115, 69.5), point(a, 115, 72), point(b, 115, 72), point(b, 115, 69.5), '#897646');
       f.quad(point(a, 74, 76), point(a, 74, 78), point(b, 74, 78), point(b, 74, 76), '#887046');
       for (let j = 0; j < 5; j++) {
         const angle = a + (j + .5) / 5 * step;
-        slimBeam(mesh, f.p(...point(angle, 115, 72.2)), f.p(...point(angle, 97, 94.3)), .55, '#c5b67f');
-        slimBeam(mesh, f.p(...point(angle, 97, 94.3)), f.p(...point(angle, 74, 78.2)), .5, '#bbab76');
+        slimBeam(mesh, f.p(...point(angle, 115, 72.2)), f.p(...point(angle, 97, 94.3)), .55, '#ac965f');
+        slimBeam(mesh, f.p(...point(angle, 97, 94.3)), f.p(...point(angle, 74, 78.2)), .5, '#a58d55');
       }
     }
     // The exposed thrust stage, classical painted columns and "Heavens" roof.
@@ -219,6 +228,10 @@ function globe(mesh, item) {
       f.cone(x, 16, 32, 4.5, 3, goldColor(), 24, 4.5);f.cone(x, 72, 32, 4.6, 5, goldColor(), 24, 4.6);
       for (let j = 0; j < 7; j++) { const y = 21 + j * 7;f.cone(x, y, 32, 3.3, 1, '#d1b27c', 24, 3.3); }
     }
+    // Scalloped crimson stage valance and gilt edging enrich the exposed
+    // theatre interior without filling in its playable open courtyard.
+    for(let x=-30;x<=30;x+=10)f.tri([x-5,75,23.9],[x+5,75,23.9],[x,68,23.9],'#793f35');
+    f.quad([-35,76,23.8],[35,76,23.8],[35,77.2,23.8],[-35,77.2,23.8],'#b48d4d');
     f.box(0, 78, 48, 74, 5, 47, oak);f.box(0, 75, 48, 66, 1.2, 39, '#315d68');
     for (const x of [-22, -11, 0, 11, 22]) for (const z of [36, 47, 58]) mesh.disk(...f.p(x, 74.3, z), 1.1, 1.1, '#d8be75', 8);
     f.box(0, 88, 65, 62, 19, 19, plaster);for (const x of [-29, 0, 29]) f.box(x, 88, 54.9, 2, 20, 1.4, oak);

@@ -67,7 +67,7 @@ function fakeGL(){
 test('eight theatre plots preserve the London route and clear every road branch, river and neighboring building',()=>{
  setTrack('coast-london');
  const snapshot=JSON.stringify({track:TRACK,samples:Array.from({length:1661},(_,i)=>trackPoint(i*10))});
- assert.equal(createHash('sha256').update(snapshot).digest('hex'),'17bacb9b4fbcd7c8d603caf6d3a751ddf2bef00139593151c5114650c86f52be');
+ assert.equal(createHash('sha256').update(snapshot).digest('hex'),'757fc0db6fe66dd89f80d116da07f7eb284f5e3962c84564f039517b9c679096');
  assert.deepEqual(new Set(plots().map(item=>item.kind)),kinds);
  const all=londonLandmarkPlacements(),street=sceneryPlacements();
  for(const item of plots()){

@@ -1,7 +1,7 @@
 import { createClosedTrack } from './tracks.js';
 
 const TAU = Math.PI * 2;
-const GRID = Object.freeze([{ lane: -18, offset: -30 }, { lane: 22, offset: -84.45 }].map(Object.freeze));
+const GRID = Object.freeze([{ lane: -18, offset: -30 }, { lane: 22, offset: -30 }].map(Object.freeze));
 const shared = { roadWidth: 120, checkpointMargin: 40, carRadius: 21, carCollisionDistance: 37, carHeight: 25, unitsPerMeter:60/11,
   startGrid: GRID, city: 'coast', trafficSections: Object.freeze([]) };
 const profiles = [

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, TRACK, trackPoint, projectTrack, mod, GRID_HANDICAP_SECONDS } from '../engine.js';
+import { RaceEngine, TRACK, TRACKS, setTrack, trackPoint, projectTrack, mod } from '../engine.js';
 
 const near = (actual, expected, tolerance = 1e-7) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} ≠ ${expected} (±${tolerance})`);
@@ -41,7 +41,7 @@ function running(laps = 1) {
   return engine;
 }
 
-test('the opening lane difference is preserved while the inner grid handicap is set to 0.15 cruise seconds', () => {
+test('the opening lane difference is preserved while both cars start abreast without a handicap', () => {
   const engine = new RaceEngine();
   const [outer, inner] = engine.cars;
   near(firstCorner.radius, 598); near(firstCorner.sweep, Math.PI);
@@ -52,10 +52,9 @@ test('the opening lane difference is preserved while the inner grid handicap is 
   near(oldInner, 2541.5573684677207);
   near(oldOuter - oldInner, 40 * Math.PI);
   near(outer._gridS, -30);
-  near(GRID_HANDICAP_SECONDS, .15);
-  near(inner._gridS, -84.45);
-  near((outer._gridS - inner._gridS) / 363, .15);
-  near(laneLength(outer._gridS, cornerExit, outer._lane) - laneLength(inner._gridS, cornerExit, inner._lane), 40 * Math.PI - 54.45);
+  near(inner._gridS, -30);
+  near(outer._gridS, inner._gridS);
+  near(laneLength(outer._gridS, cornerExit, outer._lane) - laneLength(inner._gridS, cornerExit, inner._lane), 40 * Math.PI);
   assert.ok(engine.cars.every(car => car._gridS < TRACK.startDistance && !car._started && car.lap === 0));
   for (const car of engine.cars) near(relativeS(projectTrack(car.x, car.y).s), car._gridS);
 });
@@ -76,8 +75,7 @@ test('both launch with identical acceleration and caps, but independently start 
   assert.equal(starts.size, 2);
   // Semi-implicit acceleration at 120 Hz interpolates both exact line passages.
   near(starts.get(1), .4776483704300459, .002);
-  assert.ok(starts.get(2) > starts.get(1), "the inner car crosses later from its staggered grid position");
-  assert.ok(starts.get(2) < .85, "the reduced handicap crosses sooner than the old 1.093s grid");
+  near(starts.get(2), starts.get(1), 1e-7);
   near(engine.cars[0].speed, 363); near(engine.cars[1].speed, 363);
   for (let tick = 0; tick < 42; tick++) {
     engine.step(1 / 120, new Set(['KeyW', 'ArrowUp', 'ShiftLeft', 'Enter']));
@@ -86,7 +84,7 @@ test('both launch with identical acceleration and caps, but independently start 
   near(engine.cars[0].speed, 517); near(engine.cars[1].speed, 517);
 });
 
-test('lane-preserving paths retain the reduced handicap and earn valid independent first laps', () => {
+test('lane-preserving paths start together and earn valid independent first laps', () => {
   const engine = running(), speed = 360, dt = 1 / 120;
   const distances = new Map(engine.cars.map(car => [car.id, car._gridS]));
   const crossing = new Map(), exits = new Map();
@@ -106,9 +104,9 @@ test('lane-preserving paths retain the reduced handicap and earn valid independe
       if (car._started && !crossing.has(car.id)) crossing.set(car.id, car._lapStartTime);
     }
   }
-  near(exits.get(1) - exits.get(2), (40 * Math.PI - 54.45) / speed, 1e-6);
+  near(exits.get(1) - exits.get(2), (40 * Math.PI) / speed, 1e-6);
   near(crossing.get(1), 30 / speed, 1e-6);
-  near(crossing.get(2), (30 + 54.45) / speed, 1e-6);
+  near(crossing.get(2), 30 / speed, 1e-6);
   assert.equal(engine.state, 'finished');
   for (const car of engine.cars) {
     assert.equal(car.lap, 1); assert.equal(car.finished, true);
@@ -136,4 +134,26 @@ test('a pre-line rescue restores each grid slot, while post-line rescue keeps ea
     assert.equal(car._lapStartTime, started);
     assert.equal(car._nextCheckpoint, 1); assert.equal(car.lap, 0);
   }
+});
+
+// The same removed P2 offset was shared by all current circuits. Check the
+// actual created cars and a reset before the line, not only track metadata.
+test('every circuit places and restores both cars abreast in their original lanes', () => {
+  try {
+    for (const track of Object.values(TRACKS)) {
+      setTrack(track.id);
+      const engine = running();
+      assert.deepEqual(track.startGrid, [{ lane: -18, offset: -30 }, { lane: 22, offset: -30 }]);
+      for (const car of engine.cars) {
+        near(car._gridS, track.startDistance - 30);
+        near(relativeS(projectTrack(car.x, car.y).s), -30);
+        near(projectTrack(car.x, car.y).offset, car.id === 1 ? -18 : 22);
+        car.x += 300; car.y += 300;
+        engine.rescue(car.id);
+        near(relativeS(projectTrack(car.x, car.y).s), -30);
+        near(projectTrack(car.x, car.y).offset, car.id === 1 ? -18 : 22);
+        assert.equal(car._started, false);
+      }
+    }
+  } finally { setTrack('coast'); }
 });

@@ -20,7 +20,7 @@ test('both St Paul bell openings use one clear infill plane with separated louvr
    for(const face of faces)for(const point of face.points){const p=local(point);assert.ok(Math.abs(p[2]+86)<1e-8);assert.ok(p[1]>=149&&p[1]<=176.000001);assert.ok(p[2]<-83.5-2,'opening must clear the solid tower face');}
   }
   assert.equal(mesh.boxes.filter(b=>b.color==='#3b4846').length,0,'no hidden glass back or side faces to fight the wall');
-  const slats=mesh.boxes.filter(b=>b.color==='#b9b49f'&&b.w===12&&b.h===1.5);assert.equal(slats.length,10);
+  const slats=mesh.boxes.filter(b=>b.color==='#716f5b'&&b.w===12&&b.h===1.5);assert.equal(slats.length,10);
   for(const slat of slats){const p=local([slat.x,slat.y,slat.z]);assert.ok(Math.abs(p[2]+88)<1e-8);assert.ok(p[2]+slat.d/2<=-87+1e-8,'slat rear clears the dark infill');}
  }
 });

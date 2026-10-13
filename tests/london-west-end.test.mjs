@@ -6,7 +6,7 @@ import { ObstacleWorld } from '../collisions.js';
 import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../renderer.js';
 import { WEST_END_LANDMARKS, addWestEndLandmark } from '../london-west-end.js';
 
-const originalRouteHash = '17bacb9b4fbcd7c8d603caf6d3a751ddf2bef00139593151c5114650c86f52be';
+const originalRouteHash = '757fc0db6fe66dd89f80d116da07f7eb284f5e3962c84564f039517b9c679096';
 const westEndKinds = new Set(WEST_END_LANDMARKS.map(item => item.kind));
 const newLandmarks = () => londonLandmarkPlacements().filter(item => westEndKinds.has(item.kind));
 test.afterEach(() => setTrack('coast'));

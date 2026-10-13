@@ -18,6 +18,80 @@
       "date": "2026-10-12",
       "scope": "coast-grand",
       "authorization": "User explicitly deleted Lighthouse Grand Prix and its data; route excluded from the frozen catalog."
+    },
+    {
+      "date": "2026-10-13",
+      "scope": [
+        "coast",
+        "coast-austin",
+        "coast-bay",
+        "coast-beijing",
+        "coast-london",
+        "coast-marina",
+        "coast-neon",
+        "coast-paris",
+        "coast-pines",
+        "coast-ridge",
+        "coast-rio",
+        "coast-shanghai"
+      ],
+      "authorization": "橙色车的handicap删掉吧",
+      "interpretation": "Remove the shared 0.15-second-equivalent P2 start-grid setback on all twelve existing circuits. Preserve both lanes, P1 offset, all route geometry, elevation, checkpoints and driving interpolation.",
+      "change": {
+        "field": "startGrid[1].offset",
+        "from": -84.45,
+        "to": -30
+      },
+      "previousRouteLocks": {
+        "coast": {
+          "geometrySha256": "9421ee02fb718c163526559641608d761f8e840fa9fc51d3493ca8a3f1b48596",
+          "drivingSha256": "4cf2da90bebbd1041be0ca8fbd04c0f6ace18ebb1533d05c50d9a9381757123e"
+        },
+        "coast-austin": {
+          "geometrySha256": "09b473ed9c8f461df8e2a0439a1e903ca15ede8a328cf397c3f15a396843419d",
+          "drivingSha256": "afaa63f5ebe85050798a12089e7b8b5dedfb281b2bc318af7be63d15372a91a7"
+        },
+        "coast-bay": {
+          "geometrySha256": "7d4c0769a16d667c8e2fb6ce0df6f7be24016886343a3b8b8399ece5a97fe665",
+          "drivingSha256": "e545ceef660cb68dbe137bedccac691c3c6ebb8ec69c56b1d7c684d5fa72f502"
+        },
+        "coast-beijing": {
+          "geometrySha256": "468e209926419b865e221d54936e9824387ae402d5fe4afcab7a5718681794a4",
+          "drivingSha256": "63db4cc22aeb4bb3c5938174cfbf191ed6936e140748978988f7d7d66ee721fb"
+        },
+        "coast-london": {
+          "geometrySha256": "ec4f795343c6cd96dafa9b96167b5ec054e18fb25765ccb99b9037d34ec76f3e",
+          "drivingSha256": "988a54a983ddb8460d27a25354c92b2b270c5ff1c61f4e648268a867e9d7ae67"
+        },
+        "coast-marina": {
+          "geometrySha256": "019065162b5c09a4730e130a1bef05c61b74221d7e7986c3f64d110d5d7645ef",
+          "drivingSha256": "9eb61882ccdf1329fe68b09aa3cddbec6cc5e94e23624d9accce043f877bff64"
+        },
+        "coast-neon": {
+          "geometrySha256": "71efc24ec605a271ca16444ce7f78ed7425585c5c7298eec5d5a716ee6cf1880",
+          "drivingSha256": "f15518d3abd4d6f944a9245dca8c2b167539151ad9550f7fbe3695850cd5ac49"
+        },
+        "coast-paris": {
+          "geometrySha256": "1826ccb370fadad8637ae38b206f75fc62c2fb86671d8c3c0b62fc293ff2ee71",
+          "drivingSha256": "622b22607f61d7fd355df407a0854134da15686c98ea9a0e0f53cc6884045120"
+        },
+        "coast-pines": {
+          "geometrySha256": "85ad4838b54feca78523f1ff9f4c158a53c60bf94f1c57709970ff2fa973431e",
+          "drivingSha256": "7585157d1ea41fcbc704b8af32661794628aff5edf17711c9b86169b8c4d0f23"
+        },
+        "coast-ridge": {
+          "geometrySha256": "432b2a3f4f49ccb9d35faef8518334ae4042ed1882874aa516aa7bb0d377ca60",
+          "drivingSha256": "d2d8da6530dcbb2df7ad3480d1930f4f1b8cd9f1f21a140efe32fa3003cc03a2"
+        },
+        "coast-rio": {
+          "geometrySha256": "7622a39ca6c86c9e86ec65a85cbdd273e638a4303bc54ef9a710dc0520850acb",
+          "drivingSha256": "bdac2bc678523449b5123ac066d531b26963429dd78408f5a63960f7302e4ada"
+        },
+        "coast-shanghai": {
+          "geometrySha256": "6d2cddab28c4a0837033dbf853327e5dfc432535ceb1d15e59028ae04ea17c9f",
+          "drivingSha256": "e86d33b65b57669cc8976d99eab5dea2fef30efa1e12f9d9656176e5dee06834"
+        }
+      }
     }
   ],
   "previousReleaseComparison": {
@@ -42,52 +116,52 @@
   },
   "routes": {
     "coast": {
-      "geometrySha256": "9421ee02fb718c163526559641608d761f8e840fa9fc51d3493ca8a3f1b48596",
-      "drivingSha256": "4cf2da90bebbd1041be0ca8fbd04c0f6ace18ebb1533d05c50d9a9381757123e"
+      "geometrySha256": "d0eff0c07f89aed8b87a836076a469a7dfaa824ed636e18430c48ce7330bcbd7",
+      "drivingSha256": "3beaef6c88a34f276e6b5fbe17ac4007ae11306f7e3cd8f0b104b565b4be7b21"
     },
     "coast-austin": {
-      "geometrySha256": "09b473ed9c8f461df8e2a0439a1e903ca15ede8a328cf397c3f15a396843419d",
-      "drivingSha256": "afaa63f5ebe85050798a12089e7b8b5dedfb281b2bc318af7be63d15372a91a7"
+      "geometrySha256": "c9c0406083027e27b672f350df9624005f126961e838c3a22bf768dc859f7604",
+      "drivingSha256": "a5ef2e29e4a62e72bb9e677cb8403dc742ec513dd0a3eff2fe8121215a154ad1"
     },
     "coast-bay": {
-      "geometrySha256": "7d4c0769a16d667c8e2fb6ce0df6f7be24016886343a3b8b8399ece5a97fe665",
-      "drivingSha256": "e545ceef660cb68dbe137bedccac691c3c6ebb8ec69c56b1d7c684d5fa72f502"
+      "geometrySha256": "87ec61a3fb174095a1eddc736bed39250856d83ae5c1cb9ff77aeeb875a42f5f",
+      "drivingSha256": "f7891d92489b16e9ac57fef5a062de591eab301dccdf6a1a725a6f6682627244"
     },
     "coast-beijing": {
-      "geometrySha256": "468e209926419b865e221d54936e9824387ae402d5fe4afcab7a5718681794a4",
-      "drivingSha256": "63db4cc22aeb4bb3c5938174cfbf191ed6936e140748978988f7d7d66ee721fb"
+      "geometrySha256": "8bb4d411e74489c8fd3f3f7a417cc0f450921aa0b8f6b7cdcdbf57adf04ec020",
+      "drivingSha256": "1c38909b0f02985dc7044edd5fade5ec52d87acfb43b6c3277d5336bc2433b84"
     },
     "coast-london": {
-      "geometrySha256": "ec4f795343c6cd96dafa9b96167b5ec054e18fb25765ccb99b9037d34ec76f3e",
-      "drivingSha256": "988a54a983ddb8460d27a25354c92b2b270c5ff1c61f4e648268a867e9d7ae67"
+      "geometrySha256": "d37884b7288dc3239f95e97ad589f5fd067b1d7178291bb505b85d64745dde0f",
+      "drivingSha256": "5b4833b4b28a311ab7b6300e0be4506571744140fb4bd251add1bc98d7b2fb1b"
     },
     "coast-marina": {
-      "geometrySha256": "019065162b5c09a4730e130a1bef05c61b74221d7e7986c3f64d110d5d7645ef",
-      "drivingSha256": "9eb61882ccdf1329fe68b09aa3cddbec6cc5e94e23624d9accce043f877bff64"
+      "geometrySha256": "027b1b67b1a1fbefd114fd1856f78cd92fbdb6915ae81580dee3f4fa673ce8a0",
+      "drivingSha256": "e7d357d96a455e24515981ee0aff03fac9d4399cce0b3bd51da022c0ee34a4f0"
     },
     "coast-neon": {
-      "geometrySha256": "71efc24ec605a271ca16444ce7f78ed7425585c5c7298eec5d5a716ee6cf1880",
-      "drivingSha256": "f15518d3abd4d6f944a9245dca8c2b167539151ad9550f7fbe3695850cd5ac49"
+      "geometrySha256": "aa3499e53725bc6bbe4da30361c99fa235b8c5ad22ea0d48364b6cefc3d0dc0c",
+      "drivingSha256": "dfd785f1ee24c1f1e4961bcfee50bf650302ec8434a66e193dfc11ac012e6f14"
     },
     "coast-paris": {
-      "geometrySha256": "1826ccb370fadad8637ae38b206f75fc62c2fb86671d8c3c0b62fc293ff2ee71",
-      "drivingSha256": "622b22607f61d7fd355df407a0854134da15686c98ea9a0e0f53cc6884045120"
+      "geometrySha256": "3527d3c2695b59f3100a4c418ece0533482a9dc71114955e19ba52597e234bf4",
+      "drivingSha256": "cd8e747b16909fe042230aa313f0452689d8152903d9a0543da7dda506255baf"
     },
     "coast-pines": {
-      "geometrySha256": "85ad4838b54feca78523f1ff9f4c158a53c60bf94f1c57709970ff2fa973431e",
-      "drivingSha256": "7585157d1ea41fcbc704b8af32661794628aff5edf17711c9b86169b8c4d0f23"
+      "geometrySha256": "c3cdf4d968fc253624af22190d3754b53926652ebb93795237ab21d53403fa28",
+      "drivingSha256": "a213a5bd1cc1dcdbc750273c2698e6152eac510507992c24a43aa4e848eb3270"
     },
     "coast-ridge": {
-      "geometrySha256": "432b2a3f4f49ccb9d35faef8518334ae4042ed1882874aa516aa7bb0d377ca60",
-      "drivingSha256": "d2d8da6530dcbb2df7ad3480d1930f4f1b8cd9f1f21a140efe32fa3003cc03a2"
+      "geometrySha256": "41b4fa7e530d75d949f9d68985e628a209937e66ab197d477a6b439e92250219",
+      "drivingSha256": "b39f03b30589e2879aca760115078d82e09612032dc1c43e88cd8e1bf82466b8"
     },
     "coast-rio": {
-      "geometrySha256": "7622a39ca6c86c9e86ec65a85cbdd273e638a4303bc54ef9a710dc0520850acb",
-      "drivingSha256": "bdac2bc678523449b5123ac066d531b26963429dd78408f5a63960f7302e4ada"
+      "geometrySha256": "7f1cdc204d9ad4fc62d6b262bf13353f9694f630221333a026f78e67b0cf14b2",
+      "drivingSha256": "231684014d35ba2c15fbe32653f37289d8dd935158cbb5c220e937c9c777cdfe"
     },
     "coast-shanghai": {
-      "geometrySha256": "6d2cddab28c4a0837033dbf853327e5dfc432535ceb1d15e59028ae04ea17c9f",
-      "drivingSha256": "e86d33b65b57669cc8976d99eab5dea2fef30efa1e12f9d9656176e5dee06834"
+      "geometrySha256": "94d63a4e7892a255920bf9217b8150e7d4557a206a766cbd05c8eb48777af3e2",
+      "drivingSha256": "19ef7a263f5a4c19a9886f4089044315133d9d7f265ee2cb5d0504fe52869e0b"
     }
   }
 }

@@ -47,15 +47,12 @@ addArc(920, 1210, 220, 0, Math.PI / 2);
 addLine(920, 1430, 700, 1430);
 const LENGTH = circuitLength;
 
-// Keep the existing staggered-grid handicap, now set to 0.15 seconds at
-// the normal 363 px/s cruise speed. This is a distance equivalent, not a
-// launch delay; both cars accelerate at GO and time laps at the common line.
+// Both cars start abreast, 30 units before the shared timing line. The two
+// lanes retain their original positions; acceleration and timing stay identical.
 const GRID_LANES = [-18, 22];
-export const GRID_HANDICAP_SECONDS = 0.15;
 export const OFFROAD_GRACE_SECONDS = 7;
-const GRID_HANDICAP_DISTANCE = 363 * GRID_HANDICAP_SECONDS;
-const START_GRID = Object.freeze(GRID_LANES.map((lane, index) => Object.freeze({
-  lane, offset: -30 - (index === 1 ? GRID_HANDICAP_DISTANCE : 0),
+const START_GRID = Object.freeze(GRID_LANES.map(lane => Object.freeze({
+  lane, offset: -30,
 })));
 
 const COAST_TRACK = Object.freeze({

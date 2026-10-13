@@ -59,7 +59,7 @@ function fakeGL() {
 test('five additions preserve the London course and every existing West End plot', () => {
   setTrack('coast-london');
   const snapshot = JSON.stringify({ track: TRACK, samples: Array.from({ length: 1661 }, (_, i) => trackPoint(i * 10)) });
-  assert.equal(createHash('sha256').update(snapshot).digest('hex'), '17bacb9b4fbcd7c8d603caf6d3a751ddf2bef00139593151c5114650c86f52be');
+  assert.equal(createHash('sha256').update(snapshot).digest('hex'), '757fc0db6fe66dd89f80d116da07f7eb284f5e3962c84564f039517b9c679096');
   for (const [kind, s, side, radius] of [['palace-theatre', 1900, -1, 128], ['london-palladium', 3500, -1, 135], ['royal-opera-house', 5500, 1, 145], ['piccadilly-circus', 11300, 1, 150]]) {
     const item = londonLandmarkPlacements().find(item => item.kind === kind), p = trackPoint(s, side * (radius + 94));
     assert.ok(item, `${kind} was removed`);
