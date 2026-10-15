@@ -9,6 +9,8 @@ import { LONDON_THEATRES, addLondonTheatre, THEATRE_POSTERS, theatrePosterSurfac
 import { LONDON_NEW_LANDMARKS, londonNewLandmarkPlacements, addLondonNewLandmark } from './london-new-landmarks.js';
 import { LONDON_SECOND_LANDMARKS, addLondonSecondLandmark } from './london-second-landmarks.js';
 import { londonSecondLandmarkPlacements } from './london-second-layout.js';
+import { LONDON_THIRD_LANDMARKS, addLondonThirdLandmark } from './london-third-landmarks.js';
+import { londonThirdLandmarkPlacements } from './london-third-layout.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
@@ -380,6 +382,7 @@ export function londonLandmarkPlacements() {
   }
   items.push(...londonNewLandmarkPlacements(items));
   items.push(...londonSecondLandmarkPlacements(items));
+  items.push(...londonThirdLandmarkPlacements(items,LONDON_THIRD_LANDMARKS));
   return items;
 }
 function londonSceneryPlacements() {
@@ -598,6 +601,7 @@ function addLondonLandmarks(mesh) {
     else if(LONDON_THEATRES.some(landmark=>landmark.kind===item.kind))addLondonTheatre(mesh,item);
     else if(LONDON_NEW_LANDMARKS.some(landmark=>landmark.kind===item.kind))addLondonNewLandmark(mesh,item);
     else if(LONDON_SECOND_LANDMARKS.some(landmark=>landmark.kind===item.kind))addLondonSecondLandmark(mesh,item);
+    else if(LONDON_THIRD_LANDMARKS.some(landmark=>landmark.kind===item.kind))addLondonThirdLandmark(mesh,item);
   }
   // River embankments stop outside every road approach, never across a bridge.
   for(const side of [-1,1])for(let x=-750;x<TRACK.width+750;x+=76){

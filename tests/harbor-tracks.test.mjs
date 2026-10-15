@@ -143,9 +143,11 @@ test('London has two real river bridges, solid nearby landmarks, and clear car/c
  for(const item of landmarks){
   const nearest=projectTrack(item.x,item.z);assert.ok(nearest.distance<350,'landmarks must be close enough to see from the chase camera');
   if(item.kind==='london-eye')continue; // Open wheel interior is intentionally not a solid cylinder.
-  // The Globe's center is a real open-air courtyard; test its solid outer wall.
+  // Open interiors need a real masonry sample: the Globe's outer wall and
+  // Admiralty Arch's central pier, rather than either deliberately empty center.
   const wall=item.kind==='shakespeares-globe'?103:0;
-  const car={x:item.x+Math.sin(item.angle)*wall,y:item.z-Math.cos(item.angle)*wall,elevation:0,angle:item.angle,speed:0,height:25};
+  const pier=item.kind==='admiralty-arch'?27:0;
+  const car={x:item.x+Math.sin(item.angle)*wall+Math.cos(item.angle)*pier,y:item.z-Math.cos(item.angle)*wall+Math.sin(item.angle)*pier,elevation:0,angle:item.angle,speed:0,height:25};
   assert.ok(engine.obstacleWorld.resolveCar(car)>0,`${item.kind} needs physical collision`);
  }
  for(const bridge of TRACK.bridges)for(let s=bridge.s-bridge.halfSpan-100;s<bridge.s+bridge.halfSpan+100;s+=13){
@@ -156,6 +158,23 @@ test('London has two real river bridges, solid nearby landmarks, and clear car/c
   const probe={x:camera.eye[0],y:camera.eye[2],elevation:camera.eye[1]-4,height:8,angle:0,speed:0};
   assert.equal(engine.obstacleWorld.resolveCar(probe),0,'chase camera clears bridge arches and crossbeams');
  }
+});
+
+test('production Admiralty Arch admits cars through all three tunnels while its piers and overhead masonry stay solid',()=>{
+ setTrack('coast-london');
+ const item=harborLandmarkPlacements().find(item=>item.kind==='admiralty-arch');
+ assert.ok(item,'Admiralty Arch is present in the production scene');
+ const engine=new RaceEngine({obstacles:sceneObstacles()}),c=Math.cos(item.angle),s=Math.sin(item.angle);
+ const pose=(x,z,elevation=item.elevation||0)=>({x:item.x+c*x-s*z,y:item.z+s*x+c*z,elevation,height:TRACK.carHeight,angle:item.angle+Math.PI/2,speed:0});
+ // Use the actual 21-unit car radius, including a little off-center movement,
+ // across the full depth and both approaches of each 46-unit clear opening.
+ for(const center of [-54,0,54])for(const offset of [-1,0,1])for(let z=-75;z<=75;z+=3){
+  const car=pose(center+offset,z),before={...car};
+  assert.equal(engine.obstacleWorld.resolveCar(car),0,`arch ${center}: blocked at ${offset}/${z}`);
+  assert.deepEqual(car,before,'passing an arch must not push or slow the car');
+ }
+ for(const x of [-80.5,-27,27,80.5])assert.ok(engine.obstacleWorld.resolveCar(pose(x,0))>0,`pier ${x} must collide`);
+ assert.ok(engine.obstacleWorld.resolveCar(pose(0,0,(item.elevation||0)+70))>0,'the wall above the open arch must collide');
 });
 
 test('London uploads finite detailed geometry and distinct gentle ground palettes for the original seven maps',()=>{
