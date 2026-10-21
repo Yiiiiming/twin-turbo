@@ -5,38 +5,53 @@ const mix=(a,b,t)=>a.map((n,i)=>n+(b[i]-n)*t);
 const smooth=n=>{const t=clamp(n);return t*t*(3-2*t);};
 export const MAGIC_EFFECT_VERTICES=4096;
 
-/** Shared simulation clock: both viewports observe the same actors and spell
- * phase. No random per-frame mutations, timers, traffic or physics callbacks. */
+export const MAGIC_DUEL_CYCLE=1.8;
+
+/** The duel is already in progress at every arrival time. Attacks change hands
+ * every .9 seconds, so driving past never lands in a long preparation/rest gap.
+ * One simulation clock keeps both views, pause and replay perfectly in sync. */
 export function londonMagicState(items,time=0){
  if(!items.length)return {actors:[],duels:[],car:null,lights:[]};
  const duels=items.filter(item=>item.kind.startsWith('magic-duel')).map((item,index)=>{
-  const t=((Math.max(0,time)+index*2.9)%7.6),raise=smooth(t/1.05),release=smooth((t-1.08)/.64),
-   impact=smooth((t-1.75)/.17)*(1-smooth((t-2.55)/.6)),rest=smooth((t-5.2)/1.8);
-  const armPitch=.46*(1-raise)+.12*Math.sin(t*3)*(1-release)+.34*rest;
+  const t=(Math.max(0,time)+index*.43)%MAGIC_DUEL_CYCLE,
+   attackSide=Math.floor(t/.9),attackProgress=(t% .9)/.9,
+   strike=smooth(attackProgress/.16)*(1-smooth((attackProgress-.55)/.42)),
+   counter=smooth((attackProgress-.68)/.18),impact=.5+.5*strike;
   const actors=[-1,1].map((side,i)=>{
-   const p=magicLocal(item,side*80,20,0),angle=item.angle+(side<0?Math.PI/2:-Math.PI/2),
-    kind=index?(i?'deathEater':'hermione'):(i?'voldemort':'harry');
-   const actor={kind,x:p[0],y:p[1],z:p[2],angle,armPitch:armPitch+(i?.045:0)};
+   const attacking=i===attackSide,p=magicLocal(item,side*80,20,0),
+    angle=item.angle+(side<0?Math.PI/2:-Math.PI/2),kind=index?(i?'deathEater':'hermione'):(i?'voldemort':'harry');
+   // The body leans into a cast; its opponent recoils and snaps a counter back.
+   // Shoulder and wand use the same body transform, keeping every joint joined.
+   const bodyRoll=attacking?-.12*strike:.13*strike-.09*counter,
+    armPitch=attacking?.19*(1-smooth(attackProgress/.14))+.035*Math.sin(t*24):.10*strike-.12*counter;
+   const actor={kind,x:p[0],y:p[1],z:p[2],angle,armPitch,bodyRoll,
+    attacking,beamStrength:attacking?.9+.1*strike:.58+.35*counter};
    actor.wand=magicWandPoint(actor);return actor;
   });
-  const clash=magicLocal(item,0,55+4*Math.sin(t*2),-1);
-  return {item,t,phase:t<1.08?'raise':t<1.75?'cast':t<3.15?'clash':t<5.2?'shield':'recover',release,impact,actors,clash,index};
+  const clash=magicLocal(item,(attackSide===0?1:-1)*strike*22,57+3*Math.sin(t*9),-1);
+  return {item,t,phase:attackProgress<.18?'cast':attackProgress<.72?'clash':'counter',
+   attackSide,attackProgress,release:1,impact,strike,counter,actors,clash,index};
  });
  const castle=items.find(item=>item.kind==='hogwarts-castle'),phase=time*.36;
  const local=[Math.cos(phase)*390,208+Math.sin(phase*1.6)*57,Math.sin(phase)*220-45];
  const pos=magicLocal(castle,...local),vx=-Math.sin(phase)*390,vz=Math.cos(phase)*220,
   tangent=castle.angle+Math.atan2(vz,vx);
  const lights=duels.map(duel=>({position:duel.clash,color:duel.index?[.28,.53,1]:[1,.42,.19],
-  strength:duel.impact*1.1+(duel.phase==='cast'?.35:0)}));
+  strength:.55+duel.impact*.55}));
  return {actors:duels.flatMap(duel=>duel.actors),duels,car:{x:pos[0],y:pos[1],z:pos[2],angle:tangent,
   roll:-.17*Math.sin(phase+.45),pitch:.12*Math.cos(phase*1.6)},lights};
 }
 
-/** Right-shoulder local X rotation composed with the actor's world yaw. */
+export function magicBodyMatrix(actor){
+ const c=Math.cos(actor.angle),s=Math.sin(actor.angle),cp=Math.cos(actor.bodyRoll||0),sp=Math.sin(actor.bodyRoll||0);
+ return new Float32Array([c,0,s,0,-s*sp,cp,c*sp,0,-s*cp,-sp,c*cp,0,actor.x,actor.y,actor.z,1]);
+}
+/** Right-shoulder X rotation composed with the same moving body as the robe. */
 export function magicArmMatrix(actor){
- const c=Math.cos(actor.angle),s=Math.sin(actor.angle),cp=Math.cos(actor.armPitch),sp=Math.sin(actor.armPitch);
+ const c=Math.cos(actor.angle),s=Math.sin(actor.angle),body=actor.bodyRoll||0,
+  cp=Math.cos(body+actor.armPitch),sp=Math.sin(body+actor.armPitch),bs=Math.sin(body),bc=Math.cos(body);
  return new Float32Array([c,0,s,0,-s*sp,cp,c*sp,0,-s*cp,-sp,c*cp,0,
-  actor.x+c*8,actor.y+38,actor.z+s*8,1]);
+  actor.x+c*8-s*38*bs,actor.y+38*bc,actor.z+s*8+c*38*bs,1]);
 }
 export function magicWandPoint(actor){
  const m=magicArmMatrix(actor),v=[0,-1,-24];
@@ -79,33 +94,35 @@ export class MagicEffects {
   for(const duel of state.duels){
    const colors=duel.index?[[.4,.64,1],[.9,.31,.73]]:[[1,.2,.12],[.19,1,.4]],t=duel.t;
    duel.actors.forEach((actor,i)=>{
-    const color=colors[i];
-    if(t<1.75)this.orb(actor.wand,4+4*smooth(t),color,.4+.5*smooth(t));
-    if(t>=1.08&&t<3.15){
-     const end=mix(actor.wand,duel.clash,duel.release),pulse=.7+.2*Math.sin(t*24+i);
-     const path=[actor.wand,...[1/3,2/3].map((u,j)=>{const p=mix(actor.wand,end,u);p[1]+=Math.sin(t*21+j*2+i)*.9;return p;}),end];
-     for(let j=0;j<3;j++){
-      const taper=1-j*.13;
-      this.ribbon(path[j],path[j+1],2.4*taper,color,.25*pulse,2.4*(taper-.13));
-      this.ribbon(path[j],path[j+1],.65*taper,color.map(c=>c*.8+.2),pulse,.65*(taper-.13));
-     }
-     const bead=mix(actor.wand,end,(t*3+i*.4)%1);this.orb(bead,2.3,color,.7);
-     this.orb(end,4,color,.7);
+    const color=colors[i],end=duel.clash,pulse=actor.beamStrength*(.88+.12*Math.sin(t*32+i));
+    // Both sides stay visibly connected. Fast travelling cores and a moving
+    // collision point show pressure and counterattack even during a short pass.
+    const path=[actor.wand,...[.2,.4,.6,.8].map((u,j)=>{
+     const p=mix(actor.wand,end,u),wave=Math.sin(t*31+j*1.8+i)*1.45*Math.sin(u*Math.PI);
+     p[1]+=wave;p[0]+=Math.sin(duel.item.angle)*wave*.5;p[2]-=Math.cos(duel.item.angle)*wave*.5;return p;
+    }),end];
+    for(let j=0;j<5;j++){
+     this.ribbon(path[j],path[j+1],2.7,color,.28*pulse,2.1);
+     this.ribbon(path[j],path[j+1],.8,color.map(c=>c*.7+.3),pulse,.6);
+    }
+    this.orb(actor.wand,4+2*pulse,color,.48);
+    for(const offset of[0,.5]){
+     const progress=(t*5+offset+i*.21)%1,head=mix(actor.wand,end,progress),tail=mix(actor.wand,end,Math.max(0,progress-.22));
+     this.ribbon(tail,head,1.5,color.map(c=>c*.5+.5),.95);
+     this.orb(head,3.2,color,.8);
     }
    });
-   if(duel.impact>0){
-    this.orb(duel.clash,6+duel.impact*5,[1,.78,.38],duel.impact*.65);
-    for(let j=0;j<28;j++){
-     const a=j*2.399,age=(t-1.75)*(j%3*.11+.72),speed=18+(j%7)*5;
-     if(age<0||age>1.45)continue;
-     const at=dt=>[duel.clash[0]+Math.cos(a)*speed*dt,duel.clash[1]+(j%5-1)*12*dt-24*dt*dt,duel.clash[2]+Math.sin(a)*speed*dt];
-     this.ribbon(at(age),at(Math.max(0,age-.065)),.65,j%2?colors[0]:colors[1],(1-age/1.45)*.85);
-    }
+   this.orb(duel.clash,6+duel.strike*3,[1,.8,.48],.65);
+   // Short, continuously renewed sparks replace the old multi-second wait.
+   for(let j=0;j<20;j++){
+    const a=j*2.399,age=((t*3+j*.071)%1)*.35,speed=40+(j%7)*8;
+    const at=dt=>[duel.clash[0]+Math.cos(a)*speed*dt,duel.clash[1]+(j%5-1)*24*dt-40*dt*dt,duel.clash[2]+Math.sin(a)*speed*dt];
+    this.ribbon(at(age),at(Math.max(0,age-.05)),.7,j%2?colors[0]:colors[1],(1-age/.35)*.8);
    }
-   if(t>=3.1&&t<5.2){
-    const u=(t-3.1)/2.1,center=mix(duel.actors[0].wand,duel.actors[1].wand,.72);
-    this.ring(center,5+u*30,[.32,.72,1],Math.sin(u*Math.PI)*.65,duel.item.angle);
-    this.orb(center,5+u*12,[.35,.65,1],(1-u)*.3);
+   if(duel.counter>0){
+    const defender=duel.actors[1-duel.attackSide],center=mix(defender.wand,duel.clash,.24),
+     alpha=Math.sin(duel.counter*Math.PI)*.6;
+    this.ring(center,10+duel.counter*12,[.32,.72,1],alpha,duel.item.angle);
    }
   }
   return this;

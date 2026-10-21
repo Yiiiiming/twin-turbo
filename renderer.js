@@ -13,7 +13,7 @@ import { LONDON_THIRD_LANDMARKS, addLondonThirdLandmark } from './london-third-l
 import { londonThirdLandmarkPlacements } from './london-third-layout.js';
 import { londonMagicPlacements, londonMagicBlend } from './london-magic-layout.js';
 import { addLondonMagicScenery, addMagicCharacter, addMagicFlyingCar } from './london-magic-models.js';
-import { londonMagicState, magicArmMatrix, MagicEffects } from './london-magic-effects.js';
+import { londonMagicState, magicBodyMatrix, magicArmMatrix, MagicEffects } from './london-magic-effects.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
@@ -1189,7 +1189,7 @@ export class RaceRenderer {
     const state=this.magicState;if(!state)return;
     for(const actor of state.actors){
       if(Math.hypot(actor.x-camera.eye[0],actor.z-camera.eye[2])>1500)continue;
-      this._mesh(this.magicMeshes[`${actor.kind}:body`],modelMatrix(actor.x,actor.y,actor.z,actor.angle));
+      this._mesh(this.magicMeshes[`${actor.kind}:body`],magicBodyMatrix(actor));
       this._mesh(this.magicMeshes[`${actor.kind}:arm`],magicArmMatrix(actor));
     }
     const car=state.car;

@@ -4,7 +4,7 @@ import { TRACK, setTrack, trackPoint, projectTrack, RaceEngine } from '../engine
 import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../renderer.js';
 import { LONDON_MAGIC_ZONE, londonMagicPlacements, londonMagicBlend, magicLocal } from '../london-magic-layout.js';
 import { addLondonMagicScenery, addMagicCharacter } from '../london-magic-models.js';
-import { londonMagicState, magicArmMatrix, magicWandPoint, MagicEffects, MAGIC_EFFECT_VERTICES } from '../london-magic-effects.js';
+import { londonMagicState, magicBodyMatrix, magicArmMatrix, magicWandPoint, MagicEffects, MAGIC_EFFECT_VERTICES, MAGIC_DUEL_CYCLE } from '../london-magic-effects.js';
 import { ObstacleWorld } from '../collisions.js';
 
 test.afterEach(()=>setTrack('coast'));
@@ -30,7 +30,7 @@ function fakeGL(){
  gl.getShaderParameter=gl.getProgramParameter=()=>true;gl.getAttribLocation=()=>0;gl.getUniformLocation=(program,name)=>({program,name});
  gl.shaderSource=(_,source)=>gl.sources.push(source);gl.useProgram=value=>{program=value;};
  gl.bindBuffer=(_,buffer)=>{bound=buffer;};gl.bufferData=(_,data,usage)=>{gl.buffers.set(bound,data);gl.uploads.push({buffer:bound,usage});};
- gl.bufferSubData=(_,offset,data)=>gl.subloads.push({buffer:bound,offset,count:data.length,viewport});
+ gl.bufferSubData=(_,offset,data)=>gl.subloads.push({buffer:bound,offset,count:data.length,viewport,data:Float32Array.from(data)});
  gl.deleteBuffer=buffer=>{gl.deletes.push(buffer);gl.buffers.delete(buffer);};
  for(const name of ['uniform1f','uniform1i','uniform3fv'])gl[name]=(location,value)=>gl.uniforms.push({...location,value:Array.isArray(value)?value.slice():value,viewport});
  gl.uniformMatrix4fv=(location,_,value)=>gl.uniforms.push({...location,value:Array.from(value),viewport});
@@ -41,6 +41,32 @@ function fakeGL(){
  return gl;
 }
 const makeRenderer=()=>{const gl=fakeGL(),renderer=new RaceRenderer({width:1440,height:820,getContext:()=>gl,addEventListener(){}});assert.equal(renderer.available,true,renderer.error);return {renderer,gl};};
+class SpellFlightProbe extends MagicEffects {
+ constructor(){super();this.flights=[];}
+ ribbon(a,b,width,color,alpha,endWidth=width){
+  if(alpha>=.2)this.flights.push({a,b});
+  super.ribbon(a,b,width,color,alpha,endWidth);
+ }
+ inspect(duel){
+  this.flights.length=0;this.update({duels:[duel]});
+  const a=duel.actors[0],b=duel.actors[1],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz),directions=new Set();
+  // Rejoin contiguous rendered strips so adding curvature/subdivision cannot
+  // turn the same visible beam into a false negative. Short sparks, unconnected
+  // shields and muzzle orbs cannot form a 30-unit flight from either wand.
+  const key=p=>p.map(value=>value.toFixed(5)).join(','),edges=new Map();
+  for(const {a,b} of this.flights){const from=key(a);if(!edges.has(from))edges.set(from,[]);edges.get(from).push(b);}
+  for(const [side,actor] of duel.actors.entries()){
+   const pending=[actor.wand],visited=new Set();
+   while(pending.length){
+    const p=pending.pop(),id=key(p);if(visited.has(id))continue;visited.add(id);
+    const travel=((p[0]-actor.wand[0])*dx+(p[2]-actor.wand[2])*dz)/length*(side===0?1:-1);
+    if(travel>=30){directions.add(side);break;}
+    pending.push(...(edges.get(id)||[]));
+   }
+  }
+  return directions;
+ }
+}
 
 test('the London scenery district follows each car position, fades continuously and cannot latch after rescue or reverse driving',()=>{
  setTrack('coast-london');const {start,end,fade}=LONDON_MAGIC_ZONE;
@@ -89,18 +115,50 @@ test('native castle roofs and character heads have outward-facing normals',()=>{
  for(const face of head.faces.filter(f=>f.color==='#c2c9bc')){const n=normal(face.points),middle=face.points[0].map((_,i)=>face.points.reduce((sum,p)=>sum+p[i],0)/3),radial=[middle[0],middle[1]-49,middle[2]];assert.ok(n.reduce((sum,v,i)=>sum+v*radial[i],0)>=-1e-7,'head surface points inward');}
 });
 
-test('shared-clock duels have distinct phases, visible flight spans, animated arms and a bounded reusable effect payload',()=>{
- setTrack('coast-london');const items=londonMagicPlacements(),effects=new MagicEffects(),data=effects.data,phases=new Set(),counts=new Set(),wandPositions=new Set();let maxCount=0;
- for(let time=0;time<15.2;time+=.023){
+test('every short drive-by window contains visible spell flight and both characters return fire within two seconds',()=>{
+ setTrack('coast-london');const items=londonMagicPlacements(),effects=new SpellFlightProbe(),fps=120;
+ // Include startup, an arbitrary later arrival, and a long-running game. At
+ // each epoch examine a complete attack cycle plus the two-second lookahead.
+ for(const epoch of [0,17.37,10000.731]){
+  const frames=Array.from({length:Math.ceil(4*fps)+1},(_,frame)=>londonMagicState(items,epoch+frame/fps).duels.map(duel=>({flights:effects.inspect(duel),attacker:duel.attackSide})));
+  for(let start=0;start<=Math.ceil(1.8*fps);start+=2)for(let duel=0;duel<2;duel++){
+   for(const seconds of [.25,.5]){
+    const window=frames.slice(start,start+Math.floor(seconds*fps));
+    assert.ok(window.some(frame=>frame[duel].flights.size),`duel ${duel} has no visible attack during ${seconds}s drive-by at ${epoch+start/fps}`);
+   }
+   const exchange=frames.slice(start,start+2*fps),directions=new Set(exchange.flatMap(frame=>[...frame[duel].flights]));
+   assert.deepEqual(directions,new Set([0,1]),`duel ${duel} must visibly attack and return fire within 2s at ${epoch+start/fps}`);
+   assert.deepEqual(new Set(exchange.map(frame=>frame[duel].attacker)),new Set([0,1]),'both characters must take the attack within the same short pass');
+  }
+ }
+});
+
+test('shared-clock duels alternate fast attacks with connected body and arm motion and a bounded reusable effect payload',()=>{
+ setTrack('coast-london');const items=londonMagicPlacements(),effects=new MagicEffects(),data=effects.data,phases=new Set(),counts=new Set(),wandPositions=new Set(),bodyPoses=new Set();let maxCount=0;
+ assert.equal(MAGIC_DUEL_CYCLE,1.8,'one complete attack and reply must fit the accepted short loop');
+ for(let time=0;time<4*MAGIC_DUEL_CYCLE;time+=.013){
   const state=londonMagicState(items,time);assert.equal(state.actors.length,4);assert.equal(state.lights.length,2);phases.add(state.duels[0].phase);
   assert.deepEqual(state,londonMagicState(items,time),'paused or split view observes identical poses');
-  for(const actor of state.actors){const m=magicArmMatrix(actor),tip=[0,-1,-24];assert.deepEqual(magicWandPoint(actor),[0,1,2].map(row=>m[row]*tip[0]+m[4+row]*tip[1]+m[8+row]*tip[2]+m[12+row]));}
+  for(const actor of state.actors){
+   const body=magicBodyMatrix(actor),m=magicArmMatrix(actor),tip=[0,-1,-24];
+   assert.ok([...body,...m].every(Number.isFinite));
+   assert.deepEqual(magicWandPoint(actor),[0,1,2].map(row=>m[row]*tip[0]+m[4+row]*tip[1]+m[8+row]*tip[2]+m[12+row]));
+   for(const row of [0,1,2])assert.ok(Math.abs(body[row]*8+body[4+row]*38+body[12+row]-m[12+row])<.001,'moving arm must stay joined to the leaning body shoulder');
+  }
   wandPositions.add(state.actors[0].wand.map(n=>n.toFixed(2)).join(','));
-  for(const duel of state.duels){assert.ok(Math.abs(Math.hypot(duel.actors[0].x-duel.actors[1].x,duel.actors[0].z-duel.actors[1].z)-160)<1e-7);if(duel.phase==='clash')for(const actor of duel.actors)assert.ok(Math.hypot(...actor.wand.map((n,i)=>n-duel.clash[i]))>55,'spell beam must travel visibly between separated stands');}
+  bodyPoses.add(state.actors[0].bodyRoll.toFixed(4));
+  for(const duel of state.duels){
+   assert.ok(Math.abs(Math.hypot(duel.actors[0].x-duel.actors[1].x,duel.actors[0].z-duel.actors[1].z)-160)<1e-7);
+   assert.equal(duel.actors.filter(actor=>actor.attacking).length,1);
+   assert.equal(duel.actors[duel.attackSide].attacking,true);
+   assert.ok(duel.attackProgress>=0&&duel.attackProgress<1);
+   for(const actor of duel.actors)assert.ok(Math.hypot(...actor.wand.map((n,i)=>n-duel.clash[i]))>30,'moving clash must retain visible flight from both separated stands');
+  }
+  for(const light of state.lights)assert.ok(light.strength>.5,'ongoing duel keeps its local light visible');
   effects.update(state);assert.equal(effects.data,data);assert.ok(effects.count<=MAGIC_EFFECT_VERTICES);maxCount=Math.max(maxCount,effects.count);counts.add(effects.count);
   for(let i=0;i<effects.count*11;i++)assert.ok(Number.isFinite(data[i]));
  }
- assert.deepEqual(phases,new Set(['raise','cast','clash','shield','recover']));assert.ok(counts.size>8&&wandPositions.size>30);assert.ok(maxCount>600);
+ assert.deepEqual(phases,new Set(['cast','clash','counter']));assert.ok(counts.size>=2&&wandPositions.size>30&&bodyPoses.size>30);assert.ok(maxCount>600);
  const a=londonMagicState(items,0).car,b=londonMagicState(items,8).car;assert.ok(Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z)>300);assert.notEqual(a.roll,b.roll);
 });
 
@@ -122,7 +180,10 @@ test('production split-screen isolates lighting, uploads only one dynamic spell 
  assert.equal(gl.subloads.length,1);assert.equal(gl.subloads[0].buffer,renderer.magicMeshes.effects.buffer);assert.equal(gl.uploads.length,staticUploads,'no static world or actor rebuild per frame');
  const spells=gl.draws.filter(d=>d.buffer===renderer.magicMeshes.effects.buffer);assert.equal(spells.length,2);for(const draw of spells){assert.equal(draw.depthWrite,false);assert.equal(draw.blend,true);assert.deepEqual(draw.blendMode,[gl.SRC_ALPHA,gl.ONE]);}
  assert.equal(gl.depthWrite,true);assert.equal(gl.blend,false);assert.deepEqual(gl.blendMode,[gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA]);
- const oldState=structuredClone(renderer.magicState);renderer.render(engine,0,0);assert.deepEqual(renderer.magicState,oldState,'wall clock cannot advance a paused performance');
+ const oldState=structuredClone(renderer.magicState),oldPayload=gl.subloads.at(-1).data;
+ renderer.render(engine,0,0);assert.deepEqual(renderer.magicState,oldState,'wall clock cannot advance a paused performance');
+ assert.deepEqual(gl.subloads.at(-1).data,oldPayload,'paused spell vertices must remain identical for both views');
+ assert.equal(gl.subloads.length,2,'each paused frame still updates once, rather than once per viewport');
  const oldBuffers=magicBuffers.map(m=>m.buffer);engine.selectTrack('coast');renderer.rebuild(engine);assert.equal(renderer.magicState,null);assert.deepEqual(renderer.magicMeshes,{});assert.equal(renderer.meshes.magic.count,0);
  for(const buffer of oldBuffers)assert.ok(gl.deletes.includes(buffer)&&!gl.buffers.has(buffer),'map switch must release all London-only geometry');
  t.diagnostic(`Complete London geometry ${(byteCount/1e6).toFixed(3)} MB; magic static + actors + dynamic ${(magicBytes/1e6).toFixed(3)} MB`);

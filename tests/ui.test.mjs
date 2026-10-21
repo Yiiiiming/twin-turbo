@@ -892,20 +892,20 @@ test('a real-control race saves one nickname for total, lap and complete three-l
 for (const search of ['', '?city=london']) {
   test(`harbor release is isolated from city parameters (${search || 'default'})`, async t => {
     const ui = await loadUI(t, { search, configureRace: false });
-    assert.equal(TRACK.id, 'coast-shanghai');
+    assert.equal(TRACK.id, 'coast-london');
     assert.equal(ui.renderer.canvas, ui.nodes.get('game'));
     assert.equal(ui.nodes.has('city-game'), false);
     assert.equal(ui.nodes.has('board-city'), false);
     assert.doesNotMatch(ui.html, /data-city=|london-guide|白金汉宫|伦敦/);
     assert.ok(ui.requests.length > 0);
     for (const request of ui.requests) {
-      assert.equal(new URL(request.url).searchParams.get('city'), 'coast-shanghai');
-      assert.equal(new URL(request.url).searchParams.get('version'), request.url.includes('/api/laps') ? 'coast-ghost-v3' : LEADERBOARD_VERSION);
+      assert.equal(new URL(request.url).searchParams.get('city'), 'coast-london');
+      assert.equal(new URL(request.url).searchParams.get('version'), request.url.includes('/api/laps') ? GHOST_VERSION : LEADERBOARD_VERSION);
     }
     ui.launch();
     ui.advance(3.4);
     assert.equal(ui.engine.state, 'racing');
-    assert.equal(TRACK.id, 'coast-shanghai');
+    assert.equal(TRACK.id, 'coast-london');
   });
 }
 
@@ -1068,10 +1068,36 @@ test('language choice is required before starting, persists the choice, and swit
   ui.click('resume');ui.frame();assert.equal(ui.engine.state,'racing');assert.equal(ui.keys.size,0);
 });
 
+test('London and Beijing lead the twelve-map menu, numbering and board selector in both languages',async t=>{
+  const ui=await loadUI(t,{configureRace:false});
+  const expected=['coast-london','coast-beijing','coast-shanghai','coast-rio','coast-austin','coast-paris',
+    'coast','coast-bay','coast-pines','coast-neon','coast-marina','coast-ridge'];
+  assert.deepEqual(Object.keys(TRACKS),expected,'the other ten circuits keep their accepted relative order');
+  assert.deepEqual([...ui.trackCards.keys()],expected);
+  assert.deepEqual(ui.nodes.get('track-cards').children.map(button=>button.dataset.track),expected);
+  assert.equal(ui.nodes.get('map-count').textContent,'12 CIRCUITS');
+  const board=ui.nodes.get('records-track-choice');
+  for(const language of ['zh','en']){
+    ui.click(`language-${language}`);
+    assert.deepEqual(board.children.map(option=>option.value),expected);
+    for(const [index,id]of expected.entries()){
+      const track=TRACKS[id],card=ui.trackCards.get(id),number=String(index+1).padStart(2,'0');
+      const name=language==='en'?(track.nameEn||'Coastline Grand Prix'):track.name;
+      assert.equal(card.button.children[0].textContent,number);
+      assert.equal(card.label.textContent,name);assert.equal(board.children[index].textContent,name);
+      card.button.click();await ui.flush();ui.frame();
+      assert.equal(TRACK.id,id);assert.equal(ui.ghostClient.city,id);assert.equal(ui.leaderboard.city,id);
+      assert.equal(board.value,id);assert.equal(card.button.getAttribute('aria-pressed'),'true');
+      assert.equal(ui.nodes.get('track-title').textContent,name);assert.equal(ui.nodes.get('records-track').textContent,name);
+      assert.equal(ui.nodes.get('track-english').textContent,`${number} / ${(track.nameEn||'COASTLINE GRAND PRIX').toUpperCase()}`);
+    }
+  }
+});
+
 test('changing a harbor circuit resets its opponents, recording, splits and leaderboard and is blocked during a race',async t=>{
   const ui=await loadUI(t);
   assert.deepEqual([...ui.trackCards.keys()],Object.keys(TRACKS));assert.equal(ui.trackCards.size,12);
-  assert.deepEqual([...ui.trackCards.keys()].slice(0,6),['coast-shanghai','coast-london','coast-rio','coast-austin','coast-beijing','coast-paris']);
+  assert.deepEqual([...ui.trackCards.keys()].slice(0,6),['coast-london','coast-beijing','coast-shanghai','coast-rio','coast-austin','coast-paris']);
   for(const {button,preview}of ui.trackCards.values()){assert.equal(button.tagName,'BUTTON');assert.equal(preview.tagName,'SVG');assert.ok(preview.querySelector('path').getAttribute('d').startsWith('M'));}
   ui.ghostClient.select({entry:{id:'prior-lap',name:'旧赛道记录',timeMs:42000,playerId:1,mode:'local'},
     replay:{version:1,durationMs:42000,frames:[[0,100,100,0,0],[42000,100,100,0,0]]}});
@@ -1143,14 +1169,14 @@ test('leaderboard map browsing is independent of the current race and keeps unsa
   assert.equal(ui.leaderboard.city,'coast-pines');assert.equal(ui.engine.state,'finished');
 });
 
-test('fresh product defaults to Shanghai, AI sprint and the fastest-lap board, with both complete keyboard layouts on the human side',async t=>{
+test('fresh product defaults to London, AI sprint and the fastest-lap board, with both complete keyboard layouts on the human side',async t=>{
   const ui=await loadUI(t,{configureRace:false});
-  assert.equal(TRACK.id,'coast-shanghai');
-  assert.equal(ui.ghostClient.city,'coast-shanghai');
-  assert.equal(ui.leaderboard.city,'coast-shanghai');
-  assert.equal(ui.leaderboard.raceCity,'coast-shanghai');
-  assert.equal(ui.nodes.get('records-track-choice').value,'coast-shanghai');
-  assert.equal(ui.trackCards.get('coast-shanghai').button.getAttribute('aria-pressed'),'true');
+  assert.equal(TRACK.id,'coast-london');
+  assert.equal(ui.ghostClient.city,'coast-london');
+  assert.equal(ui.leaderboard.city,'coast-london');
+  assert.equal(ui.leaderboard.raceCity,'coast-london');
+  assert.equal(ui.nodes.get('records-track-choice').value,'coast-london');
+  assert.equal(ui.trackCards.get('coast-london').button.getAttribute('aria-pressed'),'true');
   assert.equal(ui.modeButtons.find(button=>button.dataset.mode==='ai').getAttribute('aria-pressed'),'true');
   assert.equal(ui.lapButtons.find(button=>button.dataset.laps==='1').getAttribute('aria-pressed'),'true');
   assert.equal(ui.leaderboard.category,'lap');

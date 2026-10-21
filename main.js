@@ -142,8 +142,8 @@ function resize() {
   if (hud.width !== width || hud.height !== height) { hud.width = width; hud.height = height; }
 }
 new ResizeObserver(resize).observe(canvas);
-// Start on compact London; retired prototype links do not change the selection.
-engine.selectTrack('coast-shanghai');
+// Start on the first menu circuit; retired prototype links do not change it.
+engine.selectTrack(Object.keys(TRACKS)[0]);
 ghostClient.setTrack(TRACK.id);
 renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
 engine.setObstacles(renderer.obstacles || []);

@@ -1,6 +1,6 @@
 <!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>北京鸟巢 · 场内赛道验收</title>
 <style>*{box-sizing:border-box}body{margin:0;background:#182e31;color:#e9e9da;font:14px system-ui}header{min-height:76px;padding:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}button,select,input{font:inherit;padding:8px;background:#29484b;color:#f0ebd9;border:1px solid #758780;border-radius:6px}button:active{background:#45605b}canvas{display:block;width:100%;height:calc(100vh - 106px)}output{display:block;padding:5px 12px;color:#c4d9ad;font-size:12px}#along{width:180px}</style>
-<header><strong>北京 · 鸟巢场内一圈</strong><button data-point="approach">入场前</button><button data-point="entry">进入跑道</button><button data-point="quarter">第一弯</button><button data-point="half">场内直道</button><button data-point="last">末段弯道</button><button data-point="exit">回到街道</button><button id="overview">鸟瞰</button><button id="tour">自动巡游</button><select id="lane" aria-label="车道"><option value="0">中央车道</option><option value="-48">左侧车道</option><option value="48">右侧车道</option></select><input id="along" type="range" min="0" max="1000" value="0" aria-label="场馆赛程"></header><canvas id="view"></canvas><output id="status">正在加载…</output>
+<header><strong>北京 · 鸟巢场内一圈</strong><button data-point="approach">入场前</button><button data-point="entry">进入跑道</button><button data-point="quarter">第一弯</button><button data-point="half">场内直道</button><button data-point="last">末段弯道</button><button data-point="exit">回到街道</button><button id="overview">鸟瞰</button><button id="interior">球场细节</button><button id="tour">自动巡游</button><select id="lane" aria-label="车道"><option value="0">中央车道</option><option value="-48">左侧车道</option><option value="48">右侧车道</option></select><input id="along" type="range" min="0" max="1000" value="0" aria-label="场馆赛程"></header><canvas id="view"></canvas><output id="status">正在加载…</output>
 <script type="module">
 import{TRACK,setTrack,RaceEngine,trackPoint}from'../engine.js';
 import{RaceRenderer}from'../renderer.js';
@@ -14,10 +14,17 @@ function place(s){station=s;overview=false;Object.assign(engine.cars[0],trackPoi
 for(const button of document.querySelectorAll('[data-point]'))button.onclick=()=>{tour=false;place(points[button.dataset.point]);};
 slider.oninput=()=>{tour=false;place(start+(end-start)*slider.value/1000);};lane.onchange=()=>place(station);
 document.getElementById('tour').onclick=()=>{if(overview)place(start);tour=!tour;document.getElementById('tour').textContent=tour?'暂停巡游':'自动巡游';};
-document.getElementById('overview').onclick=()=>{tour=false;overview=true;renderer.cameras[0]={carX:engine.cars[0].x,carY:engine.cars[0].y,angle:0,eye:[stadium.center.x-1200,1750,stadium.center.z+1400],target:[stadium.center.x,50,stadium.center.z],fov:55*Math.PI/180};};
+function detailView(label,eye,target,fov){
+ tour=false;overview=label;
+ Object.assign(engine.cars[0],{x:target[0]-72,y:target[2],elevation:target[1]-13,angle:0,speed:0,slope:0});
+ renderer.cameras[0]={carX:engine.cars[0].x,carY:engine.cars[0].y,angle:0,eye,target,fov:fov*Math.PI/180};
+}
+document.getElementById('overview').onclick=()=>detailView('鸟瞰',[stadium.center.x-1200,1750,stadium.center.z+1400],[stadium.center.x,50,stadium.center.z],55);
+document.getElementById('interior').onclick=()=>detailView('球场细节',[stadium.center.x-120,225,stadium.center.z+385],[stadium.center.x,35,stadium.center.z-35],69);
+const drawMesh=renderer._mesh.bind(renderer);renderer._mesh=(mesh,...args)=>{if(overview&&(renderer.meshes.cars.includes(mesh)||mesh===renderer.meshes.shadow))return;drawMesh(mesh,...args);};
 place(start);
 function frame(now){const dt=Math.min(.05,(now-(last||now))/1000);last=now;if(tour){station+=310*dt;if(station>end)station=start;Object.assign(engine.cars[0],trackPoint(station,Number(lane.value)),{speed:310,_lastTrackS:station});slider.value=(station-start)/(end-start)*1000;}
  canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;engine.time+=dt;renderer.render(engine,tour?dt:0,0);
- status.textContent=`${overview?'鸟瞰':`标准跟车镜头 · 路程 ${Math.round(station)} · 高度 ${engine.cars[0].elevation.toFixed(1)}`} · 全圈 ${Math.round(TRACK.length)} · ${Object.values(renderer.meshes).flat().reduce((sum,m)=>sum+(m?.count||0),0).toLocaleString()} 顶点`;requestAnimationFrame(frame);}
+ status.textContent=`${overview?overview:`标准跟车镜头 · 路程 ${Math.round(station)} · 高度 ${engine.cars[0].elevation.toFixed(1)}`} · 全圈 ${Math.round(TRACK.length)} · ${Object.values(renderer.meshes).flat().reduce((sum,m)=>sum+(m?.count||0),0).toLocaleString()} 顶点`;requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
 </script></html>

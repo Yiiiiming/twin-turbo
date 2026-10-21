@@ -18,7 +18,11 @@ const ACCEPTED_MODELS = [
   ['beijing-paifang', 2982, '7aae97e36c3817b321d97a5b04b34b584f5adba15a7ec21fcd4432a724babdcc'],
   // 2026-10-20: explicitly requested mandatory drive-through stadium; reviewed
   // hollow bowl, red seats, steel shell, two open portals and solid infield rail.
-  ['beijing-birds-nest', 4162, 'b317db1f531ca0afca217b98a8ad12e73d4b9c71156591f5c5d38e042f849be7'],
+  // 2026-10-20: user requested a more finished stadium interior and missing
+  // football goals. Adds two open physical goals/nets, pitch markings, seat
+  // backs, recessed stair entrances, railings, dugouts and a match scoreboard.
+  // Route, portals and all other accepted landmark fingerprints are preserved.
+  ['beijing-birds-nest', 5344, '4fcb05f130300b685e9f3b6e9a2b18eafdb01233b23bb9aafb1904c500dbf356'],
   ['beijing-water-cube', 1768, '2a2fd631d00aa1fc2ef430cf1ea03b6d36f3e391da442a20269b9844d483640e'],
   ['beijing-ncpa', 1535, '85a295ecef9bb4463aee10883f1108899d1c79beaaa206532ff5c3c9dc67ba46'],
   ['beijing-cctv', 406, '90c82e8208576867bbc89eb1252de82a6296cb3ea38cee487ef08a0cc6a192ab'],

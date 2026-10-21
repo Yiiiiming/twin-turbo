@@ -1,13 +1,13 @@
 <!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>London · Hogwarts district review</title>
 <style>body{margin:0;background:#101923;color:#d7dfd9;font:14px system-ui}header{display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:12px}select,button{background:#263c4c;color:#f2deaa;border:1px solid #6d7c83;border-radius:5px;padding:7px;font:inherit}canvas{display:block;width:100%;height:calc(100vh - 96px)}#status{color:#bfd8c8;margin-left:auto}</style>
-<header><strong>霍格沃茨 · 实景检查</strong><select id="viewpoint" aria-label="视角"><option value="entrance">驶入石门</option><option value="drive">驾驶 · 主决斗</option><option value="castle">城堡细节</option><option value="duel">Harry / Voldemort</option><option value="second">Hermione / Death Eater</option><option value="split">双人 · 夜色与日光</option><option value="exit">驶出魔法区</option></select><button id="previous">后退 100</button><button id="next">前进 100</button><label><input type="checkbox" id="animate" checked>动画</label><label>演出 <input id="phase" type="range" min="0" max="7.6" step=".05" value="1.9"></label><span id="status"></span></header><canvas id="view"></canvas>
+<header><strong>霍格沃茨 · 实景检查</strong><select id="viewpoint" aria-label="视角"><option value="entrance">驶入石门</option><option value="drive">驾驶 · 主决斗</option><option value="castle">城堡细节</option><option value="duel">Harry / Voldemort</option><option value="second">Hermione / Death Eater</option><option value="split">双人 · 夜色与日光</option><option value="exit">驶出魔法区</option></select><button id="previous">后退 100</button><button id="next">前进 100</button><label><input type="checkbox" id="animate" checked>动画</label><label>演出 <input id="phase" type="range" min="0" max="1.8" step=".05" value="0.3"></label><span id="status"></span></header><canvas id="view"></canvas>
 <script type="module">
 import {RaceEngine,setTrack,trackPoint} from '../engine.js';
 import {RaceRenderer} from '../renderer.js';
 import {londonMagicPlacements,magicLocal,londonMagicBlend} from '../london-magic-layout.js';
 globalThis.__TWIN_TURBO_POSTERS__={mormon:'../assets/posters/book-of-mormon.jpg',wrong:'../assets/posters/play-that-goes-wrong.jpg',lion:'../assets/posters/lion-king.jpg'};
 setTrack('coast-london');const canvas=document.getElementById('view'),engine=new RaceEngine(),renderer=new RaceRenderer(canvas,{sceneUrls:{coast:'../assets/coast.png',alpine:'../assets/alpine.png',city:'../assets/city.png',clouds:'../assets/cloud-sky.jpg'}}),items=londonMagicPlacements();
-const $=id=>document.getElementById(id);let offset=0,detail=false,clock=1.9,previous=0;
+const $=id=>document.getElementById(id);let offset=0,detail=false,clock=.3,previous=0;
 const sky=renderer._sky.bind(renderer);renderer._sky=(camera,weights,aspect,blend)=>sky(camera,weights,aspect,detail?1:blend);
 const draw=renderer._mesh.bind(renderer);renderer._mesh=(mesh,...args)=>{if(detail&&(renderer.meshes.cars.includes(mesh)||mesh===renderer.meshes.shadow))return;draw(mesh,...args);};
 function setup(){

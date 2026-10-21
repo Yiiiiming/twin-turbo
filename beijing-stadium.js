@@ -9,6 +9,7 @@ import { frame, details, word } from './london-west-end.js';
 const TAU=Math.PI*2,clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 export const BEIJING_STADIUM_DEFAULTS=Object.freeze({radius:320,straightLength:800,halfStraight:400,seatOffset:150,seatDepth:78,shellOffset:245,railInset:95,height:238,maxRadius:980});
 const C={seat:['#a34c40','#b65445','#984337','#c0614d'],riser:'#78392f',aisle:'#62655d',steel:'#77837f',steelDark:'#4e5b59',steelLight:'#a5aaa0',shell:'#3f4c4d',glass:'#40585b',roof:'#626e69',concrete:'#555c56',grass:'#50714b',paint:'#cac8af',rail:'#727d74'};
+const I={goal:'#dedbc2',net:'#a9b2a1',seatBack:['#cd6550','#ae493d','#d8795d'],tunnel:'#202f32',screen:'#102b32',led:'#d5cda5'};
 
 /** The footprint is a capsule, not the much larger enclosing landmark circle. */
 export function beijingStadiumClearance(stadium,x,z,radius=0){
@@ -72,6 +73,35 @@ function chordBox(mesh,f,item,a,b,width,bottom,top,color,visible=true){
  else if(mesh.colliders)mesh.colliders.push({type:'box',x:center[0],y:center[2],halfWidth:Math.max(.1,length*.49),halfDepth:width/2,angle,minHeight:(item.elevation||0)+bottom,maxHeight:(item.elevation||0)+top});
 }
 
+function footballGoals(mesh,f,item){
+ // These are two open frames, not a solid goal-sized collision rectangle.
+ // The 66-unit mouth comfortably admits a car; the actual posts remain solid.
+ for(const side of[-1,1]){
+  const x=side*286,back=side*314;
+  for(const z of[-33,33]){
+   f.box(x,15,z,3,30,3,I.goal);f.box(back,11,z,2.2,22,2.2,C.steel);
+   f.box((x+back)/2,1.2,z,28,2.4,2.4,C.steel);
+  }
+  chordBox(mesh,f,item,[x,0,-33],[x,0,33],3,28.5,31.5,I.goal);
+  details(mesh,()=>{
+   // Sparse individual cords preserve sight through the net from both ends.
+   for(let z=-32;z<=32;z+=8){ribbon(mesh,f,[back,1,z],[back,22,z],.48,I.net);ribbon(mesh,f,[x,29,z],[back,22,z],.48,I.net);}
+   for(const y of[7,14,21])ribbon(mesh,f,[back,y,-33],[back,y,33],.48,I.net);
+   for(const z of[-33,33]){
+    ribbon(mesh,f,[x,29,z],[back,22,z],1.3,C.steelLight);
+    for(const y of[7,14,21])ribbon(mesh,f,[x,y,z],[back,y,z],.48,I.net);
+    for(const u of[.33,.66]){const xx=x+(back-x)*u;ribbon(mesh,f,[xx,1,z],[xx,29-7*u,z],.48,I.net);}
+   }
+  });
+ }
+}
+
+function scoreboardDigit(f,digit,x,y,z,color){
+ const bars={0:[0,1,2,4,5,6],1:[2,5],2:[0,2,3,4,6],3:[0,2,3,5,6],4:[1,2,3,5],5:[0,1,3,5,6],6:[0,1,3,4,5,6],7:[0,2,5],8:[0,1,2,3,4,5,6],9:[0,1,2,3,5,6]};
+ const rect=(xx,yy,w,h)=>f.quad([xx-w/2,yy-h/2,z],[xx-w/2,yy+h/2,z],[xx+w/2,yy+h/2,z],[xx+w/2,yy-h/2,z],color,.3);
+ for(const b of bars[digit]){if(b===0||b===3||b===6)rect(x,y+9-b*3,10,1.4);else rect(x+([1,4].includes(b)?-5:5),y+(b<3?4.5:-4.5),1.4,7);}
+}
+
 export function addBeijingStadium(mesh,item){
  const cfg=beijingStadiumModelLayout(item.stadium||TRACK.stadium||{}),f=frame(mesh,item),n=96,rows=12,step=cfg.seatDepth/rows;
  const topAt=t=>{const p=capsule(cfg,t),v=normal(cfg,p);return 198+32*v[0]*v[0];};
@@ -89,26 +119,63 @@ export function addBeijingStadium(mesh,item){
   const a=capsule(cfg,i/n,-cfg.railInset),b=capsule(cfg,(i+1)/n,-cfg.railInset);
   chordBox(mesh,f,item,a,b,8,0,18,C.rail);
  }
+ footballGoals(mesh,f,item);
+ // Low team benches are physical objects, protected inside the infield rail.
+ for(const x of[-94,94])f.box(x,5,184,70,10,11,C.steelDark);
  details(mesh,()=>{
   // Grass and pitch markings are flat surfaces, never hidden solid slabs.
   const field=cfg.radius-cfg.railInset-7,h=cfg.halfStraight;
-  f.quad([-h,.08,-field],[-h,.08,field],[h,.08,field],[h,.08,-field],C.grass);
+  for(let i=0;i<10;i++){const a=-h+i*h/5,b=a+h/5;f.quad([a,.08,-field],[a,.08,field],[b,.08,field],[b,.08,-field],i%2?'#567850':C.grass);}
   for(const side of[-1,1])for(let i=0;i<32;i++){const a=-Math.PI/2+i/32*Math.PI,b=-Math.PI/2+(i+1)/32*Math.PI,p=t=>[side*(h+Math.cos(t)*field),.08,Math.sin(t)*field];f.tri([side*h,.08,0],p(side>0?b:a),p(side>0?a:b),C.grass);}
   for(const z of[-145,145])f.quad([-285,.16,z-1],[-285,.16,z+1],[285,.16,z+1],[285,.16,z-1],C.paint);
   for(const x of[-285,0,285])f.quad([x-1,.16,-145],[x-1,.16,145],[x+1,.16,145],[x+1,.16,-145],C.paint);
   for(let i=0;i<40;i++){const a=i/40*TAU,b=(i+1)/40*TAU,p=(t,r)=>[Math.cos(t)*r,.16,Math.sin(t)*r];f.quad(p(a,54),p(b,54),p(b,56),p(a,56),C.paint);}
+  for(const side of[-1,1]){
+   for(const [inset,width]of[[80,92],[35,54]]){
+    const x=side*(285-inset),end=side*285;
+    f.quad([x-1,.18,-width],[x-1,.18,width],[x+1,.18,width],[x+1,.18,-width],C.paint);
+    for(const z of[-width,width])f.quad([Math.min(x,end),.18,z-1],[Math.min(x,end),.18,z+1],[Math.max(x,end),.18,z+1],[Math.max(x,end),.18,z-1],C.paint);
+   }
+   f.quad([side*228-2,.18,-2],[side*228-2,.18,2],[side*228+2,.18,2],[side*228+2,.18,-2],C.paint);
+  }
+  // Open-backed dugouts: red individual backs, a shallow metal canopy and
+  // slim uprights rather than a large wall across the driver's field view.
+  for(const x of[-94,94]){
+   for(let seat=0;seat<7;seat++){const xx=x+(seat-3)*9;f.quad([xx-3.6,10,187],[xx-3.6,18,188],[xx+3.6,18,188],[xx+3.6,10,187],I.seatBack[seat%3]);}
+   for(const dx of[-37,37])ribbon(mesh,f,[x+dx,0,192],[x+dx,27,192],1.6,C.steelLight);
+   f.quad([x-39,28,175],[x-39,29,195],[x+39,29,195],[x+39,28,175],C.steelDark);
+  }
   for(let i=0;i<n;i++){
    const a=i/n,b=(i+1)/n;
    const railA=capsule(cfg,a,-cfg.railInset,18.1),railB=capsule(cfg,b,-cfg.railInset,18.1),na=normal(cfg,railA),nb=normal(cfg,railB);
    f.quad(railA.map((v,k)=>v-na[k]*2),railA.map((v,k)=>v+na[k]*2),railB.map((v,k)=>v+nb[k]*2),railB.map((v,k)=>v-nb[k]*2),i%3===0?'#a64b3e':C.paint);
    if(!open[i])continue;
    const aisle=i%12===0;
-   f.quad(capsule(cfg,a,cfg.seatOffset,0),capsule(cfg,b,cfg.seatOffset,0),capsule(cfg,b,cfg.seatOffset,22),capsule(cfg,a,cfg.seatOffset,22),C.concrete);
+   if(aisle){
+    // A recessed vomitory under each main stair adds depth to the lower tier.
+    const l=a+(b-a)*.22,r=b-(b-a)*.22,front=cfg.seatOffset;
+    for(const [u,v]of[[a,l],[r,b]])f.quad(capsule(cfg,u,front,0),capsule(cfg,v,front,0),capsule(cfg,v,front,22),capsule(cfg,u,front,22),C.concrete);
+    f.quad(capsule(cfg,l,front,18),capsule(cfg,r,front,18),capsule(cfg,r,front,22),capsule(cfg,l,front,22),C.steelLight);
+    f.quad(capsule(cfg,l,front+7,0),capsule(cfg,r,front+7,0),capsule(cfg,r,front+7,18),capsule(cfg,l,front+7,18),I.tunnel);
+    for(const t of[l,r])f.quad(capsule(cfg,t,front,0),capsule(cfg,t,front+7,0),capsule(cfg,t,front+7,18),capsule(cfg,t,front,18),C.aisle);
+    f.quad(capsule(cfg,l,front-.2,19),capsule(cfg,r,front-.2,19),capsule(cfg,r,front-.2,20),capsule(cfg,l,front-.2,20),'#a2b791');
+   }else f.quad(capsule(cfg,a,cfg.seatOffset,0),capsule(cfg,b,cfg.seatOffset,0),capsule(cfg,b,cfg.seatOffset,22),capsule(cfg,a,cfg.seatOffset,22),C.concrete);
    for(let row=0;row<rows;row++){
     const inner=cfg.seatOffset+row*step,outer=inner+step,y=22+row*6;
     f.quad(capsule(cfg,a,inner,y),capsule(cfg,b,inner,y),capsule(cfg,b,outer,y),capsule(cfg,a,outer,y),aisle?C.aisle:C.seat[(row+Math.floor(i/6))%C.seat.length]);
     f.quad(capsule(cfg,a,outer,y),capsule(cfg,b,outer,y),capsule(cfg,b,outer,y+6),capsule(cfg,a,outer,y+6),aisle?C.aisle:C.riser);
+    // Separate lifted backs catch light above the tread; the gaps retain the
+    // rhythm of individual seating without thousands of hidden chair boxes.
+    if(!aisle&&[0,2,4,7,9].includes(row))for(const center of[.26,.74]){
+     const l=a+(b-a)*(center-.18),r=a+(b-a)*(center+.18),offset=outer-2;
+     f.quad(capsule(cfg,l,offset,y+.8),capsule(cfg,r,offset,y+.8),capsule(cfg,r,offset+.8,y+5.4),capsule(cfg,l,offset+.8,y+5.4),I.seatBack[(Math.floor(i/6)+Math.floor(row/2))%3]);
+    }
     for(const [t,edge]of[[a,!open[(i+n-1)%n]],[b,!open[(i+1)%n]]])if(edge)f.quad(capsule(cfg,t,inner,0),capsule(cfg,t,outer,0),capsule(cfg,t,outer,y+6),capsule(cfg,t,inner,y),C.concrete);
+   }
+   if(aisle)for(const edge of[.15,.85]){
+    const t=a+(b-a)*edge;
+    ribbon(mesh,f,capsule(cfg,t,cfg.seatOffset+2,34),capsule(cfg,t,cfg.seatOffset+cfg.seatDepth-2,104),1.5,C.steelLight);
+    for(const row of[0,5,11]){const offset=cfg.seatOffset+(row+.5)*step,y=22+row*6;ribbon(mesh,f,capsule(cfg,t,offset,y),capsule(cfg,t,offset,y+13),1.2,C.steelLight);}
    }
    f.quad(capsule(cfg,a,cfg.seatOffset+cfg.seatDepth,0),capsule(cfg,b,cfg.seatOffset+cfg.seatDepth,0),capsule(cfg,b,cfg.seatOffset+cfg.seatDepth,94),capsule(cfg,a,cfg.seatOffset+cfg.seatDepth,94),C.concrete);
    f.quad(capsule(cfg,a,cfg.shellOffset,0),capsule(cfg,b,cfg.shellOffset,0),capsule(cfg,b,cfg.shellOffset,145),capsule(cfg,a,cfg.shellOffset,145),i%5===0?C.glass:C.shell);
@@ -126,9 +193,14 @@ export function addBeijingStadium(mesh,item){
    const a=capsule(cfg,i/72,cfg.shellOffset+3,y+8*Math.sin(i*.51)),b=capsule(cfg,(i+1)/72,cfg.shellOffset+3,y+8*Math.sin((i+1)*.51));
    if(!intersectsCut(cfg,[a,b],5))ribbon(mesh,f,a,b,4.5,C.steel);
   }
-  // A single inward-facing stadium board anchors the otherwise repeated bowl.
+  // A layered match board faces the infield; shallow emissive segments remain
+  // legible from the opposite straight without a large luminous white panel.
   const board=f.p(0,0,-cfg.radius-cfg.seatOffset-cfg.seatDepth*.65),boardFrame=frame(mesh,{x:board[0],z:board[2],angle:(item.angle||0)+Math.PI,elevation:item.elevation||0});
-  boardFrame.box(0,119,0,198,44,6,'#354b4b');boardFrame.box(0,119,-3.2,187,34,.4,'#172c31');
-  word(boardFrame,'NATIONAL STADIUM',0,113,-3.6,10.5,174,'#bfbda4',.1);
+  boardFrame.box(0,126,0,198,58,6,'#354b4b');boardFrame.box(0,126,-3.2,187,49,.4,I.screen);
+  word(boardFrame,'BEIJING',0,140,-3.6,8,78,I.led,.15);
+  word(boardFrame,'HOME',-55,107,-3.6,6,37,I.led,.1);word(boardFrame,'AWAY',55,107,-3.6,6,37,I.led,.1);
+  scoreboardDigit(boardFrame,0,-55,126,-3.7,I.led);scoreboardDigit(boardFrame,0,55,126,-3.7,I.led);
+  scoreboardDigit(boardFrame,4,-11,122,-3.7,'#b17856');scoreboardDigit(boardFrame,5,6,122,-3.7,'#b17856');
+  for(const x of[-73,73])ribbon(mesh,f,[x,94,-cfg.radius-cfg.seatOffset-cfg.seatDepth*.65],[x,101,-cfg.radius-cfg.seatOffset-cfg.seatDepth*.65],3,C.steelDark);
  });
 }

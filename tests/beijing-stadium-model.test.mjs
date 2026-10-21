@@ -7,8 +7,8 @@ import { addBeijingStadium,beijingStadiumClearance,beijingStadiumModelLayout } f
 
 test.afterEach(()=>setTrack('coast'));
 class Mesh {
- constructor(){this.colliders=[];this.triangles=[];this.colors=new Set();this.points=[];}
- triangle(a,b,c,color){for(const p of[a,b,c])assert.ok(p.every(Number.isFinite));this.triangles.push([a,b,c]);this.points.push(a,b,c);this.colors.add(color);}
+ constructor(){this.colliders=[];this.triangles=[];this.faces=[];this.colors=new Set();this.points=[];}
+ triangle(a,b,c,color){for(const p of[a,b,c])assert.ok(p.every(Number.isFinite));this.triangles.push([a,b,c]);this.faces.push({vertices:[a,b,c],color});this.points.push(a,b,c);this.colors.add(color);}
  quad(a,b,c,d,color){this.triangle(a,b,c,color);this.triangle(a,c,d,color);}
  box(x,y,z,w,h,d,color,angle=0){assert.ok([w,h,d].every(v=>v>0&&Number.isFinite(v)));const c=Math.cos(angle),s=Math.sin(angle),v=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]].map(([a,b,e])=>[x+c*a*w/2-s*e*d/2,y+b*h/2,z+s*a*w/2+c*e*d/2]);for(const ids of[[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]])this.quad(...ids.map(i=>v[i]),color);if(this.colliders)this.colliders.push({type:'box',x,y:z,halfWidth:w/2,halfDepth:d/2,angle,minHeight:y-h/2,maxHeight:y+h/2});}
 }
@@ -68,6 +68,7 @@ test('stadium clearance uses the real rotated capsule instead of clearing its em
 test('actual Beijing entry, exit, complete inner course and old road leave cars and chase cameras clear',t=>{
  setTrack('coast-beijing');assert.ok(TRACK.stadium?.accessSegments?.length,'production route publishes both access paths');
  const stadium=TRACK.stadium,item={x:stadium.center.x,z:stadium.center.z,angle:stadium.angle,elevation:stadium.elevation||0,stadium},mesh=make(item),world=new ObstacleWorld(mesh.colliders),cfg=beijingStadiumModelLayout(stadium);
+ assert.ok(mesh.triangles.length<=12000,'the complete production route model keeps the original 12,000-triangle budget, including interior furniture');
  assert.ok(cfg.cuts.length>100,'real access paths cut the entire stand and shell, not just an exterior door');
  assert.equal(cfg.openSectors.filter((v,i,a)=>!v&&a[(i+a.length-1)%a.length]).length,2,'entry and exit create two true openings through the complete seating bowl');
  assert.ok(cfg.openSectors.filter(Boolean).length>=70,'the bowl remains recognisable around the two passages');
@@ -76,6 +77,32 @@ test('actual Beijing entry, exit, complete inner course and old road leave cars 
   for(const speed of[0,363,517]){const camera=updateChaseCamera({...p,speed,boosting:speed===517},null);assert.equal(world.resolveCar(eyeProbe(camera)),0,`production camera ${s}/${lane}/${speed}`);}
  }
  t.diagnostic(`Actual route model: ${mesh.triangles.length} triangles, ${mesh.colliders.length} solid hulls`);
+});
+
+test('both football goals have solid separate posts, a genuinely open mouth and sparse three-dimensional nets',()=>{
+ const mesh=make({x:0,z:0,angle:0,elevation:0,stadium:{}}),world=new ObstacleWorld(mesh.colliders),net=mesh.faces.filter(face=>face.color==='#a9b2a1');
+ assert.ok(net.length>=200&&net.length<320,'both goals carry individual cords, not a filled opaque back panel');
+ for(const side of[-1,1]){
+  const x=side*286,probe=(xx,z,elevation=0,height=25)=>({x:xx,y:z,angle:0,elevation,height,speed:0});
+  for(const z of[-33,33])assert.ok(world.resolveCar(probe(x,z))>0,'the front goalposts are actual visible solids');
+  assert.equal(world.resolveCar(probe(x,0)),0,'the 66-wide, 28.5-high opening has no invisible infill');
+  assert.ok(world.resolveCar(probe(x,0,29,2))>0,'the crossbar has a height-bounded physical solid');
+  const faces=net.filter(face=>face.vertices.every(p=>Math.sign(p[0])===side)),points=faces.flatMap(face=>face.vertices);
+  assert.ok(Math.max(...points.map(p=>Math.abs(p[0])))-Math.min(...points.map(p=>Math.abs(p[0])))>27,'the net has side and roof depth');
+  assert.ok(Math.max(...points.map(p=>p[1]))>28&&Math.min(...points.map(p=>p[1]))<2,'nets extend from ground to the goal top');
+  for(const {vertices:[a,b,c]}of faces){const u=b.map((v,i)=>v-a[i]),v=c.map((n,i)=>n-a[i]),area=Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0])/2;assert.ok(area<17,'a net face remains a thin cord, never a screen');}
+ }
+});
+
+test('raised red chair backs, recessed stair entrances and match equipment give the interior depth without filling the pitch',()=>{
+ const mesh=make({x:0,z:0,angle:0,elevation:0,stadium:{}}),seatColors=new Set(['#cd6550','#ae493d','#d8795d']),backs=mesh.faces.filter(face=>seatColors.has(face.color)&&face.vertices.some(p=>Math.abs(p[2])>450||Math.abs(p[0])>800));
+ assert.ok(backs.length>1200,'separate red backs reach many rows around the bowl');
+ const tiers=new Set(backs.flatMap(face=>face.vertices.map(p=>Math.round(p[1]))));assert.ok(tiers.size>=10,'backs rise above multiple seat treads rather than painting a flat texture');
+ const entrances=mesh.faces.filter(face=>face.color==='#202f32');assert.ok(entrances.length>=10,'multiple dark entrances are recessed behind the lower-tier frontage');
+ assert.ok(mesh.faces.some(face=>face.color==='#102b32'),'the match display has a distinct dark screen');
+ const world=new ObstacleWorld(mesh.colliders);
+ for(const x of[-94,94])assert.ok(world.resolveCar({x,y:184,elevation:0,height:25,angle:0,speed:0})>0,'team benches are actual solids within the protected infield');
+ assert.equal(world.resolveCar({x:0,y:0,elevation:0,height:25,angle:0,speed:0}),0,'the grass center remains open');
 });
 
 // Independent finite-segment/triangle intersections inspect visible roof and
