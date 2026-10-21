@@ -52,10 +52,12 @@ export class RaceAI {
     })
       :[projection,trackPoint(projection.s+150),trackPoint(projection.s+330)];
     const curvature=Math.max(...upcoming.map(point=>Math.abs(point.curvature)));
+    const stadium=TRACK.stadium&&projection.s>=TRACK.stadium.aiStart&&projection.s<=TRACK.stadium.aiEnd;
     // A little breathing room in corners and small line variations make a
     // beatable club-level opponent, without hidden speed or grip advantages.
     let targetSpeed=(curvature>.00165?329:curvature>.0002?340:351)+Math.sin(this.elapsed*.53)*2.5;
     if(city)targetSpeed=Math.min(345,Math.max(60,1.2/Math.max(curvature,.00001)));
+    if(stadium)targetSpeed=Math.min(targetSpeed,curvature>.0035?280:310);
     let desiredLane=(city?-18:this.carId===1?-24:24)+Math.sin(this.elapsed*.36)*1.8;
     if(city&&curvature>.018)desiredLane=0;
     const narrowPassage=city&&(TRACK.sections||[]).some(section=>section.passage&&projection.s>=section.start-220&&projection.s<=section.end+90);
@@ -98,7 +100,7 @@ export class RaceAI {
     this._boostCooldown=Math.max(0,this._boostCooldown-tick);
     this._boostRemaining=Math.max(0,this._boostRemaining-tick);
     const straight=curvature<.00001&&Math.abs(trackPoint(projection.s+500).curvature)<.00001;
-    const canBoost=straight&&!traffic&&Math.abs(error)<.035&&car.speed>290&&car.boost>45&&!car.offroad;
+    const canBoost=straight&&!stadium&&!traffic&&Math.abs(error)<.035&&car.speed>290&&car.boost>45&&!car.offroad;
     if(canBoost&&this._boostCooldown===0) {
       this._boostRemaining=.3;this._boostCooldown=20;
     }

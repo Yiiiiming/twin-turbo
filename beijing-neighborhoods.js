@@ -3,15 +3,19 @@
  * Local -Z is the frontage, so opposite sides face back toward the racecourse.
  */
 import { TRACK, trackPoint, projectTrack } from './engine.js';
+import { beijingReferenceTrack, beijingReferencePoint } from './beijing-reference.js';
+import { legacyToStadiumDistance } from './beijing-stadium-route.js';
+import { beijingStadiumClearance } from './beijing-stadium.js';
 import { beijingWallClearance } from './beijing-great-wall.js';
 
 const EMPTY=Object.freeze([]);
-const wrap=s=>((s%TRACK.length)+TRACK.length)%TRACK.length;
+const wrap=s=>{const length=beijingReferenceTrack().length;return ((s%length)+length)%length;};
 
 // Keep a clear fan between the road and each landmark, even when its setback
 // leaves enough geometric space for a house directly in front of the facade.
 function blocksLandmarkView(x,z,radius,landmarks){
  for(const landmark of landmarks){
+  if(landmark.kind==='beijing-birds-nest'&&TRACK.stadium)continue;
   const road=trackPoint(projectTrack(landmark.x,landmark.z).s);
   const dx=landmark.x-road.x,dz=landmark.z-road.y,length=Math.hypot(dx,dz);
   if(length<1)continue;
@@ -24,16 +28,19 @@ function blocksLandmarkView(x,z,radius,landmarks){
 
 export function beijingNeighborhoodPlacements(landmarks=[]){
  if(TRACK.theme!=='beijing')return EMPTY;
- const result=[],count=Math.ceil(TRACK.length/116),step=TRACK.length/count;
+ const reference=beijingReferenceTrack();
+ const result=[],count=Math.ceil(reference.length/116),step=reference.length/count;
  const accepts=(p,radius)=>projectTrack(p.x,p.y).distance>=TRACK.roadWidth/2+radius+18
   &&beijingWallClearance(p.x,p.y,radius)
   // Leave a small forecourt at China Zun: a house immediately before the tower
   // hid its flared base along the opening-straight approach.
-  &&landmarks.every(other=>Math.hypot(other.x-p.x,other.z-p.y)>=other.radius+radius+(other.kind==='beijing-china-zun'?95:25))
+  &&landmarks.every(other=>other.kind==='beijing-birds-nest'&&TRACK.stadium
+   ?beijingStadiumClearance(TRACK.stadium,p.x,p.y,radius+25)
+   :Math.hypot(other.x-p.x,other.z-p.y)>=other.radius+radius+(other.kind==='beijing-china-zun'?95:25))
   &&result.every(other=>Math.hypot(other.x-p.x,other.z-p.y)>=other.radius+radius+7)
   &&!blocksLandmarkView(p.x,p.y,radius,landmarks);
  for(let index=0;index<count;index++)for(const side of [-1,1]){
-  const s=wrap(36+index*step+(side>0?step*.5:0)),road=trackPoint(s);
+  const s=wrap(36+index*step+(side>0?step*.5:0)),road=beijingReferencePoint(s);
   const variant=(index+(side>0?3:0))%9;
   const garden=road.elevation>8;
   const tree=garden?variant%2===0:variant===0;
@@ -46,7 +53,7 @@ export function beijingNeighborhoodPlacements(landmarks=[]){
   let chosen;
   // Small shifts fix corner crowding without producing large empty districts.
   for(const shift of [0,18,-18]){
-   const at=wrap(s+shift),p=trackPoint(at,side*(TRACK.roadWidth/2+radius+32+(variant%3)*8));
+   const at=wrap(s+shift),p=beijingReferencePoint(at,side*(TRACK.roadWidth/2+radius+32+(variant%3)*8));
    if(!accepts(p,radius))continue;
    chosen={kind,x:p.x,z:p.y,s:at,angle:p.angle+(side<0?Math.PI:0),side,radius,width,depth,height,variant,elevation:0,garden};
    break;
@@ -54,10 +61,13 @@ export function beijingNeighborhoodPlacements(landmarks=[]){
   // A slim tree can occupy small leftover plots near squares without covering
   // the landmark. It is still subject to the same facade-view exclusion.
   if(!chosen&&!tree&&index%2===0){
-   const smallRadius=19,p=trackPoint(s,side*(TRACK.roadWidth/2+smallRadius+34));
+   const smallRadius=19,p=beijingReferencePoint(s,side*(TRACK.roadWidth/2+smallRadius+34));
    if(accepts(p,smallRadius))chosen={kind:'beijing-garden-tree',x:p.x,z:p.y,s,angle:p.angle,side,radius:smallRadius,width:36,depth:36,height:garden?84:48,variant,elevation:0,garden};
   }
-  if(chosen)result.push(Object.freeze(chosen));
+  if(chosen){
+   if(TRACK.stadium){chosen.legacyS=chosen.s;chosen.s=chosen.s>=TRACK.stadium.legacyStart&&chosen.s<=TRACK.stadium.legacyEnd?projectTrack(chosen.x,chosen.z).s:legacyToStadiumDistance(TRACK.stadium,chosen.s);}
+   result.push(Object.freeze(chosen));
+  }
  }
  return Object.freeze(result);
 }

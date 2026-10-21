@@ -1,4 +1,4 @@
-import { LEADERBOARD_VERSION, normalizeEntries, normalizeName, normalizeCity } from './leaderboard.js';
+import { leaderboardVersionForCity, normalizeEntries, normalizeName, normalizeCity } from './leaderboard.js';
 
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 // Native browser fetch requires its Window receiver, even when called by a client.
@@ -7,7 +7,7 @@ const playerLabel = result => result.playerId === 1 ? '青色车手（P1）' : '
 const cityLabel = city => city === 'london' ? '伦敦' : '海岸';
 const sameCategory = (data, result) => data && normalizeCity(data.city) === result.city
   && (data.laps === undefined || data.laps === result.laps)
-  && (data.version === undefined || data.version === LEADERBOARD_VERSION);
+  && ((data.version === undefined && result.city !== 'coast-beijing') || data.version === leaderboardVersionForCity(result.city));
 const scoreTime = milliseconds => {
   const centiseconds = Math.round(milliseconds / 10);
   return `${String(Math.floor(centiseconds / 6000)).padStart(2, '0')}:${((centiseconds % 6000) / 100).toFixed(2).padStart(5, '0')}`;
@@ -139,9 +139,9 @@ export class LeaderboardClient {
     this.node('leaderboard-status').textContent = `正在读取${cityLabel(city)}全站排行榜…`;
     this.node('leaderboard-retry').classList.add('hidden');
     try {
-      const data = await this.request(`/api/leaderboard?laps=${laps}&city=${encodeURIComponent(city)}&version=${encodeURIComponent(LEADERBOARD_VERSION)}`);
+      const data = await this.request(`/api/leaderboard?laps=${laps}&city=${encodeURIComponent(city)}&version=${encodeURIComponent(leaderboardVersionForCity(city))}`);
       if (request !== this.boardRequest) return;
-      if (data.version !== LEADERBOARD_VERSION || data.laps !== laps || normalizeCity(data.city) !== city) {
+      if (data.version !== leaderboardVersionForCity(city) || data.laps !== laps || normalizeCity(data.city) !== city) {
         throw new Error('榜单城市或版本不匹配，请刷新游戏后重试。');
       }
       this.render(data.entries);
@@ -177,7 +177,7 @@ export class LeaderboardClient {
       seen.add(result.playerId); return true;
     }).sort((a, b) => a.timeMs - b.timeMs).map(result => ({ finished: true,
       laps: result.laps, city: normalizeCity(result.city), timeMs: result.timeMs, playerId: result.playerId,
-      mode: result.mode, version: LEADERBOARD_VERSION, id: uniqueId() }));
+      mode: result.mode, version: leaderboardVersionForCity(normalizeCity(result.city)), id: uniqueId() }));
     return this.nextCandidate();
   }
 

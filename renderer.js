@@ -11,6 +11,9 @@ import { LONDON_SECOND_LANDMARKS, addLondonSecondLandmark } from './london-secon
 import { londonSecondLandmarkPlacements } from './london-second-layout.js';
 import { LONDON_THIRD_LANDMARKS, addLondonThirdLandmark } from './london-third-landmarks.js';
 import { londonThirdLandmarkPlacements } from './london-third-layout.js';
+import { londonMagicPlacements, londonMagicBlend } from './london-magic-layout.js';
+import { addLondonMagicScenery, addMagicCharacter, addMagicFlyingCar } from './london-magic-models.js';
+import { londonMagicState, magicArmMatrix, MagicEffects } from './london-magic-effects.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
@@ -156,11 +159,21 @@ varying float vEmission;
 uniform vec3 uEye;
 uniform vec3 uFog;
 uniform vec3 uFogRange;
+uniform float uMagic;
+uniform vec3 uSpellPositionA;
+uniform vec3 uSpellPositionB;
+uniform vec3 uSpellColorA;
+uniform vec3 uSpellColorB;
 void main() {
   vec3 n = normalize(vNormal);
   float sun = max(dot(n, normalize(vec3(-0.45, 0.86, 0.35))), 0.0);
   float hemisphere = 0.54 + 0.12 * n.y;
-  vec3 color = vColor.rgb * mix(vec3(hemisphere) + vec3(0.52,0.46,0.36)*sun, vec3(1.17), vEmission);
+  vec3 daylight = vec3(hemisphere) + vec3(0.52,0.46,0.36)*sun;
+  vec3 moonlight = vec3(.17,.23,.34) + vec3(.19,.24,.34)*sun + max(n.y,0.0)*vec3(.035,.045,.065);
+  vec3 color = vColor.rgb * mix(mix(daylight,moonlight,uMagic),vec3(1.17),vEmission);
+  float a = max(0.0,1.0-length(vPosition-uSpellPositionA)/145.0);
+  float b = max(0.0,1.0-length(vPosition-uSpellPositionB)/145.0);
+  color += vColor.rgb*(uSpellColorA*a*a+uSpellColorB*b*b)*(1.0-vEmission)*uMagic;
   float fog = smoothstep(uFogRange.x,uFogRange.y,length(vPosition-uEye));
   color = mix(color, uFog, fog*uFogRange.z);
   gl_FragColor = vec4(color, vColor.a);
@@ -181,6 +194,7 @@ uniform float uAspect;
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
 uniform float uLondon;
+uniform float uMagic;
 void main(){
   vec3 gradient = mix(uHorizon,uZenith,pow(clamp(vUV.y,0.0,1.0),0.7));
   // Gentle repeating parallax keeps the painted horizon stable through corners.
@@ -192,6 +206,9 @@ void main(){
   vec3 image = a*uWeights.x+b*uWeights.y+c*uWeights.z;
   float luminance=dot(image,vec3(.2126,.7152,.0722));
   image=mix(image,vec3(luminance)*vec3(.84,.98,1.13),uLondon*.64);
+  vec3 night=mix(vec3(.055,.085,.15),vec3(.012,.024,.065),clamp(vUV.y,0.0,1.0));
+  night+=vec3(.06,.08,.12)*luminance;
+  image=mix(image,night,uMagic);
   float landscape = smoothstep(0.03,0.3,vUV.y);
   gl_FragColor=vec4(mix(uHorizon,image,landscape),1.0);
 }`;
@@ -211,6 +228,7 @@ uniform float uFrameAspect;
 uniform vec3 uEye;
 uniform vec3 uFog;
 uniform vec3 uFogRange;
+uniform float uMagic;
 varying vec2 vUV;
 varying vec3 vPosition;
 void main(){
@@ -219,6 +237,7 @@ void main(){
   vec2 uv=(vUV-0.5)*scale+0.5;
   vec3 color=vec3(0.035,0.045,0.05);
   if(uv.x>=0.0&&uv.x<=1.0&&uv.y>=0.0&&uv.y<=1.0)color=texture2D(uPoster,uv).rgb;
+  color*=mix(vec3(1.0),vec3(.52,.58,.72),uMagic);
   float fog=smoothstep(uFogRange.x,uFogRange.y,length(vPosition-uEye));
   gl_FragColor=vec4(mix(color,uFog,fog*uFogRange.z),1.0);
 }`;
@@ -257,6 +276,46 @@ export function sampleRoadRibbon(step = 10) {
   return rows;
 }
 
+/** Stadium running-track material follows route metadata, never a second road. */
+export function stadiumLoopAt(distance) {
+  const stadium=TRACK.stadium,s=mod(distance,TRACK.length);
+  return !!stadium&&s>=stadium.loopStart&&s<=stadium.loopEnd;
+}
+function stadiumPassageAt(distance){
+  const stadium=TRACK.stadium,s=mod(distance,TRACK.length);
+  return !!stadium&&s>=stadium.start-250&&s<=stadium.end+250;
+}
+
+let bridgeCorridorTrack=null,bridgeCorridor=[];
+/** Test the complete lower-road/car/camera envelope, not just the nearest
+ * projection, which can select the upper deck at a layered crossing. */
+export function stadiumBridgeSupports(distance,side) {
+  if(!TRACK.stadium)return [];
+  const q=trackPoint(distance,side*(TRACK.roadWidth/2+15));
+  if(q.elevation<=70)return [];
+  if(bridgeCorridorTrack!==TRACK){
+    bridgeCorridorTrack=TRACK;bridgeCorridor=[];
+    for(let s=0;s<TRACK.length;s+=12){
+      const p=trackPoint(s);
+      bridgeCorridor.push({x:p.x,z:p.y,min:p.elevation,max:p.elevation+25,radius:TRACK.roadWidth/2+10});
+      for(const lane of [-48,0,48])for(const speed of [0,517]){
+        const camera=updateChaseCamera({...trackPoint(s,lane),speed},null);
+        bridgeCorridor.push({x:camera.eye[0],z:camera.eye[2],min:camera.eye[1]-4,max:camera.eye[1]+4,radius:20});
+      }
+    }
+  }
+  const p=trackPoint(distance,side*(TRACK.roadWidth/2+115));
+  const boxes=[{kind:'post',x:p.x,y:q.elevation/2-4,z:p.y,w:12,h:q.elevation-8,d:12,angle:0,color:'#425b67'},
+    {kind:'cap',x:(p.x+q.x)/2,y:q.elevation-8,z:(p.y+q.y)/2,w:Math.hypot(q.x-p.x,q.y-p.y)+13,h:9,d:13,angle:Math.atan2(q.y-p.y,q.x-p.x),color:'#587581'}];
+  const clear=box=>bridgeCorridor.every(sample=>{
+    if(sample.max<box.y-box.h/2||sample.min>box.y+box.h/2)return true;
+    const c=Math.cos(box.angle),s=Math.sin(box.angle),dx=sample.x-box.x,dz=sample.z-box.z;
+    const x=Math.max(0,Math.abs(dx*c+dz*s)-box.w/2),z=Math.max(0,Math.abs(-dx*s+dz*c)-box.d/2);
+    return Math.hypot(x,z)>sample.radius;
+  });
+  return boxes.every(clear)?boxes:[];
+}
+
 function buildRoad() {
   const mesh = new MeshBuilder(), step = TRACK.length / Math.ceil(TRACK.length / 10), half = TRACK.roadWidth / 2;
   const strip = (s, widthA, widthB, height, color, emission = 0) => {
@@ -264,15 +323,20 @@ function buildRoad() {
     mesh.quad([p.x,p.elevation+height,p.y],[q.x,q.elevation+height,q.y],[r.x,r.elevation+height,r.y],[t.x,t.elevation+height,t.y],color,emission,normalize([-p.slope*Math.cos(p.angle),1,-p.slope*Math.sin(p.angle)]));
   };
   for (let s = 0, i = 0; s < TRACK.length - 0.01; s += step, i++) {
-    strip(s,-half-16,half+16,0.35,'#555b58');
-    strip(s,-half,half,0.7,i%11===0?'#343a44':'#303640');
-    for (const side of [-1,1]) {
-      strip(s,side*half,side*(half+9),0.85,Math.floor(s/25)%2?'#edf2db':'#e85a62');
-      strip(s,side*(half-5),side*(half-3),0.92,'#c6d6d7');
+    const stadium=stadiumLoopAt(s+step/2);
+    strip(s,-half-16,half+16,0.35,stadium?'#765347':'#555b58');
+    strip(s,-half,half,0.7,stadium?(i%11===0?'#97483e':'#8f4039'):(i%11===0?'#343a44':'#303640'));
+    if(stadium){
+      for(const lane of [-half+3,-40,-20,0,20,40,half-3])strip(s,lane-.6,lane+.6,.94,'#eee2cc');
+    }else{
+      for (const side of [-1,1]) {
+        strip(s,side*half,side*(half+9),0.85,Math.floor(s/25)%2?'#edf2db':'#e85a62');
+        strip(s,side*(half-5),side*(half-3),0.92,'#c6d6d7');
+      }
+      if (s % 83 < 31) strip(s,-0.8,0.8,1,'#c0c4b0');
+      // Tire-darkened racing line adds surface variation without expensive textures.
+      if (i%3!==0) { strip(s,-23,-20,0.82,'#2d323b'); strip(s,20,23,0.82,'#2d323b'); }
     }
-    if (s % 83 < 31) strip(s,-0.8,0.8,1,'#c0c4b0');
-    // Tire-darkened racing line adds surface variation without expensive textures.
-    if (i%3!==0) { strip(s,-23,-20,0.82,'#2d323b'); strip(s,20,23,0.82,'#2d323b'); }
     if (trackPoint(s).elevation > 3) {
       strip(s,-half-16,half+16,-7,'#263d48');
       for(const side of [-1,1]) {
@@ -387,6 +451,8 @@ export function londonLandmarkPlacements() {
 }
 function londonSceneryPlacements() {
   const rng=random(614092),items=[],landmarks=londonLandmarkPlacements();
+  const duels=londonMagicPlacements().filter(item=>item.kind.startsWith('magic-duel'));
+  const clearDuel=(x,z,radius)=>duels.every(item=>Math.hypot(item.x-x,item.z-z)>item.radius+radius+10);
   for(let s=90,index=0;s<TRACK.length;s+=108,index++)for(const side of [-1,1]){
     const p=trackPoint(s,side*(150+rng()*45));
     if(p.elevation>5)continue;
@@ -398,6 +464,9 @@ function londonSceneryPlacements() {
     if(items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+8))continue;
     items.push({kind:tree?'london-tree':'terrace',x:p.x,z:p.y,angle:p.angle,side,radius,width,depth,height:tree?78:72+rng()*50,variant:index%5});
   }
+  // Two wider duels replace one ordinary terrace and one tree. Filter after
+  // generation to preserve the existing random sequence and refill below.
+  for(let i=items.length-1;i>=0;i--)if(!clearDuel(items[i].x,items[i].z,items[i].radius))items.splice(i,1);
   // Wide architectural landmarks leave narrow legitimate infill plots between
   // them. Keep the surrounding streets lived-in without shrinking clearances
   // or replacing another landmark; every infill roof passes the same geometry
@@ -408,6 +477,7 @@ function londonSceneryPlacements() {
       if(count>=12)break;
       const width=52,depth=46,radius=Math.hypot(width+8,depth+8)/2,p=trackPoint(s,side*setback);
       if(p.elevation>5||Math.abs(p.y-TRACK.river.centerZ)<TRACK.river.halfWidth+radius+28||projectTrack(p.x,p.y).distance<radius+76)continue;
+      if(!clearDuel(p.x,p.y,radius))continue;
       if(landmarks.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+35)||items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+8))continue;
       items.push({kind:'terrace',x:p.x,z:p.y,angle:p.angle,side,radius,width,depth,height:78+(count%3)*11,variant:count%5});count++;
     }
@@ -679,21 +749,22 @@ export function cornerMarkers() {
 
 /** Local +Z is the driver's right: an outer mast's arm must extend toward -side. */
 export function lampGeometry(distance,side=1) {
-  const skyline=TRACK.theme==='shanghai',lampLift=skyline?50:TRACK.theme==='london'?36:0;
-  const q=trackPoint(distance,side*(TRACK.roadWidth/2+(skyline?85:27)));
+  const skyline=TRACK.theme==='shanghai',beijing=TRACK.theme==='beijing',lampLift=skyline||beijing?50:TRACK.theme==='london'?36:0;
+  const q=trackPoint(distance,side*(TRACK.roadWidth/2+(skyline||beijing?85:27))),reach=beijing?101:43;
   const right=[-Math.sin(q.angle),Math.cos(q.angle)];
   const inward=(reach,height)=>[q.x-right[0]*side*reach,q.elevation+height,q.y-right[1]*side*reach];
   return {s:distance,side,angle:q.angle,
     mast:{position:[q.x,q.elevation+(74+lampLift)/2,q.y],size:[3,74+lampLift,3]},
-    arm:{position:inward(22,73+lampLift),size:[3,3,46]},
-    head:{position:inward(43,71+lampLift),size:[9,4,12]},
-    lens:{position:inward(43,68.6+lampLift),size:[8,.7,10]},
+    arm:{position:inward((reach+1)/2,73+lampLift),size:[3,3,reach+3]},
+    head:{position:inward(reach,71+lampLift),size:[9,4,12]},
+    lens:{position:inward(reach,68.6+lampLift),size:[8,.7,10]},
   };
 }
 
 export function roadsideLamps() {
   const lamps=[],football=TRACK.theme==='austin'?cityLandmarkPlacements().find(item=>item.kind==='football-team'):null;
   for(let s=0,i=0;s<TRACK.length;s+=47,i++) {
+    if(stadiumPassageAt(s))continue;
     const p=trackPoint(s),coastal=p.y>TRACK.height*.63,city=p.x>TRACK.width*.56&&p.y<TRACK.height*.63;
     if((coastal||city||TRACK.theme==='neon'||TRACK.theme==='ridge'||TRACK.theme==='london'||isCityTheme())&&i%3===0){
       // Light the opposite verge along the stadium approach so arms do not
@@ -728,7 +799,7 @@ export function cornerMarkerGeometry(marker) {
 export function timingGateGeometry() {
   return SPLIT_FRACTIONS.map((fraction,index) => {
     const s = TRACK.startDistance + TRACK.length * fraction, center = trackPoint(s);
-    const halfSpan = TRACK.roadWidth / 2 + 30;
+    const halfSpan = TRACK.roadWidth / 2 + (TRACK.theme==='beijing'?75:30);
     return { index:index+1, fraction, s, center, halfSpan, finish:index===3,
       posts:[-1,1].map(side=>trackPoint(s,side*halfSpan)),
       normal:[-Math.cos(center.angle),0,-Math.sin(center.angle)] };
@@ -870,13 +941,13 @@ function buildWorld() {
   }
   // Lamp posts and reflective barriers support road reading, including hairpins.
   for(let s=0,i=0;s<TRACK.length;s+=47,i++) {
-    const p=trackPoint(s), coastal=p.y>h*.63;
-    if(i%3===0) {
+    const p=trackPoint(s), coastal=p.y>h*.63,stadium=stadiumPassageAt(s);
+    if(!stadium&&i%3===0) {
       const side=i%2?1:-1, q=trackPoint(s,side*(TRACK.roadWidth/2+25));
       props.box(q.x,q.elevation+5,q.y,3,10,3,'#c7d3c3');
       props.box(q.x,q.elevation+9.5,q.y,4,2,4,i%2?'#ffbc7d':'#9ceaff',0,.65);
     }
-    if(coastal && i%2===0) {
+    if(!stadium&&coastal&&i%2===0) {
       const side=p.y>h*.81?1:-1;
       const q=trackPoint(s,side*(TRACK.roadWidth/2+18)),r=trackPoint(s+43,side*(TRACK.roadWidth/2+18));
       props.box(q.x,q.elevation+8,q.y,3,16,3,'#98aeb2');
@@ -886,10 +957,19 @@ function buildWorld() {
       for(const side of [-1,1]) {
         const q=trackPoint(s,side*(TRACK.roadWidth/2+15)),r=trackPoint(s+47,side*(TRACK.roadWidth/2+15));
         props.box(q.x,q.elevation+13,q.y,3,26,3,'#9aaeb5');
-        for(const lift of [11,25])props.box((q.x+r.x)/2,(q.elevation+r.elevation)/2+lift,(q.y+r.y)/2,
+        if(TRACK.stadium){
+          // Short sloped prisms follow the real ramp at each end and retain
+          // height-bounded collisions, including the elevated inner straight.
+          for(let ds=0;ds<47;ds+=11.75)for(const lift of [11,25]){
+            const a=trackPoint(s+ds,side*(TRACK.roadWidth/2+15)),b=trackPoint(s+ds+11.75,side*(TRACK.roadWidth/2+15));
+            beam(props,[a.x,a.elevation+lift,a.y],[b.x,b.elevation+lift,b.y],3,lift===25?'#b2d4d6':'#6e8b96');
+          }
+        }else for(const lift of [11,25])props.box((q.x+r.x)/2,(q.elevation+r.elevation)/2+lift,(q.y+r.y)/2,
           Math.hypot(r.x-q.x,r.y-q.y)+2,4,3,lift===25?'#b2d4d6':'#6e8b96',Math.atan2(r.y-q.y,r.x-q.x));
-        if(i%5===0&&q.elevation>70&&projectTrack(q.x,q.y).distance>TRACK.roadWidth/2+10){
-          if(TRACK.theme==='shanghai'){
+        if(i%5===0&&q.elevation>70&&(TRACK.stadium||projectTrack(q.x,q.y).distance>TRACK.roadWidth/2+10)){
+          if(TRACK.stadium){
+            for(const box of stadiumBridgeSupports(s,side))props.box(box.x,box.y,box.z,box.w,box.h,box.d,box.color,box.angle);
+          }else if(TRACK.theme==='shanghai'){
             // Set piers outside the curved chase-camera sweep. A cantilever
             // cap carries the deck; overlapping helix floors retain clearance.
             const support=trackPoint(s,side*(TRACK.roadWidth/2+115));
@@ -914,7 +994,7 @@ function buildWorld() {
     props.box(q.x,q.elevation+40,q.y,2,19,23,'#142a39',q.angle);
     for(const chevron of geometry.chevrons)for(const vertices of chevron.strokes)props.quad(...vertices,'#ffdb89',.75,geometry.normal);
   }
-  const start=trackPoint(TRACK.startDistance),half=TRACK.roadWidth/2+15,gantryRise=london||themedCity?40:0;
+  const start=trackPoint(TRACK.startDistance),half=TRACK.roadWidth/2+(TRACK.theme==='beijing'?50:15),gantryRise=london||themedCity?40:0;
   for(const side of [-1,1]) {
     const p=trackPoint(TRACK.startDistance,side*half);
     props.box(p.x,p.elevation+43+gantryRise/2,p.y,10,86+gantryRise,10,'#233b4c',p.angle);
@@ -928,7 +1008,9 @@ function buildWorld() {
     props.box(p.x,p.elevation+90+gantryRise,p.y,16,5,8,k%2?'#f0efe4':'#273b49',start.angle);
   }
   addTimingGates(props);
-  return { terrain, props, water, obstacles };
+  const magic=new MeshBuilder(obstacles);
+  addLondonMagicScenery(magic,londonMagicPlacements());
+  return { terrain, props, water, magic, obstacles };
 }
 
 /** Headless physics verification uses the exact production mesh-building path. */
@@ -1035,32 +1117,33 @@ export class RaceRenderer {
     this.mainProgram=program(gl,VERTEX,FRAGMENT);this.skyProgram=program(gl,SKY_VERTEX,SKY_FRAGMENT);
     this.posterProgram=program(gl,POSTER_VERTEX,POSTER_FRAGMENT);
     this.posterAttributes={position:gl.getAttribLocation(this.posterProgram,'aPosition'),uv:gl.getAttribLocation(this.posterProgram,'aUV')};
-    this.posterUniforms={};for(const name of ['uViewProjection','uPoster','uImageAspect','uFrameAspect','uEye','uFog','uFogRange'])this.posterUniforms[name]=gl.getUniformLocation(this.posterProgram,name);
+    this.posterUniforms={};for(const name of ['uViewProjection','uPoster','uImageAspect','uFrameAspect','uEye','uFog','uFogRange','uMagic'])this.posterUniforms[name]=gl.getUniformLocation(this.posterProgram,name);
     this.posterMeshes=[];this.scoreboardCanvas=null;
     this.attributes={};this.uniforms={};
     for(const name of ['aPosition','aNormal','aColor','aEmission'])this.attributes[name]=gl.getAttribLocation(this.mainProgram,name);
-    for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
+    for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange','uMagic','uSpellPositionA','uSpellPositionB','uSpellColorA','uSpellColorB'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
     this.skyAttributes={position:gl.getAttribLocation(this.skyProgram,'aPosition')};this.skyUniforms={};
-    for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon','uLondon'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
+    for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon','uLondon','uMagic'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
     this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
     const world=buildWorld();
     this.obstacles=world.obstacles;
-    this.meshes={terrain:upload(gl,world.terrain),road:upload(gl,buildRoad()),water:upload(gl,world.water),props:upload(gl,world.props),cars:[upload(gl,carMesh('#57dbe6')),upload(gl,carMesh('#ff9870'))],ghost:upload(gl,ghostCarMesh()),ghostGold:upload(gl,ghostCarMesh('#ffd166')),flames:upload(gl,flameMesh()),shadow:upload(gl,shadowMesh())};
+    this.meshes={terrain:upload(gl,world.terrain),road:upload(gl,buildRoad()),water:upload(gl,world.water),props:upload(gl,world.props),magic:world.magic.data.length?upload(gl,world.magic):{count:0},cars:[upload(gl,carMesh('#57dbe6')),upload(gl,carMesh('#ff9870'))],ghost:upload(gl,ghostCarMesh()),ghostGold:upload(gl,ghostCarMesh('#ffd166')),flames:upload(gl,flameMesh()),shadow:upload(gl,shadowMesh())};
     this.trackId=TRACK.id;
     this.worldMatrix=identity();
     this.textures={};
     for(const [name,url] of Object.entries(this.sceneUrls))this._loadTexture(name,url);
     this._buildPosters();
+    this._buildMagicActors();
     gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);gl.clearColor(.5,.68,.76,1);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   }
   rebuild(engine) {
     if(!this.available)return this;
     const gl=this.gl,world=buildWorld();
-    for(const [key,builder] of Object.entries({terrain:world.terrain,road:buildRoad(),water:world.water,props:world.props})) {
-      const previous=this.meshes[key];this.meshes[key]=upload(gl,builder);if(previous?.buffer)gl.deleteBuffer?.(previous.buffer);
+    for(const [key,builder] of Object.entries({terrain:world.terrain,road:buildRoad(),water:world.water,props:world.props,magic:world.magic})) {
+      const previous=this.meshes[key];this.meshes[key]=key==='magic'&&!builder.data.length?{count:0}:upload(gl,builder);if(previous?.buffer)gl.deleteBuffer?.(previous.buffer);
     }
-    this.obstacles=world.obstacles;this.trackId=TRACK.id;this.ghostPoses=[];this._buildPosters();
+    this.obstacles=world.obstacles;this.trackId=TRACK.id;this.ghostPoses=[];this._buildPosters();this._buildMagicActors();
     if(engine){engine.setObstacles(this.obstacles);this.resetCameras(engine);}else this.cameras=[null,null];
     return this;
   }
@@ -1078,6 +1161,46 @@ export class RaceRenderer {
       try{gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);state.aspect=(image.naturalWidth||image.width||1)/(image.naturalHeight||image.height||1);state.ready=1;}catch{state.ready=0;}
     };
     image.onerror=()=>{state.ready=0;};image.src=url;
+  }
+  _buildMagicActors() {
+    const gl=this.gl;
+    for(const mesh of Object.values(this.magicMeshes||{}))gl.deleteBuffer?.(mesh.buffer);
+    this.magicMeshes={};this.magicItems=londonMagicPlacements();this.magicState=null;this.magicEffects=null;
+    if(!this.magicItems.length)return;
+    for(const kind of ['harry','voldemort','hermione','deathEater'])for(const part of ['body','arm']){
+      const builder=new MeshBuilder();addMagicCharacter(builder,kind,part);
+      this.magicMeshes[`${kind}:${part}`]=upload(gl,builder);
+    }
+    const car=new MeshBuilder();addMagicFlyingCar(car);this.magicMeshes.car=upload(gl,car);
+    this.magicEffects=new MagicEffects();const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+    gl.bufferData(gl.ARRAY_BUFFER,this.magicEffects.data,gl.DYNAMIC_DRAW);
+    this.magicMeshes.effects={buffer,count:0};
+  }
+  _updateMagic(engine) {
+    if(!this.magicItems?.length)return;
+    this.magicState=londonMagicState(this.magicItems,engine.time);
+    // One upload before either viewport. Static world/actor buffers never change.
+    this.magicEffects.update(this.magicState);const mesh=this.magicMeshes.effects;
+    mesh.count=this.magicEffects.count;
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER,mesh.buffer);
+    this.gl.bufferSubData?.(this.gl.ARRAY_BUFFER,0,this.magicEffects.data.subarray(0,mesh.count*11));
+  }
+  _magicActors(camera) {
+    const state=this.magicState;if(!state)return;
+    for(const actor of state.actors){
+      if(Math.hypot(actor.x-camera.eye[0],actor.z-camera.eye[2])>1500)continue;
+      this._mesh(this.magicMeshes[`${actor.kind}:body`],modelMatrix(actor.x,actor.y,actor.z,actor.angle));
+      this._mesh(this.magicMeshes[`${actor.kind}:arm`],magicArmMatrix(actor));
+    }
+    const car=state.car;
+    if(car&&Math.hypot(car.x-camera.eye[0],car.z-camera.eye[2])<1900)
+      this._mesh(this.magicMeshes.car,modelMatrix(car.x,car.y,car.z,car.angle,car.roll,car.pitch));
+  }
+  _magicSpells() {
+    if(!this.magicState||!this.magicMeshes.effects.count)return;
+    const gl=this.gl;gl.enable(gl.BLEND);gl.depthMask(false);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+    this._mesh(this.magicMeshes.effects);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(true);gl.disable(gl.BLEND);
   }
   _buildPosters() {
     const gl=this.gl;
@@ -1112,6 +1235,7 @@ export class RaceRenderer {
     for(const loc of Object.values(this.attributes))gl.disableVertexAttribArray(loc);
     gl.useProgram(this.posterProgram);
     gl.uniformMatrix4fv(u.uViewProjection,false,viewProjection);gl.uniform3fv(u.uEye,camera.eye);gl.uniform3fv(u.uFog,this.activeFog);gl.uniform3fv(u.uFogRange,this.fogRange);
+    gl.uniform1f(u.uMagic,this.activeMagic||0);
     gl.activeTexture(gl.TEXTURE0);gl.uniform1i(u.uPoster,0);
     for(const poster of visible){
       const texture=this.textures[poster.textureKey];
@@ -1150,13 +1274,14 @@ export class RaceRenderer {
     }
     gl.uniformMatrix4fv(this.uniforms.uModel,false,model);gl.drawArrays(gl.TRIANGLES,0,mesh.count);
   }
-  _sky(camera,weights,aspect) {
+  _sky(camera,weights,aspect,magic=0) {
     const gl=this.gl,u=this.skyUniforms;
     const citySky=TRACK.theme==='london'||isCityTheme(),clouds=this.textures.clouds;
     // City skylines come from modeled landmarks; their sky must contain no buildings.
     // A pending/failed cloud texture keeps ready=0 and uses the plain shader gradient.
     const one=citySky?clouds:this.textures.coast,two=citySky?clouds:this.textures.alpine,three=citySky?clouds:this.textures.city;
-    const color=field=>[0,1,2].map(i=>Object.entries(weights).reduce((sum,[name,w])=>sum+SCENES[name][field][i]*w,0));
+    const night={zenith:[.02,.035,.09],horizon:[.085,.12,.19],fog:[.075,.115,.17]};
+    const color=field=>[0,1,2].map(i=>mix(Object.entries(weights).reduce((sum,[name,w])=>sum+SCENES[name][field][i]*w,0),night[field][i],magic));
     gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
     for(const loc of Object.values(this.attributes))gl.disableVertexAttribArray(loc);
     gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.enableVertexAttribArray(this.skyAttributes.position);gl.vertexAttribPointer(this.skyAttributes.position,2,gl.FLOAT,false,0,0);
@@ -1166,17 +1291,25 @@ export class RaceRenderer {
     gl.uniform1f(u.uReadyA,one.ready);gl.uniform1f(u.uReadyB,two.ready);gl.uniform1f(u.uReadyC,three.ready);
     gl.uniform3fv(u.uWeights,[weights.coast,weights.alpine,weights.city]);
     gl.uniform1f(u.uLondon,TRACK.theme==='london'?1:0);
+    gl.uniform1f(u.uMagic,magic);
     gl.uniform1f(u.uHeading,camera.angle);gl.uniform1f(u.uAspect,aspect);gl.uniform3fv(u.uZenith,color('zenith'));gl.uniform3fv(u.uHorizon,color('horizon'));
     gl.drawArrays(gl.TRIANGLES,0,6);gl.disableVertexAttribArray(this.skyAttributes.position);
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.mainProgram);
-    this.activeFog=color('fog');gl.uniform3fv(this.uniforms.uFog,this.activeFog);
-    this.fogRange=TRACK.theme==='shanghai'?[1800,6500,.65]:[620,2550,.9];gl.uniform3fv(this.uniforms.uFogRange,this.fogRange);
+    this.activeMagic=magic;this.activeFog=color('fog');gl.uniform3fv(this.uniforms.uFog,this.activeFog);
+    this.fogRange=TRACK.theme==='shanghai'?[1800,6500,.65]:[mix(620,580,magic),mix(2550,2900,magic),.9];gl.uniform3fv(this.uniforms.uFogRange,this.fogRange);
+    gl.uniform1f(this.uniforms.uMagic,magic);
+    for(const [index,suffix]of ['A','B'].entries()){
+      const light=this.magicState?.lights[index];
+      gl.uniform3fv(this.uniforms[`uSpellPosition${suffix}`],light?.position||[0,-1000,0]);
+      gl.uniform3fv(this.uniforms[`uSpellColor${suffix}`],light?light.color.map(c=>c*light.strength):[0,0,0]);
+    }
   }
   render(engine,dt=1/60,now=0) {
     if(!this.available)return;
     const gl=this.gl,w=this.canvas.width,h=this.canvas.height;
     if(!w||!h)return;
     this._refreshAustinScoreboard();
+    this._updateMagic(engine);
     gl.enable(gl.SCISSOR_TEST);gl.disable(gl.BLEND);
     const divider=Math.floor(w/2);
     for(let i=0;i<(this.singlePlayer?1:2);i++) {
@@ -1185,11 +1318,12 @@ export class RaceRenderer {
       gl.viewport(x,0,width,h);gl.scissor(x,0,width,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
       const camera=this.cameras[i]=updateChaseCamera(car,this.cameras[i],dt);
       const aspect=width/h;
-      this._sky(camera,sceneWeights(car.x,car.y),aspect);
+      this._sky(camera,sceneWeights(car.x,car.y),aspect,londonMagicBlend(car));
       const viewProjection=multiply(perspective(camera.fov,aspect),lookAt(camera.eye,camera.target));
       gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,viewProjection);
       gl.uniform3fv(this.uniforms.uEye,camera.eye);
       this._mesh(this.meshes.terrain);this._mesh(this.meshes.water);this._mesh(this.meshes.road);this._mesh(this.meshes.props);
+      this._mesh(this.meshes.magic);this._magicActors(camera);
       this._posters(viewProjection,camera);
       gl.enable(gl.BLEND);gl.depthMask(false);
       for(const vehicle of engine.cars)this._mesh(this.meshes.shadow,modelMatrix(vehicle.x,(vehicle.elevation||0)+1.3,vehicle.y,vehicle.angle,0,Math.atan(vehicle.slope||0)));
@@ -1201,6 +1335,7 @@ export class RaceRenderer {
         this._mesh(this.meshes.cars[vehicle.colorIndex === 1 ? 1 : vehicle.colorIndex === 0 ? 0 : j%2],model);
         if(vehicle.boosting)this._mesh(this.meshes.flames,model);
       }
+      this._magicSpells();
       const ghosts = [...(this.ghostPoses?.[i] || [])].sort((a,b)=>
         Math.hypot(b.x-camera.eye[0],b.y-camera.eye[2])-Math.hypot(a.x-camera.eye[0],a.y-camera.eye[2]));
       if (ghosts.length) {

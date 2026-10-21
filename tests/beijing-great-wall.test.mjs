@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { TRACK,setTrack,trackPoint,projectTrack } from '../engine.js';
+import { beijingReferenceTrack, beijingReferencePoint, beijingReferenceProjection } from '../beijing-reference.js';
 import { ObstacleWorld } from '../collisions.js';
 import { updateChaseCamera } from '../renderer.js';
 import { cityLandmarkPlacements,citySceneryPlacements } from '../city-scenery.js';
-import { beijingWallLayout,beijingWallClearance,addBeijingGreatWall } from '../beijing-great-wall.js';
+import { beijingWallLayout,beijingWallClearance,beijingWallPassageCuts,addBeijingGreatWall } from '../beijing-great-wall.js';
 test.afterEach(()=>setTrack('coast'));
 class Mesh {
   constructor(){this.colliders=[];this.triangles=0;this.vertices=[];this.colors=new Set();}
@@ -20,30 +21,35 @@ class Mesh {
 }
 const makeMesh=()=>{const mesh=new Mesh();addBeijingGreatWall(mesh);return mesh;};
 
-test('the Great Wall leaves Beijing road geometry, elevation, grid and checkpoints exactly unchanged',()=>{
+test('the Great Wall retains the frozen pre-stadium city reference geometry',()=>{
   setTrack('coast-beijing');
-  const fingerprint=JSON.stringify({length:TRACK.length,roadWidth:TRACK.roadWidth,startDistance:TRACK.startDistance,startGrid:TRACK.startGrid,checkpoints:TRACK.checkpoints,sections:TRACK.sections,segments:TRACK.segments,samples:Array.from({length:1621},(_,i)=>trackPoint(i*10))});
+  const reference=beijingReferenceTrack();
+  const fingerprint=JSON.stringify({length:reference.length,roadWidth:reference.roadWidth,startDistance:reference.startDistance,startGrid:reference.startGrid,checkpoints:reference.checkpoints,sections:reference.sections,segments:reference.segments,samples:Array.from({length:1621},(_,i)=>beijingReferencePoint(i*10))});
   assert.equal(createHash('sha256').update(fingerprint).digest('hex'),'1d7dd63da97648a21bc54e3b2432ff53d55c0bc6b0a51eede686b1f04e8932b1');
 });
 
-test('one continuous winding ridge spans every quarter of the complete Beijing circuit',()=>{
+test('the original winding ridge retains its perimeter with one authorised stadium entrance gap',()=>{
   setTrack('coast-beijing');const wall=beijingWallLayout();
-  assert.equal(wall.nodes.length,wall.segments.length);assert.ok(wall.length>TRACK.length);assert.equal(wall.towers.length,18);
+  assert.equal(wall.nodes.length,wall.segments.length);assert.ok(wall.length>beijingReferenceTrack().length);assert.equal(wall.towers.length,18);
   assert.ok(new Set(wall.towers.map(t=>t.kind)).size>=3);
   assert.ok(Math.max(...wall.nodes.map(n=>n.base))-Math.min(...wall.nodes.map(n=>n.base))>100);
   for(let i=0;i<wall.segments.length;i++){
     const span=wall.segments[i],next=wall.segments[(i+1)%wall.segments.length];
     assert.equal(span.b,next.a,'adjacent ridge spans must use exactly the same join');
     assert.ok(span.length>25&&span.length<=91);
-    assert.ok(projectTrack(span.x,span.z).distance>320,'ridge centerline must stay beyond all road branches');
+    assert.ok(beijingReferenceProjection(span.x,span.z).distance>320,'the original perimeter stays clear of all original road branches');
     assert.ok(Math.cos(next.angle-span.angle)>.5,'no kink or folded offset loop');
   }
-  for(let s=0;s<TRACK.length;s+=90){
-    const car=trackPoint(s),nearest=Math.min(...wall.nodes.map(n=>Math.hypot(n.x-car.x,n.z-car.y)));
+  for(let s=0;s<beijingReferenceTrack().length;s+=90){
+    const car=beijingReferencePoint(s),nearest=Math.min(...wall.nodes.map(n=>Math.hypot(n.x-car.x,n.z-car.y)));
     assert.ok(nearest<650,`Great Wall missing near racing distance ${s}`);
   }
-  for(const landmark of cityLandmarkPlacements())assert.ok(beijingWallClearance(landmark.x,landmark.z,landmark.radius),`${landmark.kind} touches the ridge`);
+  for(const landmark of cityLandmarkPlacements().filter(p=>p.kind!=='beijing-birds-nest'))assert.ok(beijingWallClearance(landmark.x,landmark.z,landmark.radius),`${landmark.kind} touches the ridge`);
   assert.ok(citySceneryPlacements().filter(item=>beijingWallClearance(item.x,item.z,item.radius)).length>100,'ordinary Beijing streets remain populated');
+  const cuts=beijingWallPassageCuts();
+  assert.deepEqual([...cuts.ridge],[167,168,169,170],'only four entrance ridge spans are removed');
+  assert.deepEqual([...cuts.wall],[167,168,169,170],'stone and mountain have the same single real opening');
+  for(const index of cuts.wall){const span=wall.segments[index],road=projectTrack(span.x,span.z);assert.ok(road.s>=TRACK.stadium.entry.start&&road.s<=TRACK.stadium.entry.end+240&&road.distance<220,'the authorised opening remains next to the new entrance');}
 });
 
 test('actual geometry is finite, richly articulated and below the 30,000 triangle scenery budget',()=>{
@@ -61,10 +67,12 @@ test('actual geometry is finite, richly articulated and below the 30,000 triangl
 });
 
 test('the rendered wall and watchtowers are solid, while every lane and chase-camera pose remains clear',()=>{
-  setTrack('coast-beijing');const mesh=makeMesh(),world=new ObstacleWorld(mesh.colliders),wall=beijingWallLayout();
-  for(const node of wall.nodes){
+  setTrack('coast-beijing');const mesh=makeMesh(),world=new ObstacleWorld(mesh.colliders),wall=beijingWallLayout(),cuts=beijingWallPassageCuts();
+  for(const [index,node]of wall.nodes.entries()){
     const probe={x:node.x,y:node.z,elevation:node.base+32,height:25,angle:node.angle,speed:0};
-    assert.ok(world.resolveCar(probe)>0,`unphysical hole at ${node.s}`);
+    const insideOpening=cuts.wall.has(index)&&cuts.wall.has((index+wall.nodes.length-1)%wall.nodes.length);
+    if(insideOpening)assert.equal(world.resolveCar(probe),0,`the entrance still has an invisible wall at ${node.s}`);
+    else assert.ok(world.resolveCar(probe)>0,`unphysical hole outside the single authorised entrance at ${node.s}`);
   }
   for(const tower of wall.towers){
     const probe={x:tower.x,y:tower.z,elevation:tower.base+tower.height-20,height:12,angle:tower.angle,speed:0};

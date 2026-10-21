@@ -491,6 +491,7 @@ export function addCityPavements(mesh){
  if(!isCityTheme())return;
  const rio=TRACK.theme==='rio';
  for(let s=0;s<TRACK.length;s+=24)for(const side of [-1,1]){
+  if(TRACK.stadium&&s>=TRACK.stadium.loopStart-120&&s<=TRACK.stadium.loopEnd+120)continue;
   const p=trackPoint(s),q=trackPoint(s+24);if(p.elevation>3||q.elevation>3)continue;
   for(let band=0;band<5;band++){
    const a=trackPoint(s,side*(69+band*9)),b=trackPoint(s+24,side*(69+band*9)),c=trackPoint(s+24,side*(78+band*9)),d=trackPoint(s,side*(78+band*9));

@@ -92,6 +92,22 @@
           "drivingSha256": "e86d33b65b57669cc8976d99eab5dea2fef30efa1e12f9d9656176e5dee06834"
         }
       }
+    },
+    {
+      "date": "2026-10-20",
+      "scope": "coast-beijing",
+      "authorization": "给北京能不能加一个项目 就是能开进鸟巢里面 绕着里面的跑道跑一圈再出来继续",
+      "confirmation": "必经路段：进场绕一圈再出来",
+      "interpretation": "Replace only the local Beijing bend with a mandatory stadium passage, both full oval straights and 93.08% of its perimeter, using separate high entry and ground exit. Preserve the frozen base for existing city plots and all eleven other courses. This authorization is consumed by this implementation.",
+      "previousRouteLock": {
+        "geometrySha256": "8bb4d411e74489c8fd3f3f7a417cc0f450921aa0b8f6b7cdcdbf57adf04ec020",
+        "drivingSha256": "1c38909b0f02985dc7044edd5fade5ec52d87acfb43b6c3277d5336bc2433b84"
+      },
+      "recordVersion": "twin-turbo-beijing-stadium-v1-363-517",
+      "ghostVersions": [
+        "coast-ghost-v2",
+        "coast-race-ghost-v2"
+      ]
     }
   ],
   "previousReleaseComparison": {
@@ -128,8 +144,8 @@
       "drivingSha256": "f7891d92489b16e9ac57fef5a062de591eab301dccdf6a1a725a6f6682627244"
     },
     "coast-beijing": {
-      "geometrySha256": "8bb4d411e74489c8fd3f3f7a417cc0f450921aa0b8f6b7cdcdbf57adf04ec020",
-      "drivingSha256": "1c38909b0f02985dc7044edd5fade5ec52d87acfb43b6c3277d5336bc2433b84"
+      "geometrySha256": "575401498dc1171319bc151df936a672cc9de497252a449a3a61ecd2d444c298",
+      "drivingSha256": "2c164ce8d307f24175411a4ee5239b2f0f2b81d84b6a2b381ca8b7517607779a"
     },
     "coast-london": {
       "geometrySha256": "d37884b7288dc3239f95e97ad589f5fd067b1d7178291bb505b85d64745dde0f",

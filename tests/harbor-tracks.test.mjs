@@ -12,7 +12,7 @@ test.afterEach(()=>setTrack('coast'));
 test('eleven distinct additional courses close with continuous headings and enough racing width',()=>{
  assert.equal(tracks.length,11);const shapes=new Set();
  for(const track of tracks){
-  setTrack(track.id);assert.ok(track.length>=15000&&track.length<=(track.id==='coast-shanghai'?24000:20000));assert.equal(track.roadWidth,120);
+  setTrack(track.id);assert.ok(track.length>=15000&&track.length<=(track.id==='coast-shanghai'?24000:track.id==='coast-beijing'?21000:20000));assert.equal(track.roadWidth,120);
   assert.ok(track.startDistance>100);assert.ok(track.nameEn&&track.descriptionEn);
   shapes.add(JSON.stringify(track.segments.map(s=>[s.kind,Math.round(s.length),s.sweep])));
   for(const seg of track.segments){
@@ -56,10 +56,15 @@ test('chase camera and landmark footprints respect the road deck and clear racin
   setTrack(track.id);
   for(let s=0;s<track.length;s+=113){
    const car={...trackPoint(s),speed:350},camera=updateChaseCamera(car,null);
-   assert.ok(camera.eye[1]>car.elevation+45&&camera.eye[1]<car.elevation+110);
+   // The approved stadium's steeper descent raises the existing slope-following camera.
+   const stadiumRamp=track.stadium&&s>=track.stadium.bridge.downStart&&s<=track.stadium.bridge.end;
+   assert.ok(camera.eye[1]>car.elevation+45&&camera.eye[1]<car.elevation+(stadiumRamp?115:110));
    assert.ok(Math.abs(camera.target[1]-car.elevation)<40);
   }
-  for(const item of harborLandmarkPlacements())assert.ok(projectTrack(item.x,item.z).distance>item.radius+40,'landmarks must not block the course');
+  for(const item of harborLandmarkPlacements()){
+   if(item.kind==='beijing-birds-nest')assert.ok(item.stadium?.loopSegments.length,'the stadium is hollow around the mandatory course; actual model/camera collisions are checked separately');
+   else assert.ok(projectTrack(item.x,item.z).distance>item.radius+40,'landmarks must not block the course');
+  }
  }
 });
 

@@ -1,4 +1,5 @@
 import { createClosedTrack } from './tracks.js';
+import { createBeijingStadiumRoute } from './beijing-stadium-route.js';
 
 const TAU = Math.PI * 2;
 const GRID = Object.freeze([{ lane: -18, offset: -30 }, { lane: 22, offset: -30 }].map(Object.freeze));
@@ -175,4 +176,4 @@ function shanghaiSkylineSpiral(){
       landmarks:['Oriental Pearl','Shanghai Tower','Shanghai World Financial Center','Jin Mao Tower','Customs House','HSBC Building','Peace Hotel','Shanghai Exhibition Centre','Shanghai Grand Theatre','Shanghai Museum','Yu Garden','Wukang Mansion'],
       courseStyle:'Compact Shanghai-inspired racing circuit; not a geographic road reconstruction.'})});
 }
-export const HARBOR_TRACKS = Object.freeze([...profiles.map(rounded),twinHelix(),londonRiverside(),rounded(cityProfiles[0]),austinRiverRun(),rounded(cityProfiles[1]),parisSeineLoop(),shanghaiSkylineSpiral()]);
+export const HARBOR_TRACKS = Object.freeze([...profiles.map(rounded),twinHelix(),londonRiverside(),createBeijingStadiumRoute(rounded(cityProfiles[0])),austinRiverRun(),rounded(cityProfiles[1]),parisSeineLoop(),shanghaiSkylineSpiral()]);

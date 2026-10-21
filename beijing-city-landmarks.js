@@ -3,13 +3,16 @@
  * Frontages face local -Z; detailed trim never creates invisible collision boxes.
  */
 import { TRACK, trackPoint, projectTrack } from './engine.js';
+import { beijingReferenceTrack, beijingReferencePoint, beijingReferenceProjection } from './beijing-reference.js';
+import { addBeijingStadium, beijingStadiumClearance } from './beijing-stadium.js';
+import { legacyToStadiumDistance } from './beijing-stadium-route.js';
 import { beijingWallClearance } from './beijing-great-wall.js';
 import { frame, details, beam, word, arch, window, frontDisk } from './london-west-end.js';
 const TAU=Math.PI*2;
 const AXIS='https://whc.unesco.org/en/list/1714/';
 const SUMMER='https://whc.unesco.org/en/list/880/';
 export const BEIJING_LANDMARKS=Object.freeze([
- ['beijing-birds-nest','国家体育场 · 鸟巢',213,110,'https://english.beijing.gov.cn/specials/beijinglifeonthesubway/landmarksalongthesubwaylines/line8/202206/t20220624_2750396.html'],
+ ['beijing-birds-nest','国家体育场 · 鸟巢',980,238,'https://english.beijing.gov.cn/specials/beijinglifeonthesubway/landmarksalongthesubwaylines/line8/202206/t20220624_2750396.html'],
  ['beijing-water-cube','国家游泳中心 · 水立方',167,99,'https://english.beijing.gov.cn/beijing2022/venues/beijing/202103/t20210316_2308897.html'],
  ['beijing-ncpa','国家大剧院',183,90,'https://en.chncpa.org/'],
  ['beijing-cctv','中央电视台总部',156,330,'https://www.oma.com/projects/cctv-headquarters'],
@@ -46,23 +49,24 @@ export const BEIJING_DISTRICTS=Object.freeze([
  {id:'civic',label:'城市街区',kinds:['beijing-exhibition-center','beijing-planetarium','beijing-capital-museum','beijing-railway-station']},
 ].map(d=>Object.freeze({...d,kinds:Object.freeze(d.kinds)})));
 
-export function beijingLandmarkPlacements(existing=[]){
+function referenceLandmarkPlacements(existing=[]){
  if(TRACK.theme!=='beijing')return [];
+ const reference=beijingReferenceTrack();
  const result=[],metadata=[...BEIJING_LANDMARKS,...BEIJING_REFINEMENTS];
  // China Zun anchors the opening straight: the long approach reveals its full
  // silhouette before the chase camera passes below its crown. The late curved
  // slot never showed the whole tower, even though the model was still present.
  const plan=BEIJING_DISTRICTS.flatMap(d=>d.kinds.map(kind=>({kind,district:d.id})));
- const circularGap=(a,b)=>{const delta=Math.abs(a-b)%TRACK.length;return Math.min(delta,TRACK.length-delta);};
+ const circularGap=(a,b)=>{const delta=Math.abs(a-b)%reference.length;return Math.min(delta,reference.length-delta);};
  for(const [index,plot]of plan.entries()){
   if(existing.some(item=>item.kind===plot.kind))continue;
-  const meta=metadata.find(m=>m.kind===plot.kind),fraction=(index+.5)/plan.length,preferredSide=index%2?1:-1;
+  const original=metadata.find(m=>m.kind===plot.kind),meta=plot.kind==='beijing-birds-nest'?{...original,radius:213,height:110}:original,fraction=(index+.5)/plan.length,preferredSide=index%2?1:-1;
   let chosen;
   // Ground-level gardens remain visible from the 48-unit raised road. The
   // surrounding terrain is flat, so a road elevation is not a building veto.
   search: for(const shift of [0,-45,45,-90,90])for(const side of [preferredSide,-preferredSide])for(const setback of [76,112,40]){
-   const s=TRACK.startDistance+fraction*TRACK.length+shift,p=trackPoint(s,side*(TRACK.roadWidth/2+meta.radius+setback));
-   if(projectTrack(p.x,p.y).distance<TRACK.roadWidth/2+meta.radius+30||!beijingWallClearance(p.x,p.y,meta.radius+10))continue;
+   const s=reference.startDistance+fraction*reference.length+shift,p=beijingReferencePoint(s,side*(TRACK.roadWidth/2+meta.radius+setback));
+   if(beijingReferenceProjection(p.x,p.y).distance<TRACK.roadWidth/2+meta.radius+30||!beijingWallClearance(p.x,p.y,meta.radius+10))continue;
    if([...existing,...result].some(q=>circularGap(s,q.s)<480||Math.hypot(p.x-q.x,p.y-q.z)<meta.radius+q.radius+80))continue;
    const refined=BEIJING_REFINEMENTS.some(m=>m.kind===meta.kind);
    chosen=Object.freeze({...meta,...plot,fraction,x:p.x,z:p.y,s,side,angle:p.angle+(!refined&&side<0?Math.PI:0),elevation:0});break search;
@@ -71,6 +75,40 @@ export function beijingLandmarkPlacements(existing=[]){
   result.push(chosen);
  }
  return Object.freeze(result);
+}
+
+/** Retain the accepted city in world space; only plots touched by the new
+ * stadium or its approaches move. The stadium footprint is a capsule, not its
+ * much larger bounding circle, so nearby neighborhoods remain intact. */
+export function beijingLandmarkPlacements(existing=[]){
+ const original=referenceLandmarkPlacements(existing),stadium=TRACK.stadium;
+ if(!stadium)return original;
+ const bird=original.find(p=>p.kind==='beijing-birds-nest');
+ const result=[],clear=(x,z,radius,others)=>projectTrack(x,z).distance>=TRACK.roadWidth/2+radius+30
+  &&beijingWallClearance(x,z,radius+10)&&beijingStadiumClearance(stadium,x,z,radius+35)
+  &&others.every(p=>Math.hypot(x-p.x,z-p.z)>=radius+p.radius+80);
+ const ordinary=original.filter(p=>p!==bird),pending=[];
+ // Reserve every untouched plot before looking for replacements.
+ for(const item of ordinary){
+  if(clear(item.x,item.z,item.radius,existing))result.push({...item,legacyS:item.s,s:legacyToStadiumDistance(stadium,item.s)});
+  else pending.push(item);
+ }
+ for(const item of pending){
+  let chosen;
+  for(let distance=24;distance<=1400&&!chosen;distance+=24){
+   for(let i=0;i<40;i++){
+    const a=i/40*TAU,x=item.x+Math.cos(a)*distance,z=item.z+Math.sin(a)*distance;
+    if(!clear(x,z,item.radius,[...existing,...result]))continue;
+    const road=projectTrack(x,z),side=road.offset>=0?1:-1,refined=BEIJING_REFINEMENTS.some(m=>m.kind===item.kind);
+    chosen={...item,x,z,s:road.s,legacyS:item.s,side,angle:road.angle+(!refined&&side<0?Math.PI:0)};break;
+   }
+  }
+  if(!chosen)throw new Error(`Beijing stadium: no safe local relocation for ${item.kind}`);
+  result.push(chosen);
+ }
+ if(bird)result.push({...bird,...BEIJING_LANDMARKS.find(m=>m.kind===bird.kind),x:stadium.center.x,z:stadium.center.z,
+  angle:stadium.angle,s:(stadium.loopStart+stadium.loopEnd)/2,legacyS:bird.s,stadium});
+ return Object.freeze(original.map(p=>Object.freeze(result.find(q=>q.kind===p.kind))));
 }
 
 const C={red:'#9c3e31',darkRed:'#633b31',gold:'#bb9344',goldLight:'#ddba69',blue:'#235a86',green:'#35635c',stone:'#d6d2bc',white:'#ece8d5',brick:'#858a80',glass:'#527b87'};
@@ -269,7 +307,7 @@ function planetarium(mesh,item){const f=frame(mesh,item);slab(f,249,162);f.box(-
   for(let y=15;y<98;y+=14)f.box(79,y,-60,86,1.2,1,'#bed0c8');for(let x=39;x<122;x+=13)f.box(x,55,-60,1.2,91,1,'#b3c9c1');for(const x of [-100,-74,-48,-22])arch(f,x,14,-61,17,34,C.white,'#476a71');sign(f,'BEIJING PLANETARIUM',-23,24,-69,182);
  });}
 const draws={
- 'beijing-birds-nest':birdsNest,'beijing-water-cube':waterCube,'beijing-ncpa':ncpa,'beijing-cctv':cctv,'beijing-china-zun':chinaZun,
+ 'beijing-birds-nest':addBeijingStadium,'beijing-water-cube':waterCube,'beijing-ncpa':ncpa,'beijing-cctv':cctv,'beijing-china-zun':chinaZun,
  'beijing-beihai-dagoba':(m,i)=>dagoba(m,i,false),'beijing-fragrant-tower':fragrant,'beijing-seventeen-arch':seventeen,
  'beijing-drum-tower':(m,i)=>drumBell(m,i,false),'beijing-bell-tower':(m,i)=>drumBell(m,i,true),'beijing-zhengyangmen':zhengyang,
  'beijing-jingshan':jingshan,'beijing-yonghe':yonghe,'beijing-confucius':confucius,'beijing-national-museum':nationalMuseum,

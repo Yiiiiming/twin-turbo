@@ -1,4 +1,4 @@
-import { LEADERBOARD_VERSION, LEADERBOARD_CITIES, normalizeEntries, normalizeName } from './leaderboard.js';
+import { leaderboardVersionForCity, LEADERBOARD_CITIES, normalizeEntries, normalizeName } from './leaderboard.js';
 import { validGhostReplay } from './ghost-client.js';
 import { GHOST_VERSION, RACE_GHOST_VERSION, ghostVersionForCity, validateRaceReplay } from './ghost-replay.js';
 
@@ -14,7 +14,7 @@ const validLapEntry = entry => validGhostEntry(entry) && (entry.kind === undefin
   && (entry.laps === undefined || entry.laps === 1);
 const validRaceEntry = entry => validGhostEntry(entry) && entry.kind === 'race' && entry.laps === 3 && entry.timeMs >= 75000;
 const lapCategory = (data, laps = 1, city = CITY) => data?.version === ghostVersionForCity(city, laps) && data?.city === city;
-const totalCategory = (data, laps, city = CITY) => data?.version === LEADERBOARD_VERSION && data?.city === city && data?.laps === laps;
+const totalCategory = (data, laps, city = CITY) => data?.version === leaderboardVersionForCity(city) && data?.city === city && data?.laps === laps;
 const cleanLaps = (entries, laps = 1) => {
   const seen = new Set();
   return (Array.isArray(entries) ? entries : []).filter(laps === 3 ? validRaceEntry : validLapEntry).map(entry => ({ ...entry, kind: laps === 3 ? 'race' : 'lap', laps })).sort((a, b) => a.timeMs - b.timeMs)
@@ -139,7 +139,7 @@ export class UnifiedRecordsClient {
     this.node('records-status').textContent = '正在读取全站速度榜…'; this.node('records-retry').hidden = true;
     try {
       const data = await this.request(category === 'lap' ? `/api/laps?${this.lapQuery('', 1, city)}`
-        : `/api/leaderboard?laps=${category}&city=${encodeURIComponent(city)}&version=${encodeURIComponent(LEADERBOARD_VERSION)}`);
+        : `/api/leaderboard?laps=${category}&city=${encodeURIComponent(city)}&version=${encodeURIComponent(leaderboardVersionForCity(city))}`);
       if (request !== this.boardRequest) return;
       if (category === 'lap' ? !lapCategory(data, 1, city) : !totalCategory(data, category, city)) throw new Error('榜单版本或类别不匹配。');
       this.entries = category === 'lap' ? cleanLaps(data.entries) : normalizeEntries(data.entries, category, city);
@@ -208,7 +208,7 @@ export class UnifiedRecordsClient {
     try {
       const replay = part === 'race' ? card.raceReplay : card.replay, ghostLaps = part === 'race' ? 3 : 1;
       const data = await this.request(part === 'total' ? '/api/records' : '/api/laps', part === 'total'
-        ? { id: card.total.id, version: LEADERBOARD_VERSION, city: card.city, laps: card.laps, timeMs: card.timeMs,
+        ? { id: card.total.id, version: leaderboardVersionForCity(card.city), city: card.city, laps: card.laps, timeMs: card.timeMs,
           playerId: card.playerId, mode: card.mode, finished: true, name }
         : { id: card[part].id, version: ghostVersionForCity(card.city, ghostLaps), city: card.city, timeMs: replay.durationMs,
           playerId: card.playerId, mode: card.mode, name, replay, ...(card.total.state !== 'none' ? { totalRecordId: card.total.id } : {}) });

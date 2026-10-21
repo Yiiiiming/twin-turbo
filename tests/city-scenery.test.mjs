@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack } from '../engine.js';
+import { beijingStadiumClearance } from '../beijing-stadium.js';
 import { RaceAI } from '../ai.js';
 import { RaceRenderer, sceneObstacles, updateChaseCamera, TERRAIN_PALETTES } from '../renderer.js';
 import { cityLandmarkPlacements, citySceneryPlacements, addCityLandmark, addCityStreetScenery } from '../city-scenery.js';
@@ -30,7 +31,8 @@ for(const id of cities)test(`${id}: authentic landmark silhouettes fit reserved 
   'coast-rio':['christ-redeemer','sugarloaf','lapa-aqueduct'],'coast-paris':['eiffel-tower','arc-de-triomphe','louvre-pyramid','paris-bridge-pylon']}[id];
  for(const kind of required)assert.ok(kinds.has(kind),kind);
  for(const item of landmarks){
-  assert.ok(projectTrack(item.x,item.z).distance>TRACK.roadWidth/2+item.radius+4,`${item.kind} road clearance`);
+  if(item.kind==='beijing-birds-nest')assert.ok(item.stadium?.loopSegments.length,'stadium is intentionally hollow around the required road');
+  else assert.ok(projectTrack(item.x,item.z).distance>TRACK.roadWidth/2+item.radius+4,`${item.kind} road clearance`);
   if(item.kind==='austin-bridge-foot')continue;
   const mesh=new BoundsMesh(item);addCityLandmark(mesh,item);assert.ok(mesh.vertices>150,`${item.kind} has model detail`);
   assert.ok(mesh.radius<=item.radius+.25,`${item.kind} visible footprint ${mesh.radius} exceeds reserved ${item.radius}`);
@@ -40,7 +42,7 @@ for(const id of cities)test(`${id}: authentic landmark silhouettes fit reserved 
   assert.ok(mesh.radius<=item.radius+.25,`${item.kind} footprint ${mesh.radius}/${item.radius}`);
   assert.ok(projectTrack(item.x,item.z).distance>=TRACK.roadWidth/2+item.radius+18);
   for(let j=i+1;j<scenery.length;j++)assert.ok(Math.hypot(item.x-scenery[j].x,item.z-scenery[j].z)>=item.radius+scenery[j].radius+7);
-  for(const landmark of landmarks)assert.ok(Math.hypot(item.x-landmark.x,item.z-landmark.z)>=item.radius+landmark.radius+25);
+  for(const landmark of landmarks)assert.ok(landmark.kind==='beijing-birds-nest'?beijingStadiumClearance(landmark.stadium,item.x,item.z,item.radius+25):Math.hypot(item.x-landmark.x,item.z-landmark.z)>=item.radius+landmark.radius+25);
  }
 });
 for(const id of cities)test(`${id}: complete GPU meshes are finite, under 40 MB, and car lanes stay clear`,()=>{

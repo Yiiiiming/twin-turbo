@@ -1,7 +1,7 @@
 // Replays follow the real car's world transform. They never participate in physics.
 export const GHOST_VERSION = 'coast-ghost-v1';
 export const RACE_GHOST_VERSION = 'coast-race-ghost-v1';
-export const isNewGhostCircuit = city => ['coast-austin', 'coast-shanghai'].includes(city);
+export const isNewGhostCircuit = city => ['coast-austin', 'coast-shanghai', 'coast-beijing'].includes(city);
 export const ghostVersionForCity = (city, laps = 1) => city === 'coast-shanghai'
   ? (laps === 3 ? 'coast-race-ghost-v3' : 'coast-ghost-v3')
   : isNewGhostCircuit(city)

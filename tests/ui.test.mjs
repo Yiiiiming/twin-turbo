@@ -1108,7 +1108,7 @@ test('every harbor map starts local and AI races in both one-lap sprint and thre
     assert.match(ui.nodes.get('race-setup-summary').textContent,new RegExp(track.name));
     const ghostRequest=ui.requests.filter(request=>request.url.includes('/api/laps')).at(-1);
     assert.equal(new URL(ghostRequest.url).searchParams.get('city'),id);
-    assert.equal(new URL(ghostRequest.url).searchParams.get('version'),id==='coast-shanghai'?(laps===3?'coast-race-ghost-v3':'coast-ghost-v3'):id==='coast-austin'?(laps===3?'coast-race-ghost-v2':'coast-ghost-v2'):(laps===3?RACE_GHOST_VERSION:GHOST_VERSION));
+    assert.equal(new URL(ghostRequest.url).searchParams.get('version'),id==='coast-shanghai'?(laps===3?'coast-race-ghost-v3':'coast-ghost-v3'):['coast-austin','coast-beijing'].includes(id)?(laps===3?'coast-race-ghost-v2':'coast-ghost-v2'):(laps===3?RACE_GHOST_VERSION:GHOST_VERSION));
     ui.click('setup-skip');ui.advance(3.1);assert.equal(ui.engine.state,'racing');assert.equal(ui.engine.laps,laps);
     ui.key('ArrowUp');if(mode==='local')ui.key('KeyW');ui.advance(.3);
     assert.ok(ui.engine.cars.every(car=>car.speed>50),`${id}/${mode}/${laps} both racers move`);

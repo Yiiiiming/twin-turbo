@@ -4,6 +4,7 @@ import { TRACK, setTrack, trackPoint, projectTrack } from '../engine.js';
 import { ObstacleWorld } from '../collisions.js';
 import { updateChaseCamera } from '../renderer.js';
 import { cityLandmarkPlacements } from '../city-scenery.js';
+import { beijingStadiumClearance } from '../beijing-stadium.js';
 import { beijingWallClearance } from '../beijing-great-wall.js';
 import { BEIJING_LANDMARKS, BEIJING_REFINEMENTS, addBeijingCityLandmark, beijingLandmarkPlacements } from '../beijing-city-landmarks.js';
 test.afterEach(()=>setTrack('coast'));
@@ -21,14 +22,17 @@ test('twenty distinct new Beijing landmarks complement three existing refined la
  setTrack('coast-beijing');const plots=cityLandmarkPlacements();assert.equal(plots.length,23);assert.equal(new Set(plots.map(p=>p.kind)).size,23);
  assert.ok(plots.filter(p=>p.side<0).length>=6);assert.ok(plots.filter(p=>p.side>0).length>=6);
  const quarters=new Set(plots.map(p=>Math.floor(((p.s%TRACK.length)+TRACK.length)%TRACK.length/TRACK.length*4)));assert.equal(quarters.size,4);
- for(const p of plots){assert.ok(projectTrack(p.x,p.z).distance>=TRACK.roadWidth/2+p.radius+24,p.kind);assert.ok(beijingWallClearance(p.x,p.z,p.radius),p.kind);}
- for(let i=0;i<plots.length;i++)for(let j=i+1;j<plots.length;j++)assert.ok(Math.hypot(plots[i].x-plots[j].x,plots[i].z-plots[j].z)>=plots[i].radius+plots[j].radius+25,`${plots[i].kind}/${plots[j].kind}`);
+ for(const p of plots){if(p.kind==='beijing-birds-nest'){assert.ok(p.stadium&&p.stadium.loopEnd>p.stadium.loopStart,'stadium contains its required road');continue;}assert.ok(projectTrack(p.x,p.z).distance>=TRACK.roadWidth/2+p.radius+24,p.kind);assert.ok(beijingWallClearance(p.x,p.z,p.radius),p.kind);}
+ for(let i=0;i<plots.length;i++)for(let j=i+1;j<plots.length;j++){
+  const a=plots[i],b=plots[j],bird=[a,b].find(p=>p.kind==='beijing-birds-nest'),other=bird===a?b:a;
+  assert.ok(bird?beijingStadiumClearance(bird.stadium,other.x,other.z,other.radius+25):Math.hypot(a.x-b.x,a.z-b.z)>=a.radius+b.radius+25,`${a.kind}/${b.kind}`);
+ }
 });
 test('all 23 models have finite detailed geometry within their declared footprints and compact geometry budget',()=>{
  let triangles=0;const shapes=new Set();
  for(const meta of [...BEIJING_LANDMARKS,...BEIJING_REFINEMENTS]){const mesh=new Probe();addBeijingCityLandmark(mesh,{...meta,x:0,z:0,angle:0,side:1});
   assert.ok(mesh.radius<=meta.radius+.25,`${meta.kind}: radius ${mesh.radius}/${meta.radius}`);assert.ok(mesh.height<=meta.height+8,`${meta.kind}: height ${mesh.height}/${meta.height}`);
-  assert.ok(mesh.triangles>500,`${meta.kind}: too little detail`);assert.ok(mesh.colors.size>=4,`${meta.kind}: materials`);assert.ok(mesh.colliders.length>0,`${meta.kind}: no collision`);assert.ok(mesh.colliders.length<150,`${meta.kind}: detail generates too many colliders`);
+  assert.ok(mesh.triangles>500,`${meta.kind}: too little detail`);assert.ok(mesh.colors.size>=4,`${meta.kind}: materials`);assert.ok(mesh.colliders.length>0,`${meta.kind}: no collision`);assert.ok(mesh.colliders.length<(meta.kind==='beijing-birds-nest'?300:150),`${meta.kind}: detail generates too many colliders`);
   shapes.add(`${Math.round(mesh.radius)}:${Math.round(mesh.height)}:${mesh.triangles}`);triangles+=mesh.triangles;
  }assert.equal(shapes.size,23);assert.ok(triangles<145000,`${triangles} landmark triangles`);
 });

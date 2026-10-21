@@ -1,17 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TRACK, setTrack, trackPoint } from '../engine.js';
+import { beijingReferenceTrack } from '../beijing-reference.js';
 import { cityLandmarkPlacements, citySceneryPlacements } from '../city-scenery.js';
 
 test.afterEach(() => setTrack('coast'));
 
-const wrap = s => ((s - TRACK.startDistance) % TRACK.length + TRACK.length) % TRACK.length;
+// The new stadium has its own seats, steel shell and infield; it must not cause
+// the original promenade to redistribute every landmark or street frontage.
+// Its actual interior driving/camera geometry is covered by the stadium tests.
+
+const wrap = s => {const route=beijingReferenceTrack();return ((s-route.startDistance)%route.length+route.length)%route.length;};
 function circularGaps(items) {
-  const stations = items.map(item => wrap(item.s)).sort((a, b) => a - b);
-  return stations.map((s, i) => (stations[(i + 1) % stations.length] - s + TRACK.length) % TRACK.length);
+  const stations = items.map(item => wrap(item.legacyS??item.s)).sort((a, b) => a - b);
+  return stations.map((s, i) => (stations[(i + 1) % stations.length] - s + beijingReferenceTrack().length) % beijingReferenceTrack().length);
 }
 
-test('Beijing landmarks have a steady viewing rhythm across the entire lap', () => {
+test('Beijing retains its steady landmark rhythm along the original city promenade', () => {
   setTrack('coast-beijing');
   const landmarks = cityLandmarkPlacements();
   assert.equal(landmarks.length, 23);
@@ -23,18 +28,28 @@ test('Beijing landmarks have a steady viewing rhythm across the entire lap', () 
   }
 });
 
-test('Beijing ordinary streetscape continues through every twelfth of the lap', () => {
+test('Beijing ordinary streetscape remains populated in every original city district', () => {
   setTrack('coast-beijing');
   const scenery = citySceneryPlacements();
   const bins = Array(12).fill(0);
   for (const item of scenery) {
     assert.ok(Number.isFinite(item.s), `${item.kind} must identify its roadside station`);
-    bins[Math.floor(wrap(item.s) / TRACK.length * bins.length)]++;
+    bins[Math.floor(wrap(item.legacyS??item.s) / beijingReferenceTrack().length * bins.length)]++;
   }
   for (let i = 0; i < bins.length; i++) {
-    assert.ok(bins[i] >= 8, `lap sector ${i + 1}/12 has only ${bins[i]} ordinary scenery objects`);
+    const midpoint=beijingReferenceTrack().startDistance+(i+.5)*beijingReferenceTrack().length/bins.length;
+    const stadiumDistrict=midpoint>=TRACK.stadium.legacyStart&&midpoint<=TRACK.stadium.legacyEnd;
+    if(stadiumDistrict)assert.ok(bins[i]>0&&TRACK.stadium.loopCoverage>.93,'the stadium district retains ordinary frontage around its occupied arena');
+    else assert.ok(bins[i] >= 8, `lap sector ${i + 1}/12 has only ${bins[i]} ordinary scenery objects`);
   }
-  const longestGap = Math.max(...circularGaps(scenery));
+  // The stadium replaces the old bend with populated stands and a field.
+  // Every ordinary district outside that explicitly replaced plot stays dense.
+  const stations=scenery.map(item=>wrap(item.legacyS??item.s)).sort((a,b)=>a-b);
+  const gaps=circularGaps(scenery).filter((gap,i)=>{
+    const midpoint=(stations[i]+gap/2)%beijingReferenceTrack().length+beijingReferenceTrack().startDistance;
+    return midpoint<TRACK.stadium.legacyStart||midpoint>TRACK.stadium.legacyEnd;
+  });
+  const longestGap = Math.max(...gaps);
   assert.ok(longestGap < 350, `ordinary scenery disappears for ${longestGap.toFixed(1)} units`);
   for (const side of [-1, 1]) {
     assert.ok(scenery.filter(item => item.side === side).length >= 30, `ordinary streetscape is missing on side ${side}`);

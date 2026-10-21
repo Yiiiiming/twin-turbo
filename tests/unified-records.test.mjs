@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { UnifiedRecordsClient } from '../unified-records.js';
-import { LEADERBOARD_VERSION } from '../leaderboard.js';
+import { LEADERBOARD_VERSION, leaderboardVersionForCity } from '../leaderboard.js';
 import { GHOST_VERSION, RACE_GHOST_VERSION } from '../ghost-replay.js';
 
 class Node {
@@ -385,7 +385,7 @@ for (const trackId of ['coast-london', 'coast-beijing', 'coast-austin', 'coast-r
       return response({ city, version, laps: req.body.laps, saved: true, entry });
     }
     const matches = saved.filter(item => item.entry.city === city && item.version === version);
-    if (req.url.pathname === '/api/leaderboard') return response(tp({ city, entries: matches.filter(item => item.total).map(item => item.entry) }, Number(req.url.searchParams.get('laps'))));
+    if (req.url.pathname === '/api/leaderboard') return response(tp({ city, version, entries: matches.filter(item => item.total).map(item => item.entry) }, Number(req.url.searchParams.get('laps'))));
     if (req.url.pathname.startsWith('/api/ghosts/')) {
       const match = matches.find(item => item.entry.id === decodeURIComponent(req.url.pathname.split('/').at(-1)));
       return match ? response({ city, version, entry: match.entry }) : response({ error: 'not_found' }, 404);
@@ -403,8 +403,8 @@ for (const trackId of ['coast-london', 'coast-beijing', 'coast-austin', 'coast-r
   assert.equal(h.client.entries.length, 0, 'another course board must not display this city result');
   assert.ok(posted(h).every(req => req.body.city === trackId));
   assert.equal(posted(h).length, laps === 3 ? 3 : 2);
-  const revised=['coast-austin','coast-shanghai'].includes(trackId);
-  assert.deepEqual(posted(h).map(req=>req.body.version),[LEADERBOARD_VERSION,trackId==='coast-shanghai'?'coast-ghost-v3':revised?'coast-ghost-v2':GHOST_VERSION,...(laps===3?[trackId==='coast-shanghai'?'coast-race-ghost-v3':revised?'coast-race-ghost-v2':RACE_GHOST_VERSION]:[])]);
+  const revised=['coast-austin','coast-shanghai','coast-beijing'].includes(trackId);
+  assert.deepEqual(posted(h).map(req=>req.body.version),[leaderboardVersionForCity(trackId),trackId==='coast-shanghai'?'coast-ghost-v3':revised?'coast-ghost-v2':GHOST_VERSION,...(laps===3?[trackId==='coast-shanghai'?'coast-race-ghost-v3':revised?'coast-race-ghost-v2':RACE_GHOST_VERSION]:[])]);
   await h.client.setTrack(trackId, { preserveResults: true }); await h.client.load(laps);
   assert.equal(h.client.challengeButtons.length, 1); await h.client.challengeButtons[0].dispatch('click');
   assert.equal(h.challenges[0].city, trackId); assert.equal(h.challenges[0].laps, laps);
@@ -462,4 +462,14 @@ for(const city of ['coast-austin','coast-shanghai'])test(`${city} unified board 
   h.client.showResults([result({city,raceReplay:fullRace()})]);const card=h.client.cards[0];card.input.value='Old Racer';await h.client.save(card);
   assert.equal(card.total.state,'saved');assert.equal(card.lap.state,'error');assert.equal(card.race.state,'error');assert.equal(card.done,false);assert.equal(h.savedCalls,0);
   assert.equal(h.client.lapCache.size,0);assert.equal(h.client.raceCache.size,0);
+});
+
+test('Beijing stadium rejects a stale old-route total board and old-route save confirmation',async()=>{
+ const h=setup();await h.client.init();await h.client.setTrack('coast-beijing');
+ h.handler=req=>req.method==='POST'?response(tp({city:'coast-beijing',saved:true},1)):response(tp({city:'coast-beijing',entries:[]},1));
+ await h.client.load(1);assert.equal(h.client.entries.length,0);assert.equal(h.get('records-retry').hidden,false);
+ assert.match(h.get('records-status').textContent,/版本/);
+ h.client.showResults([result({city:'coast-beijing',laps:1,timeMs:70000,replay:null})]);const card=h.client.cards[0];card.input.value='新赛道';
+ await h.client.save(card);assert.equal(card.total.state,'error');assert.equal(card.done,false);
+ assert.equal(posted(h).at(-1).body.version,leaderboardVersionForCity('coast-beijing'));
 });

@@ -4,6 +4,8 @@ import { TRACK, setTrack, trackPoint, projectTrack } from '../engine.js';
 import { ObstacleWorld } from '../collisions.js';
 import { updateChaseCamera } from '../renderer.js';
 import { cityLandmarkPlacements } from '../city-scenery.js';
+import { beijingReferencePoint } from '../beijing-reference.js';
+import { beijingStadiumClearance } from '../beijing-stadium.js';
 import { beijingWallClearance } from '../beijing-great-wall.js';
 import { beijingNeighborhoodPlacements, addBeijingNeighborhood } from '../beijing-neighborhoods.js';
 
@@ -35,9 +37,9 @@ test('Beijing frontages are deterministic, road-facing, and clear of every reser
   assert.ok(projectTrack(item.x,item.z).distance>=TRACK.roadWidth/2+item.radius+18);
   assert.ok(beijingWallClearance(item.x,item.z,item.radius));
   assert.equal(item.elevation,0,'the roadside buildings stay on the ground beside the raised road');
-  for(const other of landmarks)assert.ok(Math.hypot(item.x-other.x,item.z-other.z)>=item.radius+other.radius+25);
+  for(const other of landmarks)assert.ok(other.kind==='beijing-birds-nest'?beijingStadiumClearance(other.stadium,item.x,item.z,item.radius+25):Math.hypot(item.x-other.x,item.z-other.z)>=item.radius+other.radius+25);
   if(item.kind!=='beijing-garden-tree'){
-   const p=trackPoint(item.s),toward=[p.x-item.x,p.y-item.z],front=[Math.sin(item.angle),-Math.cos(item.angle)];
+   const p=beijingReferencePoint(item.legacyS??item.s),toward=[p.x-item.x,p.y-item.z],front=[Math.sin(item.angle),-Math.cos(item.angle)];
    assert.ok(toward[0]*front[0]+toward[1]*front[1]>0,'front door faces the road');
   }
  }

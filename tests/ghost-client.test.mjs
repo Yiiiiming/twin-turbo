@@ -341,7 +341,7 @@ test('Beijing, Austin, Rio, Paris and Shanghai each load only their own single-l
   const h = setup(); h.client.recordsManaged = true; await h.client.init();
   for(const city of ['coast-beijing','coast-austin','coast-rio','coast-paris','coast-shanghai'])for(const laps of [1,3]) {
     h.client.setTrack(city);assert.equal(h.client.city,city);
-    const version=city==='coast-shanghai'?(laps===3?'coast-race-ghost-v3':'coast-ghost-v3'):city==='coast-austin'?(laps===3?'coast-race-ghost-v2':'coast-ghost-v2'):(laps===3?RACE_GHOST_VERSION:GHOST_VERSION);
+    const version=city==='coast-shanghai'?(laps===3?'coast-race-ghost-v3':'coast-ghost-v3'):['coast-austin','coast-beijing'].includes(city)?(laps===3?'coast-race-ghost-v2':'coast-ghost-v2'):(laps===3?RACE_GHOST_VERSION:GHOST_VERSION);
     const value=laps===1?entry('城市车手',`${city}-lap`):raceEntry('城市车手',`${city}-race`);
     h.queue.push(response({city,version,entries:[value]}));
     await h.client.openPicker(laps);assert.match(h.requests.at(-1).url,new RegExp(`city=${city}`));
@@ -353,16 +353,16 @@ test('Beijing, Austin, Rio, Paris and Shanghai each load only their own single-l
 });
 
 
-test('only revised Austin and Shanghai use new lap/race versions',()=>{
-  for(const city of ['coast','coast-london','coast-rio','coast-beijing','coast-paris']) {
+test('only revised Austin, Shanghai and Beijing use new lap/race versions',()=>{
+  for(const city of ['coast','coast-london','coast-rio','coast-paris']) {
     assert.equal(ghostVersionForCity(city,1),GHOST_VERSION);assert.equal(ghostVersionForCity(city,3),RACE_GHOST_VERSION);
   }
-  for(const city of ['coast-austin','coast-shanghai']) {
+  for(const city of ['coast-austin','coast-shanghai','coast-beijing']) {
     const v=city==='coast-shanghai'?3:2;assert.equal(ghostVersionForCity(city,1),`coast-ghost-v${v}`);assert.equal(ghostVersionForCity(city,3),`coast-race-ghost-v${v}`);
   }
 });
 
-for(const city of ['coast-austin','coast-shanghai'])for(const laps of [1,3])test(`${city} ${laps}-lap picker rejects old paths and lets a normalized nickname select all twenty retained ghosts`,async()=>{
+for(const city of ['coast-austin','coast-shanghai','coast-beijing'])for(const laps of [1,3])test(`${city} ${laps}-lap picker rejects old paths and lets a normalized nickname select all twenty retained ghosts`,async()=>{
   const h=setup();h.client.recordsManaged=true;await h.client.init();h.client.setTrack(city);h.client.setLaps(laps);
   const v=city==='coast-shanghai'?3:2,version=laps===3?`coast-race-ghost-v${v}`:`coast-ghost-v${v}`,oldVersion=laps===3?RACE_GHOST_VERSION:GHOST_VERSION;
   const values=Array.from({length:21},(_,i)=>laps===3?raceEntry('Alice',`retained-${i}`,126000+i*1000):entry('Alice',`retained-${i}`,42000+i*1000));

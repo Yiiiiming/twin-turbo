@@ -1,27 +1,58 @@
 /** A continuous scenic Great Wall ridge. The existing Beijing racecourse stays untouched. */
 import { TRACK, trackPoint } from './engine.js';
+import { updateChaseCamera } from './renderer.js';
+import { beijingReferenceTrack, beijingReferencePoint } from './beijing-reference.js';
 const TAU = Math.PI * 2;
 const cache = new WeakMap();
 const empty = Object.freeze({ nodes: Object.freeze([]), segments: Object.freeze([]), towers: Object.freeze([]), length: 0 });
 const mix = (a,b,t) => a+(b-a)*t;
 const distance = (a,b) => Math.hypot(b.x-a.x,b.z-a.z);
 const RIDGE_HALF_WIDTH = 96;
+const passageCache=new WeakMap();
+
+/** Only the new stadium entrance can interrupt the accepted outside ridge.
+ * Test the actual ascending road and production camera/view envelopes in 3-D;
+ * remote wall spans and all towers retain their original meshes and solids. */
+export function beijingWallPassageCuts(){
+ if(!TRACK.stadium)return{ridge:new Set(),wall:new Set()};
+ if(passageCache.has(TRACK))return passageCache.get(TRACK);
+ const samples=[],entry=TRACK.stadium.entry;
+ for(let s=entry.start;s<=entry.end+240;s+=9){
+  const road=trackPoint(s);samples.push({x:road.x,z:road.y,min:road.elevation-14,max:road.elevation+32,radius:84});
+  for(const lane of[-48,0,48])for(const speed of[0,363,517]){
+   const camera=updateChaseCamera({...trackPoint(s,lane),speed},null);
+   samples.push({x:camera.eye[0],z:camera.eye[2],min:camera.eye[1]-12,max:camera.eye[1]+12,radius:34});
+   for(let i=1;i<9;i++){const t=i/9,p=camera.eye.map((v,k)=>v+(camera.target[k]-v)*t);samples.push({x:p[0],z:p[2],min:p[1]-12,max:p[1]+12,radius:19});}
+  }
+ }
+ const cuts={ridge:new Set(),wall:new Set()},overlap=(segment,halfDepth,top)=>samples.some(p=>{
+  if(p.max<0||p.min>top)return false;
+  const c=Math.cos(segment.angle),s=Math.sin(segment.angle),dx=p.x-segment.x,dz=p.z-segment.z,x=Math.max(0,Math.abs(dx*c+dz*s)-segment.length/2-2),z=Math.max(0,Math.abs(-dx*s+dz*c)-halfDepth);
+  return Math.hypot(x,z)<=p.radius;
+ });
+ for(const span of beijingWallLayout().segments){
+  if(overlap(span,RIDGE_HALF_WIDTH,Math.max(span.a.base,span.b.base)))cuts.ridge.add(span.index);
+  if(overlap(span,24,span.base+87))cuts.wall.add(span.index);
+ }
+ passageCache.set(TRACK,cuts);return cuts;
+}
 
 export function beijingWallLayout() {
   if (TRACK.theme !== 'beijing') return empty;
   if (cache.has(TRACK)) return cache.get(TRACK);
   // Soften the exterior offsets at the two concave bends, rather than folding
   // an offset ribbon back over itself. These offsets change scenery only.
-  const turns = TRACK.segments.filter(segment => segment.kind === 'arc' && segment.direction < 0);
-  const raw = [], samples = Math.ceil(TRACK.length/32);
+  const reference=beijingReferenceTrack();
+  const turns = reference.segments.filter(segment => segment.kind === 'arc' && segment.direction < 0);
+  const raw = [], samples = Math.ceil(reference.length/32);
   for (let i=0;i<=samples;i++) {
-    const s=i/samples*TRACK.length,t=s/TRACK.length;
+    const s=i/samples*reference.length,t=s/reference.length;
     let offset=550+45*Math.sin(t*TAU*3)+20*Math.cos(t*TAU*7);
     for (const turn of turns) {
       const delta=Math.abs(s-(turn.s+turn.length/2));
       offset-=205*Math.exp(-((delta/(turn.length*.8))**4));
     }
-    const p=trackPoint(s,-offset);
+    const p=beijingReferencePoint(s,-offset);
     raw.push({x:p.x,z:p.y,s,base:105+42*Math.sin(t*TAU*3+.4)+23*Math.sin(t*TAU*7-.6)});
   }
   const arc=[0];for(let i=1;i<raw.length;i++)arc.push(arc.at(-1)+distance(raw[i-1],raw[i]));
@@ -93,7 +124,7 @@ function curtainWall(mesh,segment){
   const {base,length,index}=segment,top=base+58;
   // Adjacent stone spans join below the parapets; their buried bottoms and
   // internal end faces need no triangles. Collision still uses the exact solid.
-  stonePrism(mesh,segment,0,top/2,0,length+1.6,top,43,index%4===0?'#82887e':'#92968b',[0,1,4]);
+  stonePrism(mesh,segment,0,top/2,0,length+1.6,top,43,index%4===0?'#82887e':'#92968b',[0,1,4,...(segment.cutBefore?[2]:[]),...(segment.cutAfter?[3]:[])]);
   for(const side of[-1,1])stonePrism(mesh,segment,0,top+7,side*19,length+1.7,14,6,'#a5a89a',[0,1,4]);
   detail(mesh,()=>{
     mesh.quad(local(segment,-length/2,top+.8,-16),local(segment,-length/2,top+.8,16),local(segment,length/2,top+.8,16),local(segment,length/2,top+.8,-16),'#b5b5a4');
@@ -174,8 +205,19 @@ function watchtower(mesh,item){
 }
 export function addBeijingGreatWall(mesh){
   if(TRACK.theme!=='beijing')return;
-  const {segments,towers}=beijingWallLayout();
-  for(const segment of segments)ridge(mesh,segment);
-  for(const segment of segments)curtainWall(mesh,segment);
+  const {segments,towers}=beijingWallLayout(),cuts=beijingWallPassageCuts(),count=segments.length;
+  for(const segment of segments){
+    if(cuts.ridge.has(segment.index))continue;
+    ridge(mesh,segment);
+    // Close exposed rock ends where the new bridge crosses the local pass.
+    for(const [node,neighbor]of[[segment.a,(segment.index+count-1)%count],[segment.b,(segment.index+1)%count]])if(cuts.ridge.has(neighbor)){
+      const profile=[[-96,0],[-63,.27],[-29,.84],[0,1],[29,.84],[63,.27],[96,0]],p=([offset,scale])=>[node.x+node.nx*offset,node.base*scale,node.z+node.nz*offset];
+      for(let i=0;i<profile.length-1;i++){const a=p(profile[i]),b=p(profile[i+1]);mesh.quad(a,b,[b[0],0,b[2]],[a[0],0,a[2]],i%2?'#657051':'#59644b');}
+    }
+  }
+  for(const segment of segments){
+    if(cuts.wall.has(segment.index))continue;
+    curtainWall(mesh,{...segment,cutBefore:cuts.wall.has((segment.index+count-1)%count),cutAfter:cuts.wall.has((segment.index+1)%count)});
+  }
   for(const tower of towers)watchtower(mesh,tower);
 }

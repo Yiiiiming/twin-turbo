@@ -1,5 +1,8 @@
 /** Pure leaderboard rules shared by the game and the score service. */
 export const LEADERBOARD_VERSION = 'twin-turbo-technical-v2-363-517';
+export const BEIJING_STADIUM_VERSION = 'twin-turbo-beijing-stadium-v1-363-517';
+/** The mandatory stadium loop starts a new Beijing record category. */
+export const leaderboardVersionForCity = city => city === 'coast-beijing' ? BEIJING_STADIUM_VERSION : LEADERBOARD_VERSION;
 export const LEADERBOARD_LIMIT = 5;
 export const LEADERBOARD_CITIES = Object.freeze(['coast', 'coast-bay', 'coast-pines', 'coast-neon', 'coast-marina', 'coast-ridge', 'coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'coast-paris', 'coast-shanghai', 'london']);
 const SUPPORTED_LAPS = [1, 3, 5];
