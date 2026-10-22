@@ -22,3 +22,12 @@ kbd{display:inline-block;min-width:19px;padding:2px 4px;font-family:var(--font);
 @media(prefers-reduced-motion:reduce),(pointer:coarse){.pointer-orbits{display:none!important}}
 /* Race deltas: one driver per line; the stopwatch is the only top timing readout. */
 .pause-race-details .lap-timing{position:static;display:flex;gap:7px;font-size:10px;text-shadow:none;color:#ad9fc6;margin:0 0 12px}.split-readout>span{display:grid;gap:7px;margin-top:10px}.split-readout>span>span{display:flex;justify-content:space-between;gap:12px;font-size:10px;line-height:1.5;overflow-wrap:anywhere}.split-readout>strong{font-size:17px;line-height:1.4}.split-readout>strong>span,.split-readout>span>span>span{min-width:0;overflow-wrap:anywhere}.split-readout>strong>b,.split-readout>span>span>b{font-weight:400;white-space:nowrap;font-variant-numeric:tabular-nums}.split-readout>strong:has(>span){display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px}.split-readout>strong>b{font-size:21px}.split-readout>span>span>b{color:inherit}
+
+/* Fullscreen and pause remain side by side without moving the central clock. */
+.scoreboard .race-actions{position:absolute;top:0;right:0;display:flex;align-items:center;gap:8px;pointer-events:auto}
+.scoreboard .race-actions :is(#fullscreen,#pause){position:static;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:9px 12px;border:1px solid #ffffff20;border-radius:18px;background:#16122bb8;color:#e9e2f6;font-size:12px;line-height:1.4;white-space:nowrap;pointer-events:auto;backdrop-filter:blur(10px)}
+.scoreboard .race-actions :is(#fullscreen,#pause):hover:enabled{border-color:#d0bcf773;background:#2b214ac9}
+.scoreboard .race-actions #fullscreen>span:first-child{font-family:system-ui,sans-serif;font-size:18px;font-weight:400;line-height:1}
+.scoreboard .race-actions #pause kbd{margin:0;font-size:9px}
+@media(max-width:600px){.scoreboard .race-actions{gap:6px}.scoreboard .race-actions :is(#fullscreen,#pause){padding:8px;font-size:11px;min-height:34px}.scoreboard .race-actions #fullscreen{width:34px;padding:7px;gap:0}.scoreboard .race-actions #fullscreen-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.scoreboard .race-card{padding:8px 10px}.scoreboard .race-card strong{font-size:18px}}
+@media(max-width:360px){.scoreboard .race-actions #pause{font-size:0;gap:0}.scoreboard .race-actions #pause kbd{font-size:10px}}

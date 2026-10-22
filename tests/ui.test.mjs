@@ -72,6 +72,7 @@ class MockNode extends MockTarget {
   async requestFullscreen() {
     this.fullscreenRequests = (this.fullscreenRequests || 0) + 1;
     this.ownerDocument.fullscreenElement = this;
+    this.ownerDocument.dispatch('fullscreenchange');
   }
   scrollIntoView(options) { this.scrollCalls ||= []; this.scrollCalls.push(options); }
   showModal() { this.open = true; }
@@ -138,6 +139,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
   document.fullscreenExits = 0;
   document.exitFullscreen = async () => {
     document.fullscreenElement = null; document.fullscreenExits++;
+    document.dispatch('fullscreenchange');
   };
   document.getElementById = id => {
     assert.ok(nodes.has(id), `main.js references an existing HTML id: ${id}`);
@@ -332,7 +334,7 @@ test('losing graphics during a race freezes time and requires explicit resume af
   assert.equal(ui.keys.size, 0);
 });
 
-test('fullscreen targets the entire race stage with scoreboard and arena and has a working exit', async t => {
+test('fullscreen stays beside pause, tracks native exits and language changes, and keeps legacy race details hidden', async t => {
   const ui = await loadUI(t);
   const opening = /<div\b[^>]*\bid="race-stage"[^>]*>/.exec(ui.html);
   assert.ok(opening, 'HTML provides the full race stage');
@@ -350,14 +352,40 @@ test('fullscreen targets the entire race stage with scoreboard and arena and has
   assert.match(contents, /id="fullscreen-exit"/);
   assert.match(contents, /id="records-results"/, 'fullscreen results contain the actual nickname save forms');
   assert.doesNotMatch(ui.html, /id="(?:record-dialog|ghost-results|lap-list|board-list)"/, 'old duplicate boards and nickname dialog are absent');
+  const scoreboard=/<section\b[^>]*class="scoreboard"[^>]*>([\s\S]*?)<\/section>/.exec(ui.html)?.[1];
+  assert.ok(scoreboard);
+  const actions=/<div\b[^>]*class="race-actions"[^>]*>([\s\S]*?)<\/div>/.exec(scoreboard)?.[1];
+  assert.match(actions,/id="fullscreen"/);assert.match(actions,/id="pause"/);
+  const settings=/<dialog\b[^>]*id="settings-dialog"[^>]*>([\s\S]*?)<\/dialog>/.exec(ui.html)?.[1];
+  assert.doesNotMatch(settings,/id="fullscreen"/,'settings no longer duplicate the top-right fullscreen control');
+  assert.equal(ui.nodes.get('fullscreen-exit').hidden,true);
+  const details=ui.allNodes.find(node=>node.classList.contains('pause-race-details'));
+  assert.equal(details.hidden,true);assert.equal(details.getAttribute('aria-hidden'),'true');
+  const assertLabel=label=>{
+    assert.equal(ui.nodes.get('fullscreen-label').textContent,label);
+    assert.equal(ui.nodes.get('fullscreen').getAttribute('aria-label'),label);
+    assert.equal(ui.nodes.get('fullscreen').getAttribute('title'),label);
+  };
+  assertLabel('全屏');
   await Promise.all(ui.click('fullscreen').pending);
   assert.equal(ui.document.fullscreenElement, ui.nodes.get('race-stage'));
   assert.equal(ui.nodes.get('race-stage').fullscreenRequests, 1);
   assert.equal(ui.document.activeElement, ui.nodes.get('game'));
+  assertLabel('退出全屏');
+  ui.click('language-en');assertLabel('Exit fullscreen');
+  // The browser's Esc exits fullscreen outside the application's click handler.
+  ui.document.fullscreenElement=null;ui.document.dispatch('fullscreenchange');
+  assertLabel('Fullscreen');
+  await Promise.all(ui.click('fullscreen').pending);assertLabel('Exit fullscreen');
+  await Promise.all(ui.click('fullscreen').pending);assertLabel('Fullscreen');
+  assert.equal(ui.document.fullscreenExits,1,'the same visible button also exits fullscreen');
+  ui.click('language-zh');assertLabel('全屏');
+  await Promise.all(ui.click('fullscreen').pending);assertLabel('退出全屏');
   await Promise.all(ui.click('fullscreen-exit').pending);
   assert.equal(ui.document.fullscreenElement, null);
-  assert.equal(ui.document.fullscreenExits, 1);
+  assert.equal(ui.document.fullscreenExits, 2);
   assert.equal(ui.document.activeElement, ui.nodes.get('game'));
+  assertLabel('全屏');
 });
 
 test('race-state styling follows menu, countdown, racing, paused and finished transitions',async t=>{
@@ -1053,6 +1081,37 @@ test('driving HUD omits navigation prompts on straights and turns while retainin
   assert.ok(context.calls.some(call=>call[0]==='fillText'&&/逆向行驶/.test(call[1])));
 });
 
+test('above-car nitro HUD is a slim bar without words, preserving charge length and both player and boosting colors',async t=>{
+  const ui=await loadUI(t);ui.launch();ui.advance(3.1);ui.click('pause');
+  const context=ui.nodes.get('hud').context,shapes=[];
+  context.roundRect=(...bounds)=>shapes.push({bounds,color:context.fillStyle});
+  ui.renderer.cameras=ui.engine.cars.map(car=>({
+    eye:[car.x,car.elevation+42,car.y-100],target:[car.x,car.elevation+42,car.y],fov:Math.PI/2,
+  }));
+  const draw=()=>{
+    shapes.length=0;context.calls.length=0;ui.frame(0);
+    assert.doesNotMatch(context.calls.filter(call=>call[0]==='fillText').map(call=>call[1]).join(' '),/NITRO|%/);
+    const shells=shapes.filter(shape=>shape.color==='#0b1926df');
+    assert.equal(shells.length,2,'each car keeps its own above-car meter');
+    for(const {bounds:[x,y,width,height]} of shells){
+      assert.ok(height<=14,'the label-free shell is only as tall as the bar and padding');
+      assert.ok(x<=-42&&x+width>=42&&y<=0&&y+height>=4,'the slim shell still encloses the full 84-pixel meter');
+    }
+    assert.equal(shapes.filter(shape=>shape.color==='#ffffff26').length,2,'empty charge still has a visible track');
+    return shapes.filter(shape=>['#51dfe5','#ff9870','#c6f56b'].includes(shape.color));
+  };
+  Object.assign(ui.engine.cars[0],{boost:100,boosting:false});
+  Object.assign(ui.engine.cars[1],{boost:50,boosting:false});
+  assert.deepEqual(draw().map(({bounds,color})=>({width:bounds[2],height:bounds[3],color})),[
+    {width:84,height:4,color:'#51dfe5'},{width:42,height:4,color:'#ff9870'},
+  ]);
+  Object.assign(ui.engine.cars[0],{boost:0,boosting:false});
+  Object.assign(ui.engine.cars[1],{boost:25,boosting:true});
+  assert.deepEqual(draw().map(({bounds,color})=>({width:bounds[2],height:bounds[3],color})),[
+    {width:21,height:4,color:'#c6f56b'},
+  ],'depleted charge disappears and active nitro keeps its lime color');
+});
+
 test('all six solo split rivals follow actual checkpoint crossing order without promoting the nearest or dropping the remaining five',async t=>{
   const fixture=challengeFixture();fixture.entries[0].name='<b>Alice</b>';fixture.board=fixture.entries;
   fixture.replay=entry=>({version:1,durationMs:entry.timeMs,frames:Array.from({length:entry.timeMs/100+1},(_,i)=>{
@@ -1080,9 +1139,9 @@ test('all six solo split rivals follow actual checkpoint crossing order without 
     const shown=Number(row.children[1].textContent.replace('−','-').split(' ')[0]);
     assert.equal(shown,Math.round((10750-checkpointOrder[index].timeMs)/10)/100);
   }
-  const alice=rows.find(row=>row.children[0].textContent==='<b>Alice</b>');
+  const alice=allRows.find(row=>row.children[0].textContent==='<b>Alice</b>');
   assert.ok(alice);assert.equal(alice.children[1].textContent,'+0.25 秒','positive means the player passed this point later');
-  assert.ok(rows.every(row=>row.children.length===2&&row.children[0].getAttribute('data-i18n-skip')!==null));
+  assert.ok(allRows.every(row=>row.children.length===2&&row.children[0].getAttribute('data-i18n-skip')!==null));
   assert.ok(!rows.some(row=>row.children[0].textContent===main.children[0].textContent),'the first rival must not be repeated');
   assert.equal(alice.children[0].innerHTML,'','a nickname resembling markup remains literal text');
   const fastest=checkpointOrder[0];ui.splitTiming.racers.get(1).latest.lapTimeMs=fastest.timeMs-100;ui.frame(0);
@@ -1370,7 +1429,12 @@ test('automatic solo setup waits for matching, then starts three distinct human 
   assert.deepEqual(roster.ghosts.filter(ghost=>!ghost.synthetic).map(ghost=>ghost.entry.name),['Alice','Bob','Carol']);
   assert.equal(new Set(roster.ghosts.map(ghost=>ghost.color)).size,6);
   assert.deepEqual(roster.ghosts.map(ghost=>ghost.slotId),[0,1,2,3,4,5]);
-  assert.deepEqual(roster.ghosts.slice(3).map(ghost=>ghost.entry.timeMs),[41370,43215,45540]);
+  const slowestHuman=Math.max(...roster.ghosts.filter(ghost=>!ghost.synthetic).map(ghost=>ghost.replay.durationMs));
+  for(const [index,ghost] of roster.ghosts.filter(ghost=>ghost.synthetic).entries()){
+    assert.ok(ghost.replay.durationMs>=slowestHuman+(index+1)*1000,'pace finish targets are later than every matched human');
+    assert.equal(ghost.entry.timeMs,ghost.replay.durationMs,'the roster reports the actual generated replay duration');
+    assert.equal(ghost.targetMs,ghost.replay.durationMs,'live and final ranking use the same actual duration');
+  }
   assert.equal(ui.nodes.get('challenge-roster').children.length,6);
   assert.equal(ui.nodes.get('challenge-status').textContent,'');
   assert.equal(ui.nodes.get('challenge-status').hidden,true);
@@ -1418,9 +1482,10 @@ for(const laps of [1])test(`Ghost Challenge ${laps}-lap results use the correct 
   assert.equal(ui.nodes.get('result-driver2-row').hidden,true);
   assert.equal(ui.nodes.get('challenge-results').hidden,false);
   assert.equal(ui.nodes.get('challenge-results-list').children.length,7);
-  assert.equal(ui.nodes.get('winner-name').textContent,'第 3 名 · 挑战完成');
+  assert.deepEqual(ui.application.activeGhosts.filter(ghost=>ghost.replay.durationMs<lastLap*1000).map(ghost=>ghost.entry.name),['Alice']);
+  assert.equal(ui.nodes.get('winner-name').textContent,'第 2 名 · 挑战完成');
   const own=ui.nodes.get('challenge-results-list').children.find(node=>node.className.includes('is-you'));
-  assert.equal(own.children[0].textContent,'03');assert.equal(own.children[1].textContent,'你');
+  assert.equal(own.children[0].textContent,'02');assert.equal(own.children[1].textContent,'你');
   assert.equal(own.children[2].textContent,laps===1?'00:42.50':'02:08.50');
   assert.match(ui.nodes.get('result-subtitle').textContent,laps===1?/起终点之间/:/GO/);
   assert.equal(ui.leaderboard.cards.length,1);
@@ -1552,9 +1617,10 @@ test('a millisecond tie keeps the player in the same place in the live HUD and f
   const car=ui.engine.cars[0];
   Object.assign(car,{finished:true,_started:true,lap:1,finishTime:42.6,lastLap:42,bestLap:42,speed:0,progress:1});
   ui.engine.time=42.6;ui.frame();await ui.flush();
-  assert.equal(ui.nodes.get('position-place1').textContent,2);
-  assert.equal(ui.nodes.get('winner-name').textContent,'第 2 名 · 挑战完成');
+  assert.ok(ui.application.activeGhosts.every(ghost=>ghost.replay.durationMs>=car.lastLap*1000));
+  assert.equal(ui.nodes.get('position-place1').textContent,1);
+  assert.equal(ui.nodes.get('winner-name').textContent,'第 1 名 · 挑战完成');
   const ranked=ui.nodes.get('challenge-results-list').children;
-  assert.ok(ranked[1].className.includes('is-you'));
-  assert.equal(ranked[2].children[1].textContent,'Alice','the player remains ahead of the equally timed human ghost');
+  assert.ok(ranked[0].className.includes('is-you'));
+  assert.equal(ranked[1].children[1].textContent,'Alice','the player remains ahead of the equally timed human ghost');
 });

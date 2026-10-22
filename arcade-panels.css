@@ -542,6 +542,11 @@ dialog:not([open]),
 :is(dialog, #pause-panel, #result, #records-center):is([hidden], .hidden),
 :is(dialog, #pause-panel, #result, #records-center) :is([hidden], .hidden) { display: none !important; }
 
+/* Retain the live data nodes for the controller, without a visible or sized
+   statistics block in the simplified pause menu. The top action owns exit. */
+#pause-panel .pause-race-details[hidden],
+#pause-panel #fullscreen-exit[hidden] { display: none !important; }
+
 :is(dialog, #records-center) .sr-only {
   position: absolute;
   width: 1px;

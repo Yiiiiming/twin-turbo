@@ -19,7 +19,7 @@ let renderer;
 const keys = new Set();
 let controlStorage; try { controlStorage = window.localStorage; } catch {}
 const bindings = new ControlBindings(controlStorage);
-const i18n = createI18n({ document, storage: controlStorage, onChange: () => {refreshTrackUI();renderChallengeRoster();buildChallengeRacePanel();if(engine.state==='finished'&&raceMode==='ai')renderChallengeResults(engine.cars[0]);} });
+const i18n = createI18n({ document, storage: controlStorage, onChange: () => {refreshTrackUI();refreshFullscreenUI();renderChallengeRoster();buildChallengeRacePanel();if(engine.state==='finished'&&raceMode==='ai')renderChallengeResults(engine.cars[0]);} });
 let bindingCapture = null;
 
 const leaderboard = new UnifiedRecordsClient({ document, onSaved: () => {
@@ -195,10 +195,7 @@ function drawHUD(now) {
         const nx=x+anchor.x/pixelsWide*viewWidth, ny=anchor.y/pixelsHigh*700;
         ctx.save();ctx.translate(nx,ny);
         const meterScale=Math.min(1.5,Math.max(1,1200/canvas.clientWidth));ctx.scale(meterScale,meterScale);
-        rounded(ctx,-51,-18,102,30,9,'#0b1926df');
-        ctx.font='bold 9px "Chakra Petch", sans-serif';ctx.textAlign='left';ctx.fillStyle=car.boosting?'#c6f56b':'#d4e2e8';
-        ctx.fillText(car.boosting?'NITRO ↑':'NITRO',-42,-6);
-        ctx.textAlign='right';ctx.fillText(`${Math.round(car.boost)}%`,42,-6);
+        rounded(ctx,-48,-4,96,12,6,'#0b1926df');
         rounded(ctx,-42,0,84,4,2,'#ffffff26');
         if(car.boost>0)rounded(ctx,-42,0,84*Math.max(0,Math.min(car.boost,100))/100,4,2,car.boosting?'#c6f56b':colors[i]);
         ctx.restore();
@@ -614,16 +611,23 @@ $('sound').addEventListener('click',()=>{soundEnabled=!soundEnabled;$('sound').s
 $('help').addEventListener('click',()=>{engine.pause();keys.clear();$('help-dialog').showModal();});
 $('close-help').addEventListener('click',()=>$('help-dialog').close());$('help-done').addEventListener('click',()=>$('help-dialog').close());
 $('help-dialog').addEventListener('click',event=>{if(event.target===$('help-dialog')){const r=$('help-dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('help-dialog').close();}});
+function refreshFullscreenUI() {
+  const label=i18n.t(document.fullscreenElement?'退出全屏':'全屏');
+  $('fullscreen-label').textContent=label;
+  $('fullscreen').setAttribute('aria-label',label);
+  $('fullscreen').setAttribute('title',label);
+}
 async function toggleFullscreen() {
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
     else await $('race-stage').requestFullscreen();
-    resize();
+    refreshFullscreenUI();
     (engine.state==='finished' ? leaderboard.cards.find(card=>!card.done)?.input || canvas : canvas).focus({preventScroll: true});
-  } catch { $('fullscreen').title = '请使用浏览器的全屏功能'; }
+  } catch { $('fullscreen').setAttribute('title',i18n.t('请使用浏览器的全屏功能')); }
 }
 $('fullscreen').addEventListener('click', toggleFullscreen);
 $('fullscreen-exit').addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange',()=>{refreshFullscreenUI();resize();});
 const controlKeys={has:code=>bindings.recognizes(code)||['Space','Escape'].includes(code)};
 
 function typingTarget(event) {

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHALLENGE_COLORS, PACE_PROFILES, paceReplay, createGhostChallenge, loadGhostChallenge } from '../ghost-challenge.js';
+import { CHALLENGE_COLORS, PACE_PROFILES, PACE_SPEED_LIMIT, paceReplay, createGhostChallenge, loadGhostChallenge } from '../ghost-challenge.js';
 import { validateReplay, validateRaceReplay, sampleReplay, ghostVersionForCity, GhostRecorder, GHOST_LIMITS } from '../ghost-replay.js';
 import { ghostSplitTimes } from '../split-timing.js';
-import { RaceEngine, TRACK, setTrack, trackPoint } from '../engine.js';
+import { RaceEngine, TRACK, setTrack, trackPoint, projectTrack, mod } from '../engine.js';
 import { RaceAI } from '../ai.js';
 import { RaceRenderer } from '../renderer.js';
 
@@ -23,97 +23,113 @@ function candidate(name, timeMs = 39000, laps = 1, id = `record-${++nextId}`) {
     ...(laps === 3 ? { kind: 'race', laps: 3 } : {}) }, replay: replay(timeMs, laps) };
 }
 
-test('challenge mixes faster and slower pacing on different human paths without mutating history', () => {
-  const input = [candidate('Alice', 40000), candidate('Bob', 39000), candidate('ＡLICE', 37000), candidate('Carol', 38000), candidate('Dave', 41000)];
-  // Distinct driven lanes let this test detect reusing only the slowest path.
+// Match every output segment back to its original straight segment. Testing
+// speeds between every pair of output frames proves the bound for arbitrary
+// playback times too, since sampleReplay interpolates linearly between them.
+function assertSegmentBounds(source,paced){
+  const times=[...new Set([...source.frames.map(f=>f[0]),...(source.lapEndsMs||[])])].sort((a,b)=>a-b);
+  let at=0;
+  const mapped=new Map([[0,0]]);
+  for(let i=1;i<times.length;i++){
+    const a=sampleReplay(source,times[i-1]),b=sampleReplay(source,times[i]),dx=b.x-a.x,dy=b.y-a.y;
+    const length=Math.hypot(dx,dy),sourceSpeed=length*1000/(times[i]-times[i-1]),start=at;
+    let previousU=0;
+    do{
+      const before=paced.frames[at],frame=paced.frames[++at];assert.ok(frame,'every original vertex remains represented');
+      const u=((frame[1]-a.x)*dx+(frame[2]-a.y)*dy)/(length*length);
+      assert.ok(u>previousU&&u<=1+1e-9,'corresponding source progress is strictly forward');previousU=u;
+      assert.ok(Math.hypot(frame[1]-a.x-u*dx,frame[2]-a.y-u*dy)<1e-7,'no chord cuts across an original corner');
+      const speed=Math.hypot(frame[1]-before[1],frame[2]-before[2])*1000/(frame[0]-before[0]);
+      assert.ok(speed<=sourceSpeed,`pace ${speed} exceeds human segment ${sourceSpeed}`);
+      assert.ok(speed<=PACE_SPEED_LIMIT,`pace ${speed} exceeds the vehicle speed cap`);
+      assert.ok(frame[0]-before[0]>0&&frame[0]-before[0]<=100);
+      const sourceTime=times[i-1]+u*(times[i]-times[i-1]);assert.ok(frame[0]>=sourceTime,'pace progress never leads the fastest human clock');
+      const pose=sampleReplay(source,Math.max(0,Math.min(source.durationMs,sourceTime)));
+      assert.ok(Math.abs(frame[4]-pose.elevation)<1e-7);
+    }while(Math.hypot(paced.frames[at][1]-b.x,paced.frames[at][2]-b.y)>1e-7);
+    assert.ok(paced.frames[at][0]-paced.frames[start][0]>=times[i]-times[i-1],'integer rounding never shrinks a source interval');
+    mapped.set(times[i],paced.frames[at][0]);
+  }
+  assert.equal(at,paced.frames.length-1);return mapped;
+}
+
+test('all pace ghosts follow the fastest human and finish behind every original human record',()=>{
+  const input=[candidate('Alice',40000),candidate('Bob',39000),candidate('ＡLICE',37000),candidate('Carol',38000),candidate('Dave',41000)];
   input.forEach((value,index)=>value.replay.frames.forEach(frame=>{frame[1]+=index*31;}));
-  const original = structuredClone(input), result = createGhostChallenge(input);
-  assert.deepEqual(result.ghosts.slice(0, 3).map(g => g.entry.name), ['ＡLICE', 'Carol', 'Bob']);
-  assert.equal(result.humanCount, 3); assert.equal(result.paceCount, 3);
-  assert.deepEqual(result.ghosts.slice(3).map(g => g.targetMs), [36445,38190,40365]);
-  assert.ok(result.ghosts.slice(3).some(g=>g.targetMs<39000));assert.ok(result.ghosts.slice(3).some(g=>g.targetMs>39000));
+  const original=structuredClone(input),result=createGhostChallenge(input);
+  assert.deepEqual(result.ghosts.slice(0,3).map(g=>g.entry.name),['ＡLICE','Carol','Bob']);
+  assert.equal(result.humanCount,3);assert.equal(result.paceCount,3);
   for(let i=0;i<3;i++){
     const human=result.ghosts[i],pace=result.ghosts[i+3],source=original.find(value=>value.entry.id===human.entry.id);
-    assert.deepEqual(human.replay,source.replay,'every original human frame and clock is retained');
-    assert.deepEqual(sampleReplay(pace.replay,0),sampleReplay(human.replay,0),'pace slots use fastest, middle and slowest driven lanes');
+    assert.deepEqual(human.replay,source.replay,'every human frame and timestamp is unchanged');
+    assert.equal(pace.entry.timeMs,pace.replay.durationMs);assert.equal(pace.targetMs,pace.replay.durationMs);
+    assert.ok(pace.targetMs>=39000+PACE_PROFILES[i].delayMs&&pace.targetMs<43000,'rounding retains roughly one to four seconds behind the slowest human');
+    assertSegmentBounds(result.ghosts[0].replay,pace.replay);
   }
-  assert.deepEqual(createGhostChallenge(input),result,'the same roster always generates the same clocks and poses');
-  assert.equal(new Set(result.ghosts.map(g => g.color)).size, 6);
-  assert.deepEqual(result.ghosts.map(g => g.slotId), [0, 1, 2, 3, 4, 5]);
-  assert.ok(result.ghosts.slice(3).every(g => g.synthetic && g.entry.isHuman === false && g.entry.playerId === 0));
-  result.ghosts[0].replay.frames[0][1] = 9999;
-  assert.deepEqual(input, original, 'rendering or selection cannot change a stored attempt');
+  assert.deepEqual(createGhostChallenge(input),result,'same source and slot always give identical clocks');
+  assert.equal(new Set(result.ghosts.map(g=>g.color)).size,6);assert.deepEqual(result.ghosts.map(g=>g.slotId),[0,1,2,3,4,5]);
+  assert.ok(result.ghosts.slice(3).every(g=>g.synthetic&&g.entry.isHuman===false&&g.entry.playerId===0&&g.entry.mode==='ghost'));
+  result.ghosts[0].replay.frames[0][1]=9999;assert.deepEqual(input,original);
 });
 
-test('nonlinear faster and slower clocks preserve driven geometry and exact three-lap boundaries', () => {
-  for (const laps of [1, 3]) for(const [profileIndex,profile]of PACE_PROFILES.entries()) {
-    const original = replay(laps === 1 ? 39000 : 117000, laps), saved = structuredClone(original);
-    const durationMs=Math.round(original.durationMs*profile.durationRatio),paced = paceReplay(original,durationMs,profileIndex);
-    assert.ok(laps === 1 ? validateReplay(paced) : validateRaceReplay(paced));
-    assert.equal(paced.durationMs,durationMs);assert.equal(paced.frames.at(-1)[0],durationMs);
-    assert.deepEqual(sampleReplay(paced,0),sampleReplay(original,0));
-    assert.deepEqual(sampleReplay(paced,durationMs),sampleReplay(original,original.durationMs));
-    let previousSource=0;
-    for (const frame of paced.frames) {
-      // Independently recover the point's position on the source polyline.
-      // Search only forward: an accidental reverse clock cannot pass this.
-      let match=null;
-      for(let i=Math.max(0,Math.floor(previousSource/100)-1);i<original.frames.length-1;i++){
-        const a=original.frames[i],b=original.frames[i+1],dx=b[1]-a[1],dy=b[2]-a[2],u=((frame[1]-a[1])*dx+(frame[2]-a[2])*dy)/(dx*dx+dy*dy);
-        if(u< -1e-8||u>1+1e-8||Math.hypot(frame[1]-a[1]-u*dx,frame[2]-a[2]-u*dy)>1e-6)continue;
-        const time=a[0]+u*(b[0]-a[0]);if(time>=previousSource-1e-7){match=time;break;}
-      }
-      assert.notEqual(match,null,'retiming never leaves the original driven path');
-      if(frame[0])assert.ok(match>previousSource,'the clock is strictly monotonic');
-      previousSource=match;
-      const pose = sampleReplay(original,Math.max(0,Math.min(original.durationMs,match)));
-      assert.ok(Math.hypot(frame[1] - pose.x, frame[2] - pose.y) < 1e-7);
-      assert.ok(Math.abs(frame[4] - pose.elevation) < 1e-7);
+test('per-segment slowdown keeps every path corner, exact lap boundary, speed ceiling and finish clock',()=>{
+  for(const laps of[1,3])for(const [index,profile]of PACE_PROFILES.entries()){
+    const source=replay(laps===1?39017:117043,laps),saved=structuredClone(source);
+    // Exercise an extra one-millisecond source interval and fractional lap-end
+    // poses between original samples, not just conveniently aligned 100 ms data.
+    const at=sampleReplay(source,1);source.frames.splice(1,0,[1,at.x,at.y,at.angle,at.elevation]);saved.frames=structuredClone(source.frames);
+    const paced=paceReplay(source,source.durationMs+profile.delayMs,index);
+    assert.ok(laps===3?validateRaceReplay(paced):validateReplay(paced));
+    const mapped=assertSegmentBounds(source,paced);
+    assert.equal(paced.frames.at(-1)[0],paced.durationMs);assert.equal(sampleReplay(paced,paced.durationMs+1),null);
+    assert.deepEqual(sampleReplay(paced,0),sampleReplay(source,0));
+    assert.deepEqual(sampleReplay(paced,paced.durationMs),sampleReplay(source,source.durationMs));
+    if(laps===3){
+      assert.deepEqual(paced.lapEndsMs,source.lapEndsMs.map(time=>mapped.get(time)));
+      paced.lapEndsMs.forEach((time,i)=>assert.deepEqual(sampleReplay(paced,time),sampleReplay(source,source.lapEndsMs[i])));
     }
-    assert.deepEqual(original, saved);
-    assert.equal(sampleReplay(paced, paced.durationMs + 1), null, 'finished ghosts never wrap around');
-    if (laps === 3) {
-      assert.notDeepEqual(paced.lapEndsMs,original.lapEndsMs.map(t=>Math.round(t*durationMs/original.durationMs)),'lap clocks follow the nonlinear rhythm');
-      paced.lapEndsMs.forEach((time,index)=>{
-        assert.ok(paced.frames.some(frame=>frame[0]===time),'every finish has an exact render frame');
-        assert.deepEqual(sampleReplay(paced,time),sampleReplay(original,original.lapEndsMs[index]));
-      });
-    }
+    assert.deepEqual(source,saved);
   }
 });
 
-test('three deterministic rhythms speed up and ease off smoothly, exchanging position during a run',()=>{
-  const source=replay(39000),paced=PACE_PROFILES.map((profile,index)=>paceReplay(source,Math.round(source.durationMs*profile.durationRatio),index));
+test('three nonnegative delay rhythms vary pace and exchange places without ever accelerating beyond the source',()=>{
+  const source=replay(),paced=PACE_PROFILES.map((profile,index)=>paceReplay(source,source.durationMs+profile.delayMs,index));
   const progress=(ghost,time)=>{const p=sampleReplay(ghost,time);return(Math.atan2(p.y,p.x)+Math.PI*2)%(Math.PI*2);};
   for(const ghost of paced){
     const speeds=[];let last=sampleReplay(ghost,0);
     for(let time=25;time<ghost.durationMs-100;time+=25){
       const pose=sampleReplay(ghost,time),delta=Math.atan2(last.x*pose.y-last.y*pose.x,last.x*pose.x+last.y*pose.y);
-      assert.ok(delta>0&&delta<.007,'no reverse progress or teleport at any sub-frame sample');
-      speeds.push(delta/.025);last=pose;
+      assert.ok(delta>0&&delta<.005,'no reversed motion or teleports');speeds.push(delta/.025);last=pose;
     }
-    assert.ok(Math.max(...speeds)/Math.min(...speeds)>1.3,'each car has a substantial nonuniform pace');
-    assert.ok(speeds.slice(1).every((speed,index)=>Math.abs(speed-speeds[index])<.001),'pace changes smoothly without frame-to-frame jitter');
+    assert.ok(Math.max(...speeds)/Math.min(...speeds)>1.035,'each pace has a visible rhythm rather than a uniform distance ratio');
+    assert.ok(speeds.slice(1).every((speed,i)=>Math.abs(speed-speeds[i])<.002),'millisecond clock rounding does not introduce a large speed jump');
+    assertSegmentBounds(source,ghost);
   }
   const ordering=time=>paced.map((ghost,index)=>({index,p:progress(ghost,time)})).sort((a,b)=>b.p-a.p).map(v=>v.index).join(',');
-  assert.notEqual(ordering(8000),ordering(22000),'front and mid-race specialists can exchange places');
-  const quarterFractions=paced.map(ghost=>progress(ghost,ghost.durationMs/4)/(Math.PI*2));
-  assert.ok(Math.max(...quarterFractions)-Math.min(...quarterFractions)>.03,'the three slots do not form an equally spaced train');
+  assert.notEqual(ordering(9000),ordering(23000),'paces can trade positions while the human remains ahead');
 });
 
-test('validator-edge archives use bounded safe fallback clocks and never create invalid synthetic records',()=>{
+test('the absolute speed ceiling adds real time instead of compressing an over-fast archived path',()=>{
+  const source=replay();source.frames.forEach(frame=>{frame[1]*=5;frame[2]*=5;});assert.ok(validateReplay(source),'the broad storage validator accepts this over-fast archive');
+  const paced=paceReplay(source,source.durationMs+1000);assert.ok(validateReplay(paced));
+  assert.ok(paced.durationMs>source.durationMs+15000,'speed limiting takes precedence over the requested finish target');
+  assertSegmentBounds(source,paced);
+});
+
+test('duration and frame capacity limits omit a pace instead of making it faster or dropping path vertices',()=>{
   for(const [duration,laps]of[[25000,1],[75000,3],[GHOST_LIMITS.maxDurationMs,1]]){
     const source=candidate('Limit',duration,laps),before=structuredClone(source),challenge=createGhostChallenge([source],laps);
-    assert.equal(challenge.humanCount,1);assert.equal(challenge.paceCount,3);
+    assert.equal(challenge.humanCount,1);assert.equal(challenge.paceCount,duration===GHOST_LIMITS.maxDurationMs?0:3);
     for(const ghost of challenge.ghosts.filter(g=>g.synthetic)){
       assert.ok(laps===3?validateRaceReplay(ghost.replay):validateReplay(ghost.replay));
-      assert.equal(ghost.targetMs,ghost.replay.durationMs);assert.equal(ghost.entry.timeMs,ghost.targetMs);
-      assert.equal(ghost.entry.mode,'ghost');assert.equal(ghost.entry.playerId,0);assert.equal(ghost.entry.isAI,true);
+      assert.equal(ghost.targetMs,ghost.replay.durationMs);assert.ok(ghost.targetMs>duration);
     }
     assert.deepEqual(source,before);
   }
-  assert.equal(paceReplay(replay(),24999),null);assert.equal(paceReplay(replay(),900001),null);
-  assert.equal(paceReplay(replay(),39000,99),null);assert.equal(paceReplay(replay(),39000,'map'),null);assert.equal(paceReplay(null,39000),null);
+  const crowded=replay(650000);assert.ok(validateReplay(crowded));assert.equal(paceReplay(crowded,651000),null,'preserving corners plus safe sampling exceeds maxFrames');
+  assert.equal(paceReplay(replay(),39000),null);assert.equal(paceReplay(replay(),38999),null);
+  assert.equal(paceReplay(replay(),900001),null);assert.equal(paceReplay(replay(),40000,99),null);
+  assert.equal(paceReplay(replay(),40000,'map'),null);assert.equal(paceReplay(null,40000),null);
 });
 
 test('empty and partially populated boards do not invent human records', () => {
@@ -183,12 +199,16 @@ test('real one-car recordings keep every checkpoint, lap boundary and finish on 
     const original=laps===3?recorder.fullRaceReplay(1):recorder.bestReplay(1),saved=structuredClone(original),sourceSplits=ghostSplitTimes(original);
     assert.equal(sourceSplits.length,laps*4);assert.ok(sourceSplits.every(Number.isFinite),'the real recorded drive crosses every gate');
     for(const [index,profile]of PACE_PROFILES.entries()){
-      const target=Math.round(original.durationMs*profile.durationRatio),paced=paceReplay(original,target,index),splits=ghostSplitTimes(paced);
+      const target=original.durationMs+profile.delayMs,paced=paceReplay(original,target,index),splits=ghostSplitTimes(paced);
       assert.ok(splits.every(Number.isFinite),'retiming preserves real-track checkpoint recognition');
-      assert.equal(splits.at(-1),target);assert.equal(paced.frames.at(-1)[0],target);
+      assert.equal(splits.at(-1),paced.durationMs);assert.equal(paced.frames.at(-1)[0],paced.durationMs);
+      assert.ok(paced.durationMs>=target);
       sourceSplits.forEach((sourceTime,gate)=>{
-        const u=sourceTime/original.durationMs,expected=target*(u+profile.amplitude/(2*Math.PI)*(Math.sin(2*Math.PI*u+profile.phase)-Math.sin(profile.phase)));
-        assert.ok(Math.abs(splits[gate]-expected)<=4,`gate ${gate} disagrees with the displayed trajectory clock`);
+        assert.ok(splits[gate]>=sourceTime,'no checkpoint can be reached before the fastest source');
+        const pose=sampleReplay(paced,splits[gate]),projection=projectTrack(pose.x,pose.y,undefined,pose.elevation);
+        const station=mod(TRACK.startDistance+((gate%4)+1)*TRACK.length/4,TRACK.length);
+        const distance=Math.abs(mod(projection.s-station+TRACK.length/2,TRACK.length)-TRACK.length/2);
+        assert.ok(distance<5,'the rendered pose actually reaches the timed checkpoint');
       });
       if(laps===3)assert.deepEqual([splits[3],splits[7],splits[11]],paced.lapEndsMs);
     }

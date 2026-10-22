@@ -10,13 +10,13 @@ export const CHALLENGE_COLORS = Object.freeze([
   { color: '#e6e8f2', colorLabel: '银色', colorLabelEn: 'Silver' },
 ].map((color, slotId) => Object.freeze({ slotId, ...color })));
 // These clocks are fixed before the race. They never react to the live player.
-// A single smooth cycle moves the strongest effort from early to middle to late.
+// Each slot distributes only added delay across a different part of the run.
 export const PACE_PROFILES = Object.freeze([
-  { durationRatio: .985, amplitude: .16, phase: Math.PI },
-  { durationRatio: 1.005, amplitude: .16, phase: Math.PI / 3 },
-  { durationRatio: 1.035, amplitude: .16, phase: -Math.PI / 3 },
+  { delayMs: 1000, amplitude: .98, phase: Math.PI * 4 / 3 },
+  { delayMs: 2000, amplitude: .98, phase: 0 },
+  { delayMs: 3000, amplitude: .98, phase: Math.PI * 2 / 3 },
 ].map(profile => Object.freeze(profile)));
-const FALLBACK_DELAYS_MS = [980, 2020, 3070];
+export const PACE_SPEED_LIMIT = 517;
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 const validDistance = laps => laps === 1 || laps === 3;
 const replayValid = (replay, laps) => laps === 3 ? validateRaceReplay(replay) : validateReplay(replay);
@@ -31,51 +31,44 @@ const validEntry = (entry, laps) => entry && typeof entry.id === 'string'
   && (laps === 3 ? entry.kind === 'race' && entry.laps === 3
     : (entry.kind === undefined || entry.kind === 'lap') && (entry.laps === undefined || entry.laps === 1));
 
-function resamplePace(replay, durationMs, profile, strength) {
-  const amplitude = profile.amplitude * strength, tau = Math.PI * 2;
-  // Source progress -> target clock. Its derivative lies in [0.84, 1.16],
-  // so the car always advances continuously, with no step in pace or reversal.
-  const clock = progress => progress + amplitude / tau
-    * (Math.sin(tau * progress + profile.phase) - Math.sin(profile.phase));
-  const sourceAt = time => {
-    const target = time / durationMs;
-    let low = 0, high = 1;
-    for (let i = 0; i < 36; i++) {
-      const middle = (low + high) / 2;
-      if (clock(middle) < target) low = middle; else high = middle;
-    }
-    return (low + high) / 2 * replay.durationMs;
-  };
-  const lapEndsMs = replay.lapEndsMs?.map((time, index, ends) => index === ends.length - 1
-    ? durationMs : Math.round(durationMs * clock(time / replay.durationMs)));
-  // Frame sampling, checkpoint passages and lap ends all share this one clock.
-  // Insert exact lap poses at rounded boundary milliseconds to avoid losing a
-  // finish between two 100 ms render samples, including an uneven three-lap run.
-  const times = new Set([0, durationMs, ...(lapEndsMs || [])]);
-  for (let time = 100; time < durationMs; time += 100) times.add(time);
-  const frames = [...times].sort((a, b) => a - b).map(time => {
-    const boundary = lapEndsMs?.indexOf(time) ?? -1;
-    const sourceTime = time === 0 ? 0 : time === durationMs ? replay.durationMs
-      : boundary !== -1 ? replay.lapEndsMs[boundary] : sourceAt(time);
-    const pose = sampleReplay(replay, sourceTime);
-    return [time, pose.x, pose.y, pose.angle, pose.elevation];
-  });
-  return { version: 1, durationMs, frames,
-    ...(replay.kind === 'race' ? { kind: 'race', laps: 3, lapEndsMs } : {}) };
-}
-
-/** Re-time only the recorded path; human records and live race physics are untouched. */
+/** durationMs is a minimum target, never a deadline that permits acceleration.
+ * Keep every original path vertex: resampling across a corner could cut its
+ * chord and invalidate the corresponding-segment speed bound. This is a speed
+ * bound, not a claim that the replay proves acceleration or nitro feasibility.
+ */
 export function paceReplay(replay, durationMs, profileIndex = 0) {
   const laps = replay?.kind === 'race' ? 3 : 1, profile = PACE_PROFILES[profileIndex];
   if (!Number.isInteger(profileIndex) || !profile || !replayValid(replay, laps) || !Number.isSafeInteger(durationMs)
-    || durationMs < GHOST_LIMITS.minDurationMs * laps || durationMs > GHOST_LIMITS.maxDurationMs) return null;
-  // An archived trace can already sit at a validator limit. Reduce the rhythm
-  // before trying the old uniform clock; never weaken replay validation.
-  for (const strength of [1, .5, 0]) {
-    const paced = resamplePace(replay, durationMs, profile, strength);
-    if (replayValid(paced, laps)) return paced;
+    || durationMs <= replay.durationMs || durationMs > GHOST_LIMITS.maxDurationMs) return null;
+  const times = [...new Set([...replay.frames.map(frame => frame[0]), ...(replay.lapEndsMs || [])])].sort((a,b)=>a-b);
+  const poses = times.map(time=>sampleReplay(replay,time)),segments=[];
+  for(let i=1;i<times.length;i++){
+    const dt=times[i]-times[i-1],a=poses[i-1],b=poses[i];
+    segments.push({start:times[i-1],end:times[i],a,b,minimum:Math.max(dt,Math.hypot(b.x-a.x,b.y-a.y)*1000/PACE_SPEED_LIMIT)});
   }
-  return null;
+  const minimum=segments.reduce((sum,segment)=>sum+segment.minimum,0);
+  // The positive floor maintains distinct rhythms even when the speed cap
+  // already requires more time than the requested target. Nothing is squeezed.
+  const delay=Math.max(300,durationMs-minimum),tau=Math.PI*2;
+  const integral=u=>u+profile.amplitude/tau*(Math.sin(tau*u+profile.phase)-Math.sin(profile.phase));
+  const first=poses[0],frames=[[0,first.x,first.y,first.angle,first.elevation]],lapEndsMs=[];
+  let elapsed=0;
+  for(const segment of segments){
+    const extra=delay*(integral(segment.end/replay.durationMs)-integral(segment.start/replay.durationMs));
+    // Strictly positive delay plus upward integer rounding guarantees dt >=
+    // source dt and dt >= distance/517, including one-millisecond source gaps.
+    const dt=Math.ceil(segment.minimum+Math.max(Number.EPSILON,extra)),parts=Math.ceil(dt/100);
+    if(elapsed+dt>GHOST_LIMITS.maxDurationMs||frames.length+parts>GHOST_LIMITS.maxFrames)return null;
+    for(let part=1;part<=parts;part++){
+      const offset=Math.round(part*dt/parts),u=offset/dt;
+      const pose=part===parts?segment.b:sampleReplay(replay,segment.start+(segment.end-segment.start)*u);
+      frames.push([elapsed+offset,pose.x,pose.y,pose.angle,pose.elevation]);
+    }
+    elapsed+=dt;
+    if(replay.lapEndsMs?.includes(segment.end))lapEndsMs.push(elapsed);
+  }
+  const paced={version:1,durationMs:elapsed,frames,...(laps===3?{kind:'race',laps:3,lapEndsMs}:{})};
+  return elapsed>=durationMs&&replayValid(paced,laps)?paced:null;
 }
 
 /** Build a fresh race roster. Synthetic entries are deliberately not valid score submissions. */
@@ -94,11 +87,8 @@ export function createGhostChallenge(candidates = [], laps = 1) {
     entry: { ...value.entry, name: normalizeName(value.entry.name) }, replay: copyReplay(value.replay),
     synthetic: false, targetMs: value.entry.timeMs }));
   if (humans.length) for (const [index, profile] of PACE_PROFILES.entries()) {
-    const source = humans[[0, Math.floor(humans.length / 2), humans.length - 1][index]];
-    const target = Math.max(GHOST_LIMITS.minDurationMs * laps,
-      Math.min(GHOST_LIMITS.maxDurationMs, Math.round(source.entry.timeMs * profile.durationRatio)));
-    const replay = paceReplay(source.replay, target, index)
-      || paceReplay(source.replay, Math.min(GHOST_LIMITS.maxDurationMs, source.entry.timeMs + FALLBACK_DELAYS_MS[index]), index);
+    const source = humans[0],target=humans.at(-1).entry.timeMs+profile.delayMs;
+    const replay = paceReplay(source.replay, target, index);
     if (!replay) continue;
     const targetMs = replay.durationMs;
     ghosts.push({ ...CHALLENGE_COLORS[index + 3], synthetic: true, targetMs, replay,
