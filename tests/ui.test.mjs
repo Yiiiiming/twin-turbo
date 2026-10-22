@@ -1053,7 +1053,7 @@ test('driving HUD omits navigation prompts on straights and turns while retainin
   assert.ok(context.calls.some(call=>call[0]==='fillText'&&/逆向行驶/.test(call[1])));
 });
 
-test('solo split rows show signed times, highlight one nearest rival and list other rivals once in checkpoint-time order',async t=>{
+test('all six solo split rivals follow actual checkpoint crossing order without promoting the nearest or dropping the remaining five',async t=>{
   const fixture=challengeFixture();fixture.entries[0].name='<b>Alice</b>';fixture.board=fixture.entries;
   fixture.replay=entry=>({version:1,durationMs:entry.timeMs,frames:Array.from({length:entry.timeMs/100+1},(_,i)=>{
     const p=trackPoint(TRACK.startDistance+TRACK.length*i*100/entry.timeMs,-24);
@@ -1069,24 +1069,28 @@ test('solo split rows show signed times, highlight one nearest rival and list ot
   const checkpointOrder=ui.splitTiming.ghosts.map(ghost=>({name:ghost.entry.name,timeMs:ghost.times[0]}))
     .sort((a,b)=>a.timeMs-b.timeMs);
   assert.ok(checkpointOrder.every(ghost=>Number.isFinite(ghost.timeMs)));
-  assert.deepEqual(main.children.map(node=>node.textContent),['Bob','+0.00 秒']);
-  assert.equal(main.hidden,false);assert.equal(rows.length,3);
-  const remaining=checkpointOrder.filter(ghost=>ghost.name!=='Bob').slice(0,3);
-  assert.deepEqual(rows.map(row=>row.children[0].textContent),remaining.map(ghost=>ghost.name));
-  for(const [index,row]of rows.entries()){
+  assert.equal(main.hidden,false);assert.equal(rows.length,5);
+  const allRows=[main,...rows],shownNames=allRows.map(row=>row.children[0].textContent);
+  assert.deepEqual(shownNames,checkpointOrder.map(ghost=>ghost.name));
+  assert.equal(new Set(shownNames).size,6,'every comparable opponent appears exactly once');
+  assert.notEqual(main.children[0].textContent,'Bob','the tied nearest rival must not jump ahead of earlier checkpoint crossings');
+  assert.deepEqual(rows.find(row=>row.children[0].textContent==='Bob').children.map(node=>node.textContent),['Bob','+0.00 秒']);
+  for(const [index,row]of allRows.entries()){
     assert.match(row.children[1].textContent,/^[+−]\d+\.\d{2} 秒$/);
     const shown=Number(row.children[1].textContent.replace('−','-').split(' ')[0]);
-    assert.equal(shown,Math.round((10750-remaining[index].timeMs)/10)/100);
+    assert.equal(shown,Math.round((10750-checkpointOrder[index].timeMs)/10)/100);
   }
   const alice=rows.find(row=>row.children[0].textContent==='<b>Alice</b>');
   assert.ok(alice);assert.equal(alice.children[1].textContent,'+0.25 秒','positive means the player passed this point later');
   assert.ok(rows.every(row=>row.children.length===2&&row.children[0].getAttribute('data-i18n-skip')!==null));
-  assert.ok(!rows.some(row=>row.children[0].textContent==='Bob'),'the highlighted rival must not be repeated');
+  assert.ok(!rows.some(row=>row.children[0].textContent===main.children[0].textContent),'the first rival must not be repeated');
   assert.equal(alice.children[0].innerHTML,'','a nickname resembling markup remains literal text');
   const fastest=checkpointOrder[0];ui.splitTiming.racers.get(1).latest.lapTimeMs=fastest.timeMs-100;ui.frame(0);
   assert.deepEqual(main.children.map(node=>node.textContent),[fastest.name,'−0.10 秒']);
   assert.equal(main.classList.contains('split-ahead'),true);
   assert.ok(!ui.nodes.get('split-ghost1').children.some(row=>row.children[0].textContent===fastest.name));
+  assert.deepEqual([main,...ui.nodes.get('split-ghost1').children].map(row=>row.children[0].textContent),shownNames,
+    'changing the player gap never changes the rivals’ checkpoint crossing order');
 });
 
 

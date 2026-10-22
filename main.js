@@ -335,11 +335,11 @@ function updateSplitUI(car) {
   panel.classList.toggle('hidden', !visible);
   if (!visible) return;
   $('split-point'+car.id).textContent = `第 ${split.lap} 圈 · ${split.index === 4 ? '终点' : `计时点 0${split.index}`}`;
-  const comparisons=(split.ghostDeltas||[]).filter(value=>Number.isFinite(value.deltaMs));
-  const ahead=comparisons.filter(value=>value.deltaMs>=0).sort((a,b)=>a.deltaMs-b.deltaMs);
-  const nearest=ahead[0] || [...comparisons].sort((a,b)=>b.deltaMs-a.deltaMs)[0];
-  const ghost=activeGhosts.find(value=>value.slotId===nearest?.slotId);
-  const comparison=raceMode==='ai'?nearest?.deltaMs:split.deltaMs;
+  const comparisons=(split.ghostDeltas||[]).filter(value=>Number.isFinite(value.deltaMs))
+    .sort((a,b)=>b.deltaMs-a.deltaMs||a.slotId-b.slotId);
+  const primary=comparisons[0];
+  const ghost=activeGhosts.find(value=>value.slotId===primary?.slotId);
+  const comparison=raceMode==='ai'?primary?.deltaMs:split.deltaMs;
   const target=raceMode==='ai'?(ghost?challengeLabel(ghost):i18n.t('幽灵')):i18n.t(names[split.opponentId-1]||'对手');
   const delta = $('split-gap'+car.id);
   delta.hidden=!Number.isFinite(comparison);
@@ -347,8 +347,7 @@ function updateSplitUI(car) {
   delta.classList.toggle('split-ahead', Number.isFinite(comparison) && comparison <= -5);
   delta.classList.toggle('split-behind', Number.isFinite(comparison) && comparison >= 5);
   const ghostLine = $('split-ghost'+car.id); ghostLine.replaceChildren();
-  const remaining=comparisons.filter(value=>raceMode!=='ai'||value.slotId!==nearest?.slotId)
-    .sort((a,b)=>b.deltaMs-a.deltaMs||a.slotId-b.slotId).slice(0,3);
+  const remaining=comparisons.filter(value=>raceMode!=='ai'||value.slotId!==primary?.slotId).slice(0,5);
   for (const comparison of remaining) {
     const row=document.createElement('span');row.style.color=comparison.color;
     const ghost=activeGhosts.find(value=>value.slotId===comparison.slotId);
