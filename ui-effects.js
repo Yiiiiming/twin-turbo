@@ -1,3 +1,9 @@
+import { enhanceTrackSelect } from './track-select.js';
+import { initLandmarkHologram } from './landmark-hologram.js';
+
+enhanceTrackSelect(document);
+initLandmarkHologram(document);
+
 // Subtle three-ring pointer trail, derived from the chosen Canva waiting-room UI.
 // Decoration only: no input capture and no work during a running race.
 const stage = document.getElementById('race-stage');

@@ -1,6 +1,7 @@
 // Chinese remains the authoring language; a DOM adapter also translates dynamic
 // status messages. Player-entered nicknames are kept verbatim.
 const PHRASES = [
+['地标全息投影，可左右拖动或使用方向键旋转','Landmark hologram. Drag horizontally or use the arrow keys to rotate.'],
 ['设置','Settings'],['已暂停','Paused'],['关闭设置','Close settings'],['关闭成绩榜','Close leaderboards'],['比赛计时','Race timing'],
 ['发车准备','Race setup'],['Language / 语言','Language'],['正在匹配…','Matching…'],
 ['发车前请向前行驶，已回到起跑位。','Drive forward. Back on the grid.'],

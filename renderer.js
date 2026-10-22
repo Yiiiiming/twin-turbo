@@ -590,7 +590,7 @@ function bigBen(mesh,item) {
     }
   });
 }
-function londonEye(mesh,item) {
+export function londonEye(mesh,item) {
   const {x,z}=item,angle=item.angle+Math.PI/2,radius=191,hubHeight=222,right=[Math.cos(angle),0,Math.sin(angle)],normal=[-Math.sin(angle),0,Math.cos(angle)];
   const p=(a,depth=0,r=radius)=>[x+right[0]*Math.cos(a)*r+normal[0]*depth,hubHeight+Math.sin(a)*r,z+right[2]*Math.cos(a)*r+normal[2]*depth];
   for(const depth of [-8,8])for(let i=0;i<112;i++)beam(mesh,p(i/112*TAU,depth),p((i+1)/112*TAU,depth),3,'#b4c2ba');

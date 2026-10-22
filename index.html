@@ -24,7 +24,7 @@
         <canvas id="hud" width="1200" height="700" aria-hidden="true"></canvas>
         <div class="arena-tag"><span class="live-dot"></span><span id="arena-tag-text">CHASE CAM / P1</span><b id="scene1">海岸港湾</b></div><div class="arena-meta opponent-ui"><span class="live-dot orange-dot"></span> CHASE CAM / P2 <b id="scene2">海岸港湾</b></div>
         <div class="center-overlay" id="menu">
-          <div class="lobby-identity"><div class="lobby-orbit" aria-hidden="true"><i></i></div><h1>Twin Turbo</h1></div>
+          <div class="lobby-identity"><div class="landmark-hologram"><canvas id="landmark-hologram" width="440" height="280" tabindex="0" role="img" aria-label="地标全息投影，可左右拖动或使用方向键旋转" data-i18n-skip></canvas></div><h1>Twin Turbo</h1></div>
           <div class="lobby-selection"><p class="eyebrow sr-only" id="route-eyebrow">CHOOSE YOUR CIRCUIT.</p><h2 id="route-title" data-i18n-skip>伦敦河岸</h2><p class="menu-description sr-only" id="route-description" data-i18n-skip></p><span id="track-title" class="sr-only" data-i18n-skip>伦敦河岸</span><span id="track-english" class="sr-only">01 / LONDON RIVERSIDE</span></div>
           <div class="map-picker" aria-labelledby="map-picker-title"><div class="map-picker-heading"><span id="map-picker-title">选择赛道</span><small id="map-count">11 CIRCUITS</small></div><div id="track-cards" class="track-cards" role="group" aria-labelledby="map-picker-title"></div></div>
           <div class="mode-select" role="group" aria-label="游戏模式"><button class="selected" data-mode="ai" aria-pressed="true">幽灵挑战</button><button data-mode="local" aria-pressed="false">本地双人</button></div>
@@ -59,7 +59,7 @@
         </div>
         
         <div id="records-pending-host"></div>
-        <div class="records-track-filter"><label for="records-track-choice">选择赛道</label><select id="records-track-choice" data-i18n-skip></select></div>
+        <div class="records-track-filter"><label id="records-track-label" for="records-track-trigger">选择赛道</label><div class="track-select" data-i18n-skip><select id="records-track-choice" aria-labelledby="records-track-label"></select><button id="records-track-trigger" class="track-select-trigger" type="button" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-controls="records-track-options" aria-labelledby="records-track-label records-track-value" hidden><span id="records-track-value" class="track-select-label"></span><span class="track-select-chevron" aria-hidden="true"></span></button><div id="records-track-options" class="track-select-list" role="listbox" aria-labelledby="records-track-label" hidden></div></div></div>
         <div class="records-board-heading">
           <div class="records-tabs" role="tablist" aria-label="成绩排行方式"><button id="records-tab-lap" type="button" role="tab" aria-selected="true" aria-controls="records-table" class="selected">最快单圈</button><button id="records-tab-1" type="button" role="tab" aria-selected="false" aria-controls="records-table">1 圈极速竞技</button></div>
           <span class="records-board-note">全站最快五名</span>

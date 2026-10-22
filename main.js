@@ -195,7 +195,7 @@ function drawHUD(now) {
         const nx=x+anchor.x/pixelsWide*viewWidth, ny=anchor.y/pixelsHigh*700;
         ctx.save();ctx.translate(nx,ny);
         const meterScale=Math.min(1.5,Math.max(1,1200/canvas.clientWidth));ctx.scale(meterScale,meterScale);
-        rounded(ctx,-48,-4,96,12,6,'#0b1926df');
+        rounded(ctx,-48,-4,96,12,6,'#0b192680');
         rounded(ctx,-42,0,84,4,2,'#ffffff26');
         if(car.boost>0)rounded(ctx,-42,0,84*Math.max(0,Math.min(car.boost,100))/100,4,2,car.boosting?'#c6f56b':colors[i]);
         ctx.restore();
@@ -442,6 +442,7 @@ function begin(skipGhosts = false) {
   if ($('language-dialog').open || $('help-dialog').open || $('bindings-dialog').open || leaderboard.busyDialog || !renderer.available) return;
   const automatic=selectedMode==='ai'&&!manualGhosts;
   if(!skipGhosts && automatic && challengeSetup?.loading)return;
+  void requestRaceFullscreen();
   const opponents=automatic&&!skipGhosts ? challengeSetup?.ghosts||[] : null;
   cancelChallengeLoad(); $('race-setup-dialog').close();
   if (skipGhosts) ghostClient.node('ghost-enabled').checked = false;
@@ -617,6 +618,24 @@ function refreshFullscreenUI() {
   $('fullscreen').setAttribute('aria-label',label);
   $('fullscreen').setAttribute('title',label);
 }
+let firstFullscreenGesture=true;
+async function requestRaceFullscreen() {
+  const stage=$('race-stage');
+  if(document.fullscreenElement || document.fullscreenEnabled===false || typeof stage.requestFullscreen!=='function')return;
+  try {
+    // Gesture callers reach the native request before the first await.
+    await stage.requestFullscreen();
+  } catch {}
+}
+function fullscreenOnFirstGesture(event) {
+  if(!firstFullscreenGesture || !event.isTrusted || event.repeat || event.metaKey || event.ctrlKey || event.altKey
+    || (event.type==='keydown'&&!['Enter','Space'].includes(event.code)))return;
+  firstFullscreenGesture=false;
+  // These controls own their request, especially the user's explicit exit.
+  const button=event.target?.closest?.('button');
+  if(['fullscreen','fullscreen-exit','setup-launch','setup-skip'].includes(button?.id))return;
+  void requestRaceFullscreen();
+}
 async function toggleFullscreen() {
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
@@ -627,7 +646,21 @@ async function toggleFullscreen() {
 }
 $('fullscreen').addEventListener('click', toggleFullscreen);
 $('fullscreen-exit').addEventListener('click', toggleFullscreen);
-document.addEventListener('fullscreenchange',()=>{refreshFullscreenUI();resize();});
+window.addEventListener('click',fullscreenOnFirstGesture,{capture:true});
+window.addEventListener('keydown',fullscreenOnFirstGesture,{capture:true});
+document.addEventListener('fullscreenchange',()=>{
+  if(document.fullscreenElement){
+    firstFullscreenGesture=false;
+    const languageDialog=$('language-dialog');
+    if(languageDialog.open){
+      const focused=languageDialog.contains(document.activeElement)?document.activeElement:null;
+      // Fullscreen is added above an already-modal dialog in the top layer.
+      languageDialog.close();languageDialog.showModal();
+      focused?.focus({preventScroll:true});
+    }
+  }
+  refreshFullscreenUI();resize();
+});
 const controlKeys={has:code=>bindings.recognizes(code)||['Space','Escape'].includes(code)};
 
 function typingTarget(event) {
@@ -696,4 +729,5 @@ function loop(timestamp) {
 }
 $('language-toggle').addEventListener('click',()=>{keys.clear();engine.pause();});
 i18n.init();
+void requestRaceFullscreen();
 resize();requestAnimationFrame(loop);

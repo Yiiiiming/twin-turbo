@@ -98,6 +98,7 @@ class MockNode extends MockTarget {
     }
     return null;
   }
+  contains(node) { for(let current=node;current;current=current.parentElement)if(current===this)return true;return false; }
   querySelector(selector) {
     let child = this.children.find(item => item.matches(selector));
     if (!child) child = this.appendChild(new MockNode(selector, this.ownerDocument));
@@ -127,7 +128,7 @@ function canvasContext() {
   });
 }
 
-async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=coast', language = 'zh', configureRace = true } = {}) {
+async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=coast', language = 'zh', configureRace = true, fullscreenAtLoad = false } = {}) {
   setTrack('coast'); t.after(() => setTrack('coast'));
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const document = new MockTarget();
@@ -169,6 +170,13 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
   nodes.get('records-center').appendChild(nodes.get('records-pending-host'));
   nodes.get('countdown').appendChild(new MockNode('strong', document));
   nodes.get('countdown').appendChild(new MockNode('span', document));
+  const stage=nodes.get('race-stage'),requestFullscreen=stage.requestFullscreen.bind(stage);
+  stage.requestFullscreen=()=>{
+    stage.fullscreenAttempts=(stage.fullscreenAttempts||0)+1;
+    // Browsers normally reject the initial request without user activation.
+    if(stage.fullscreenAttempts===1&&!fullscreenAtLoad)return Promise.reject(new Error('User activation required'));
+    return requestFullscreen();
+  };
   const window = new MockTarget(); window.devicePixelRatio = 1;
   const stored = new Map(); window.localStorage = { getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,String(value)),removeItem:key=>stored.delete(key) };
   let clock = 0;
@@ -386,6 +394,130 @@ test('fullscreen stays beside pause, tracks native exits and language changes, a
   assert.equal(ui.document.fullscreenExits, 2);
   assert.equal(ui.document.activeElement, ui.nodes.get('game'));
   assertLabel('全屏');
+});
+
+test('page load can enter fullscreen and never reverses the first manual exit',async t=>{
+  const ui=await loadUI(t,{fullscreenAtLoad:true}),stage=ui.nodes.get('race-stage');
+  assert.equal(stage.fullscreenAttempts,1);
+  assert.equal(ui.document.fullscreenElement,stage);
+  assert.equal(ui.nodes.get('fullscreen-label').textContent,'退出全屏');
+  ui.window.dispatch('click',{target:ui.nodes.get('fullscreen'),isTrusted:true});
+  await Promise.all(ui.click('fullscreen').pending);
+  assert.equal(ui.document.fullscreenElement,null);
+  assert.equal(ui.document.fullscreenExits,1);
+  ui.window.dispatch('click',{target:ui.nodes.get('start'),isTrusted:true});
+  assert.equal(stage.fullscreenAttempts,1,'a successful load consumes the first-gesture fallback');
+});
+
+test('fullscreen re-shows only an open language dialog above the stage and preserves the focused language choice',async t=>{
+  const ui=await loadUI(t,{language:null}),dialog=ui.nodes.get('language-dialog'),choice=ui.nodes.get('language-en');
+  dialog.appendChild(choice);choice.focus();
+  assert.equal(dialog.open,true);
+  let reopened=0;
+  const show=dialog.showModal.bind(dialog);
+  dialog.showModal=()=>{reopened++;show();};
+  const setup=ui.nodes.get('race-setup-dialog');
+  let setupClosed=0;setup.addEventListener('close',()=>setupClosed++);
+  await ui.nodes.get('race-stage').requestFullscreen();
+  assert.equal(reopened,1,'the still-open language dialog is brought back to the top layer');
+  assert.equal(dialog.open,true);
+  assert.equal(ui.document.activeElement,choice,'the existing focused language button is restored');
+  assert.equal(setupClosed,0,'fullscreen does not cycle setup or cancel its loading state');
+  ui.click('language-en');
+  assert.equal(dialog.open,false);assert.equal(ui.i18n.language,'en');
+  await ui.document.exitFullscreen();
+  await ui.nodes.get('race-stage').requestFullscreen();
+  assert.equal(reopened,1,'a completed language choice is never reopened by later fullscreen changes');
+});
+
+test('blocked page-load fullscreen retries synchronously on the first trusted click, Enter or Space',async t=>{
+  for(const kind of ['click','Enter','Space'])await t.test(kind,async t=>{
+    const ui=await loadUI(t),stage=ui.nodes.get('race-stage'),request=stage.requestFullscreen.bind(stage);
+    assert.equal(stage.fullscreenAttempts,1,'page load attempted fullscreen once');
+    assert.equal(ui.document.fullscreenElement,null);
+    let insideGesture=false;
+    stage.requestFullscreen=()=>{assert.equal(insideGesture,true);return request();};
+    const type=kind==='click'?'click':'keydown',event={target:ui.nodes.get('start'),code:kind};
+    ui.window.dispatch(type,event);
+    assert.equal(stage.fullscreenAttempts,1,'synthetic interactions do not consume the fallback');
+    insideGesture=true;ui.window.dispatch(type,{...event,isTrusted:true});insideGesture=false;
+    assert.equal(stage.fullscreenAttempts,2,'request happens before the trusted handler returns');
+    await ui.flush();
+    assert.equal(ui.document.fullscreenElement,stage);
+    await ui.document.exitFullscreen();
+    ui.window.dispatch(type,{...event,isTrusted:true});
+    assert.equal(stage.fullscreenAttempts,2,'later ordinary gestures do not undo a fullscreen exit');
+  });
+});
+
+test('a first trusted manual fullscreen click owns its request instead of toggling the fallback back off',async t=>{
+  const ui=await loadUI(t),stage=ui.nodes.get('race-stage');
+  ui.window.dispatch('click',{target:ui.nodes.get('fullscreen'),isTrusted:true});
+  assert.equal(stage.fullscreenAttempts,1,'capture leaves the manual control in charge');
+  await Promise.all(ui.click('fullscreen').pending);
+  assert.equal(stage.fullscreenAttempts,2);
+  assert.equal(ui.document.fullscreenElement,stage);
+  assert.equal(ui.document.fullscreenExits,0);
+});
+
+test('actual launch retries fullscreen synchronously after a blocked load without forcing setup, menu or an already-fullscreen race',async t=>{
+  const ui=await loadUI(t),stage=ui.nodes.get('race-stage');
+  const request=stage.requestFullscreen.bind(stage);
+  let launchClick=false;
+  stage.requestFullscreen=()=>{
+    assert.equal(launchClick,true,'native request stays in the launch click before any asynchronous work');
+    return request();
+  };
+  assert.equal(stage.fullscreenAttempts,1,'the blocked initial request does not suppress launch');
+  assert.equal(stage.fullscreenRequests||0,0);
+  ui.click('start');
+  assert.equal(stage.fullscreenRequests||0,0,'preparing a race does not enter fullscreen');
+  launchClick=true;ui.window.dispatch('click',{target:ui.nodes.get('setup-launch'),isTrusted:true});ui.click('setup-launch');launchClick=false;
+  assert.equal(stage.fullscreenRequests,1,'request starts before the click handler returns');
+  assert.equal(ui.engine.state,'countdown');
+  await ui.flush();
+  assert.equal(ui.document.fullscreenElement,stage);
+  assert.equal(ui.nodes.get('fullscreen-label').textContent,'退出全屏');
+  ui.click('restart');ui.click('setup-launch');
+  assert.equal(stage.fullscreenRequests,1,'restarting an already-fullscreen race does not request again');
+  await Promise.all(ui.click('fullscreen').pending);
+  ui.click('pause-menu');
+  assert.equal(ui.document.fullscreenElement,null);
+  assert.equal(stage.fullscreenRequests,1,'returning to the menu does not re-enter fullscreen');
+  ui.click('start');
+  assert.equal(stage.fullscreenRequests,1);
+  launchClick=true;ui.click('setup-skip');launchClick=false;
+  assert.equal(stage.fullscreenRequests,2,'the no-ghost launch uses the same direct request');
+  assert.equal(ui.engine.state,'countdown');
+  await ui.flush();
+});
+
+test('unavailable or denied automatic fullscreen stays quiet, retries on launch and never blocks a race or manual fullscreen',async t=>{
+  for(const failure of ['missing API','disabled policy','synchronous rejection','promise rejection'])await t.test(failure,async t=>{
+    const ui=await loadUI(t),stage=ui.nodes.get('race-stage'),request=stage.requestFullscreen.bind(stage);
+    let attempts=0;
+    if(failure==='missing API')stage.requestFullscreen=undefined;
+    else if(failure==='disabled policy')ui.document.fullscreenEnabled=false;
+    else stage.requestFullscreen=()=>{
+      attempts++;
+      if(failure==='synchronous rejection')throw new Error('Fullscreen unavailable');
+      return Promise.reject(new Error('Fullscreen denied'));
+    };
+    ui.window.dispatch('click',{target:ui.nodes.get('start'),isTrusted:true});
+    await ui.flush();
+    ui.window.dispatch('click',{target:ui.nodes.get('start'),isTrusted:true});
+    assert.equal(attempts,failure.includes('rejection')?1:0,'ordinary gestures have only one fallback attempt');
+    ui.launch();await ui.flush();
+    assert.equal(ui.engine.state,'countdown');
+    assert.equal(ui.document.fullscreenElement,null);
+    assert.equal(ui.nodes.get('fullscreen').getAttribute('title'),'全屏','automatic failure shows no error prompt');
+    ui.click('restart');ui.click('setup-launch');await ui.flush();
+    assert.equal(ui.engine.state,'countdown');
+    assert.equal(attempts,failure.includes('rejection')?3:0,'each explicit launch retries despite prior automatic rejection');
+    stage.requestFullscreen=request;ui.document.fullscreenEnabled=true;
+    await Promise.all(ui.click('fullscreen').pending);
+    assert.equal(ui.document.fullscreenElement,stage,'the explicit fullscreen control remains usable');
+  });
 });
 
 test('race-state styling follows menu, countdown, racing, paused and finished transitions',async t=>{
@@ -676,7 +808,7 @@ test('finish overlay directly offers the sole nickname form without leaving full
   assert.equal(ui.nodes.get('records-results').hidden, false);
   assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 0);
   assert.equal(ui.requests.filter(request => request.method === 'POST').length, 0, 'results wait for an explicit save');
-  await Promise.all(ui.click('fullscreen').pending);
+  assert.equal(ui.document.fullscreenElement,ui.nodes.get('race-stage'),'launch already entered fullscreen');
   const positions = ui.engine.cars.map(({x,y}) => ({x,y}));
   const card = ui.leaderboard.cards[0];
   assert.equal(ui.nodes.has('show-records'),false,'no separate button or navigation is needed to save');
@@ -1091,7 +1223,7 @@ test('above-car nitro HUD is a slim bar without words, preserving charge length 
   const draw=()=>{
     shapes.length=0;context.calls.length=0;ui.frame(0);
     assert.doesNotMatch(context.calls.filter(call=>call[0]==='fillText').map(call=>call[1]).join(' '),/NITRO|%/);
-    const shells=shapes.filter(shape=>shape.color==='#0b1926df');
+    const shells=shapes.filter(shape=>shape.color==='#0b192680');
     assert.equal(shells.length,2,'each car keeps its own above-car meter');
     for(const {bounds:[x,y,width,height]} of shells){
       assert.ok(height<=14,'the label-free shell is only as tall as the bar and padding');
