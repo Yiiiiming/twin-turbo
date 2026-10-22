@@ -89,6 +89,27 @@ test('language switching restores original text and attributes while respecting 
   h.client.setLanguage('en');assert.equal(label.textContent,'Paused');
 });
 
+test('fullscreen lobby, pause and dialog labels switch both ways without translating a matching nickname',()=>{
+  const pairs=[['设置','Settings'],['已暂停','Paused'],['关闭设置','Close settings'],['关闭成绩榜','Close leaderboards'],['比赛计时','Race timing'],['发车准备','Race setup'],['Language / 语言','Language'],['正在匹配…','Matching…'],['对手','opponent'],['幽灵','ghost']];
+  const h=fixture('en'),labels=pairs.map(([source],index)=>{
+    const label=h.add(`lobby-label-${index}`,'button',source);
+    label.setAttribute('aria-label',source);label.setAttribute('title',source);return label;
+  });
+  const name='设置已暂停比赛计时',nickname=h.add('nickname','strong',name),input=h.add('name-input','input');
+  nickname.setAttribute('translate','no');input.value=name;
+  assert.equal(translateText(`「${name}」 · 00:42.10`),`“${name}” · 00:42.10`);
+  h.client.init();
+  for(const language of['en','zh','en']){
+    h.client.setLanguage(language);
+    for(const [index,pair]of pairs.entries()){
+      const expected=pair[language==='en'?1:0],label=labels[index];
+      assert.equal(label.textContent,expected);
+      assert.equal(label.getAttribute('aria-label'),expected);assert.equal(label.getAttribute('title'),expected);
+    }
+    assert.equal(nickname.textContent,name);assert.equal(input.value,name);
+  }
+});
+
 test('dynamic DOM text and accessibility labels are translated without altering excluded content',t=>{
   const observers=[];
   class Observer{constructor(callback){this.callback=callback;observers.push(this);}observe(){this.observing=true;}disconnect(){this.observing=false;}}

@@ -1,6 +1,8 @@
 // Chinese remains the authoring language; a DOM adapter also translates dynamic
 // status messages. Player-entered nicknames are kept verbatim.
 const PHRASES = [
+['设置','Settings'],['已暂停','Paused'],['关闭设置','Close settings'],['关闭成绩榜','Close leaderboards'],['比赛计时','Race timing'],
+['发车准备','Race setup'],['Language / 语言','Language'],['正在匹配…','Matching…'],
 ['发车前请向前行驶，已回到起跑位。','Drive forward. Back on the grid.'],
 ['这次单圈起步不符合规则，幽灵未保存；请从起跑位向前重新比赛。','This lap did not follow the start rules, so its ghost was not saved. Start a new race driving forward from the grid.'],
 ['这次单圈起步不符合规则，幽灵未保存；请从起跑位向前重新比赛','This lap did not follow the start rules, so its ghost was not saved. Start a new race driving forward from the grid'],

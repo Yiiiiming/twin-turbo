@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHALLENGE_COLORS, PACE_DELAYS_MS, paceReplay, createGhostChallenge, loadGhostChallenge } from '../ghost-challenge.js';
-import { validateReplay, validateRaceReplay, sampleReplay, ghostVersionForCity } from '../ghost-replay.js';
+import { CHALLENGE_COLORS, PACE_PROFILES, paceReplay, createGhostChallenge, loadGhostChallenge } from '../ghost-challenge.js';
+import { validateReplay, validateRaceReplay, sampleReplay, ghostVersionForCity, GhostRecorder, GHOST_LIMITS } from '../ghost-replay.js';
+import { ghostSplitTimes } from '../split-timing.js';
 import { RaceEngine, TRACK, setTrack, trackPoint } from '../engine.js';
 import { RaceAI } from '../ai.js';
 import { RaceRenderer } from '../renderer.js';
@@ -22,12 +23,21 @@ function candidate(name, timeMs = 39000, laps = 1, id = `record-${++nextId}`) {
     ...(laps === 3 ? { kind: 'race', laps: 3 } : {}) }, replay: replay(timeMs, laps) };
 }
 
-test('challenge takes three fastest different human names and three slower pace ghosts without mutating history', () => {
+test('challenge mixes faster and slower pacing on different human paths without mutating history', () => {
   const input = [candidate('Alice', 40000), candidate('Bob', 39000), candidate('ＡLICE', 37000), candidate('Carol', 38000), candidate('Dave', 41000)];
+  // Distinct driven lanes let this test detect reusing only the slowest path.
+  input.forEach((value,index)=>value.replay.frames.forEach(frame=>{frame[1]+=index*31;}));
   const original = structuredClone(input), result = createGhostChallenge(input);
   assert.deepEqual(result.ghosts.slice(0, 3).map(g => g.entry.name), ['ＡLICE', 'Carol', 'Bob']);
   assert.equal(result.humanCount, 3); assert.equal(result.paceCount, 3);
-  assert.deepEqual(result.ghosts.slice(3).map(g => g.targetMs), PACE_DELAYS_MS.map(delay => 39000 + delay));
+  assert.deepEqual(result.ghosts.slice(3).map(g => g.targetMs), [36445,38190,40365]);
+  assert.ok(result.ghosts.slice(3).some(g=>g.targetMs<39000));assert.ok(result.ghosts.slice(3).some(g=>g.targetMs>39000));
+  for(let i=0;i<3;i++){
+    const human=result.ghosts[i],pace=result.ghosts[i+3],source=original.find(value=>value.entry.id===human.entry.id);
+    assert.deepEqual(human.replay,source.replay,'every original human frame and clock is retained');
+    assert.deepEqual(sampleReplay(pace.replay,0),sampleReplay(human.replay,0),'pace slots use fastest, middle and slowest driven lanes');
+  }
+  assert.deepEqual(createGhostChallenge(input),result,'the same roster always generates the same clocks and poses');
   assert.equal(new Set(result.ghosts.map(g => g.color)).size, 6);
   assert.deepEqual(result.ghosts.map(g => g.slotId), [0, 1, 2, 3, 4, 5]);
   assert.ok(result.ghosts.slice(3).every(g => g.synthetic && g.entry.isHuman === false && g.entry.playerId === 0));
@@ -35,23 +45,75 @@ test('challenge takes three fastest different human names and three slower pace 
   assert.deepEqual(input, original, 'rendering or selection cannot change a stored attempt');
 });
 
-test('pace replay preserves the driven path and all three lap boundaries on a stretched clock', () => {
-  for (const laps of [1, 3]) {
+test('nonlinear faster and slower clocks preserve driven geometry and exact three-lap boundaries', () => {
+  for (const laps of [1, 3]) for(const [profileIndex,profile]of PACE_PROFILES.entries()) {
     const original = replay(laps === 1 ? 39000 : 117000, laps), saved = structuredClone(original);
-    const paced = paceReplay(original, original.durationMs + 3070);
+    const durationMs=Math.round(original.durationMs*profile.durationRatio),paced = paceReplay(original,durationMs,profileIndex);
     assert.ok(laps === 1 ? validateReplay(paced) : validateRaceReplay(paced));
-    const ratio = paced.durationMs / original.durationMs;
+    assert.equal(paced.durationMs,durationMs);assert.equal(paced.frames.at(-1)[0],durationMs);
+    assert.deepEqual(sampleReplay(paced,0),sampleReplay(original,0));
+    assert.deepEqual(sampleReplay(paced,durationMs),sampleReplay(original,original.durationMs));
+    let previousSource=0;
     for (const frame of paced.frames) {
-      const index = paced.lapEndsMs?.indexOf(frame[0]) ?? -1;
-      const sourceTime = frame[0] === paced.durationMs ? original.durationMs : index >= 0 ? original.lapEndsMs[index] : frame[0] / ratio;
-      const pose = sampleReplay(original, sourceTime);
+      // Independently recover the point's position on the source polyline.
+      // Search only forward: an accidental reverse clock cannot pass this.
+      let match=null;
+      for(let i=Math.max(0,Math.floor(previousSource/100)-1);i<original.frames.length-1;i++){
+        const a=original.frames[i],b=original.frames[i+1],dx=b[1]-a[1],dy=b[2]-a[2],u=((frame[1]-a[1])*dx+(frame[2]-a[2])*dy)/(dx*dx+dy*dy);
+        if(u< -1e-8||u>1+1e-8||Math.hypot(frame[1]-a[1]-u*dx,frame[2]-a[2]-u*dy)>1e-6)continue;
+        const time=a[0]+u*(b[0]-a[0]);if(time>=previousSource-1e-7){match=time;break;}
+      }
+      assert.notEqual(match,null,'retiming never leaves the original driven path');
+      if(frame[0])assert.ok(match>previousSource,'the clock is strictly monotonic');
+      previousSource=match;
+      const pose = sampleReplay(original,Math.max(0,Math.min(original.durationMs,match)));
       assert.ok(Math.hypot(frame[1] - pose.x, frame[2] - pose.y) < 1e-7);
       assert.ok(Math.abs(frame[4] - pose.elevation) < 1e-7);
     }
     assert.deepEqual(original, saved);
     assert.equal(sampleReplay(paced, paced.durationMs + 1), null, 'finished ghosts never wrap around');
-    if (laps === 3) assert.deepEqual(paced.lapEndsMs, original.lapEndsMs.map(t => Math.round(t * ratio)));
+    if (laps === 3) {
+      assert.notDeepEqual(paced.lapEndsMs,original.lapEndsMs.map(t=>Math.round(t*durationMs/original.durationMs)),'lap clocks follow the nonlinear rhythm');
+      paced.lapEndsMs.forEach((time,index)=>{
+        assert.ok(paced.frames.some(frame=>frame[0]===time),'every finish has an exact render frame');
+        assert.deepEqual(sampleReplay(paced,time),sampleReplay(original,original.lapEndsMs[index]));
+      });
+    }
   }
+});
+
+test('three deterministic rhythms speed up and ease off smoothly, exchanging position during a run',()=>{
+  const source=replay(39000),paced=PACE_PROFILES.map((profile,index)=>paceReplay(source,Math.round(source.durationMs*profile.durationRatio),index));
+  const progress=(ghost,time)=>{const p=sampleReplay(ghost,time);return(Math.atan2(p.y,p.x)+Math.PI*2)%(Math.PI*2);};
+  for(const ghost of paced){
+    const speeds=[];let last=sampleReplay(ghost,0);
+    for(let time=25;time<ghost.durationMs-100;time+=25){
+      const pose=sampleReplay(ghost,time),delta=Math.atan2(last.x*pose.y-last.y*pose.x,last.x*pose.x+last.y*pose.y);
+      assert.ok(delta>0&&delta<.007,'no reverse progress or teleport at any sub-frame sample');
+      speeds.push(delta/.025);last=pose;
+    }
+    assert.ok(Math.max(...speeds)/Math.min(...speeds)>1.3,'each car has a substantial nonuniform pace');
+    assert.ok(speeds.slice(1).every((speed,index)=>Math.abs(speed-speeds[index])<.001),'pace changes smoothly without frame-to-frame jitter');
+  }
+  const ordering=time=>paced.map((ghost,index)=>({index,p:progress(ghost,time)})).sort((a,b)=>b.p-a.p).map(v=>v.index).join(',');
+  assert.notEqual(ordering(8000),ordering(22000),'front and mid-race specialists can exchange places');
+  const quarterFractions=paced.map(ghost=>progress(ghost,ghost.durationMs/4)/(Math.PI*2));
+  assert.ok(Math.max(...quarterFractions)-Math.min(...quarterFractions)>.03,'the three slots do not form an equally spaced train');
+});
+
+test('validator-edge archives use bounded safe fallback clocks and never create invalid synthetic records',()=>{
+  for(const [duration,laps]of[[25000,1],[75000,3],[GHOST_LIMITS.maxDurationMs,1]]){
+    const source=candidate('Limit',duration,laps),before=structuredClone(source),challenge=createGhostChallenge([source],laps);
+    assert.equal(challenge.humanCount,1);assert.equal(challenge.paceCount,3);
+    for(const ghost of challenge.ghosts.filter(g=>g.synthetic)){
+      assert.ok(laps===3?validateRaceReplay(ghost.replay):validateReplay(ghost.replay));
+      assert.equal(ghost.targetMs,ghost.replay.durationMs);assert.equal(ghost.entry.timeMs,ghost.targetMs);
+      assert.equal(ghost.entry.mode,'ghost');assert.equal(ghost.entry.playerId,0);assert.equal(ghost.entry.isAI,true);
+    }
+    assert.deepEqual(source,before);
+  }
+  assert.equal(paceReplay(replay(),24999),null);assert.equal(paceReplay(replay(),900001),null);
+  assert.equal(paceReplay(replay(),39000,99),null);assert.equal(paceReplay(replay(),39000,'map'),null);assert.equal(paceReplay(null,39000),null);
 });
 
 test('empty and partially populated boards do not invent human records', () => {
@@ -107,17 +169,30 @@ test('solo uses one centered physical car at the same grid distance and local mo
   setTrack('coast');
 });
 
-test('a real one-car race concludes when its human finishes one or three laps', () => {
+test('real one-car recordings keep every checkpoint, lap boundary and finish on the same pace clock', () => {
   setTrack('coast');
   for (const laps of [1, 3]) {
     const engine = new RaceEngine({ playerCount: 1 }).start(laps);
     // The existing deterministic driver is a test-only source of human keys;
     // challenge gameplay does not instantiate it or create a second car.
-    const driver = new RaceAI({ carId: 1 });
-    for (let step = 0; step < 60 * 220 && engine.state !== 'finished'; step++) engine.step(1 / 60, driver.update(engine));
+    const driver = new RaceAI({ carId: 1 }),recorder=new GhostRecorder();recorder.sample(engine,[1]);
+    for (let step = 0; step < 60 * 220 && engine.state !== 'finished'; step++) {engine.step(1 / 60, driver.update(engine));recorder.sample(engine,[1]);}
     assert.equal(engine.state, 'finished'); assert.equal(engine.cars.length, 1);
     assert.equal(engine.winner, engine.cars[0]); assert.equal(engine.cars[0].lap, laps);
     assert.equal(engine.time, engine.cars[0].finishTime); assert.equal(driver.rescues, 0);
+    const original=laps===3?recorder.fullRaceReplay(1):recorder.bestReplay(1),saved=structuredClone(original),sourceSplits=ghostSplitTimes(original);
+    assert.equal(sourceSplits.length,laps*4);assert.ok(sourceSplits.every(Number.isFinite),'the real recorded drive crosses every gate');
+    for(const [index,profile]of PACE_PROFILES.entries()){
+      const target=Math.round(original.durationMs*profile.durationRatio),paced=paceReplay(original,target,index),splits=ghostSplitTimes(paced);
+      assert.ok(splits.every(Number.isFinite),'retiming preserves real-track checkpoint recognition');
+      assert.equal(splits.at(-1),target);assert.equal(paced.frames.at(-1)[0],target);
+      sourceSplits.forEach((sourceTime,gate)=>{
+        const u=sourceTime/original.durationMs,expected=target*(u+profile.amplitude/(2*Math.PI)*(Math.sin(2*Math.PI*u+profile.phase)-Math.sin(profile.phase)));
+        assert.ok(Math.abs(splits[gate]-expected)<=4,`gate ${gate} disagrees with the displayed trajectory clock`);
+      });
+      if(laps===3)assert.deepEqual([splits[3],splits[7],splits[11]],paced.lapEndsMs);
+    }
+    assert.deepEqual(original,saved,'building synthetic rivals never retimes the stored human');
   }
 });
 

@@ -9,7 +9,14 @@ export const CHALLENGE_COLORS = Object.freeze([
   { color: '#70a5ff', colorLabel: '蓝色', colorLabelEn: 'Blue' },
   { color: '#e6e8f2', colorLabel: '银色', colorLabelEn: 'Silver' },
 ].map((color, slotId) => Object.freeze({ slotId, ...color })));
-export const PACE_DELAYS_MS = Object.freeze([980, 2020, 3070]);
+// These clocks are fixed before the race. They never react to the live player.
+// A single smooth cycle moves the strongest effort from early to middle to late.
+export const PACE_PROFILES = Object.freeze([
+  { durationRatio: .985, amplitude: .16, phase: Math.PI },
+  { durationRatio: 1.005, amplitude: .16, phase: Math.PI / 3 },
+  { durationRatio: 1.035, amplitude: .16, phase: -Math.PI / 3 },
+].map(profile => Object.freeze(profile)));
+const FALLBACK_DELAYS_MS = [980, 2020, 3070];
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 const validDistance = laps => laps === 1 || laps === 3;
 const replayValid = (replay, laps) => laps === 3 ? validateRaceReplay(replay) : validateReplay(replay);
@@ -24,27 +31,51 @@ const validEntry = (entry, laps) => entry && typeof entry.id === 'string'
   && (laps === 3 ? entry.kind === 'race' && entry.laps === 3
     : (entry.kind === undefined || entry.kind === 'lap') && (entry.laps === undefined || entry.laps === 1));
 
-/** Preserve the driven path while resampling a slower clock at safe 100 ms gaps. */
-export function paceReplay(replay, durationMs) {
-  const laps = replay?.kind === 'race' ? 3 : 1;
-  if (!replayValid(replay, laps) || !Number.isSafeInteger(durationMs)
-    || durationMs <= replay.durationMs || durationMs > GHOST_LIMITS.maxDurationMs) return null;
-  const ratio = durationMs / replay.durationMs;
-  const lapEndsMs = replay.lapEndsMs?.map((time, index, ends) => index === ends.length - 1 ? durationMs : Math.round(time * ratio));
-  // Include each scaled lap boundary exactly, so checkpoint comparisons and
-  // three-lap finish timing use the same replay clock as the rendered vehicle.
+function resamplePace(replay, durationMs, profile, strength) {
+  const amplitude = profile.amplitude * strength, tau = Math.PI * 2;
+  // Source progress -> target clock. Its derivative lies in [0.84, 1.16],
+  // so the car always advances continuously, with no step in pace or reversal.
+  const clock = progress => progress + amplitude / tau
+    * (Math.sin(tau * progress + profile.phase) - Math.sin(profile.phase));
+  const sourceAt = time => {
+    const target = time / durationMs;
+    let low = 0, high = 1;
+    for (let i = 0; i < 36; i++) {
+      const middle = (low + high) / 2;
+      if (clock(middle) < target) low = middle; else high = middle;
+    }
+    return (low + high) / 2 * replay.durationMs;
+  };
+  const lapEndsMs = replay.lapEndsMs?.map((time, index, ends) => index === ends.length - 1
+    ? durationMs : Math.round(durationMs * clock(time / replay.durationMs)));
+  // Frame sampling, checkpoint passages and lap ends all share this one clock.
+  // Insert exact lap poses at rounded boundary milliseconds to avoid losing a
+  // finish between two 100 ms render samples, including an uneven three-lap run.
   const times = new Set([0, durationMs, ...(lapEndsMs || [])]);
   for (let time = 100; time < durationMs; time += 100) times.add(time);
   const frames = [...times].sort((a, b) => a - b).map(time => {
     const boundary = lapEndsMs?.indexOf(time) ?? -1;
-    const sourceTime = time === durationMs ? replay.durationMs
-      : boundary !== -1 ? replay.lapEndsMs[boundary] : time / ratio;
+    const sourceTime = time === 0 ? 0 : time === durationMs ? replay.durationMs
+      : boundary !== -1 ? replay.lapEndsMs[boundary] : sourceAt(time);
     const pose = sampleReplay(replay, sourceTime);
     return [time, pose.x, pose.y, pose.angle, pose.elevation];
   });
-  const paced = { version: 1, durationMs, frames,
-    ...(laps === 3 ? { kind: 'race', laps: 3, lapEndsMs } : {}) };
-  return replayValid(paced, laps) ? paced : null;
+  return { version: 1, durationMs, frames,
+    ...(replay.kind === 'race' ? { kind: 'race', laps: 3, lapEndsMs } : {}) };
+}
+
+/** Re-time only the recorded path; human records and live race physics are untouched. */
+export function paceReplay(replay, durationMs, profileIndex = 0) {
+  const laps = replay?.kind === 'race' ? 3 : 1, profile = PACE_PROFILES[profileIndex];
+  if (!Number.isInteger(profileIndex) || !profile || !replayValid(replay, laps) || !Number.isSafeInteger(durationMs)
+    || durationMs < GHOST_LIMITS.minDurationMs * laps || durationMs > GHOST_LIMITS.maxDurationMs) return null;
+  // An archived trace can already sit at a validator limit. Reduce the rhythm
+  // before trying the old uniform clock; never weaken replay validation.
+  for (const strength of [1, .5, 0]) {
+    const paced = resamplePace(replay, durationMs, profile, strength);
+    if (replayValid(paced, laps)) return paced;
+  }
+  return null;
 }
 
 /** Build a fresh race roster. Synthetic entries are deliberately not valid score submissions. */
@@ -62,11 +93,14 @@ export function createGhostChallenge(candidates = [], laps = 1) {
   const ghosts = humans.map((value, index) => ({ ...CHALLENGE_COLORS[index],
     entry: { ...value.entry, name: normalizeName(value.entry.name) }, replay: copyReplay(value.replay),
     synthetic: false, targetMs: value.entry.timeMs }));
-  const source = humans.at(-1);
-  if (source) for (const [index, delay] of PACE_DELAYS_MS.entries()) {
-    const targetMs = source.entry.timeMs + delay;
-    const replay = paceReplay(source.replay, targetMs);
-    if (!replay) continue; // Extremely long archived runs can meet the replay cap.
+  if (humans.length) for (const [index, profile] of PACE_PROFILES.entries()) {
+    const source = humans[[0, Math.floor(humans.length / 2), humans.length - 1][index]];
+    const target = Math.max(GHOST_LIMITS.minDurationMs * laps,
+      Math.min(GHOST_LIMITS.maxDurationMs, Math.round(source.entry.timeMs * profile.durationRatio)));
+    const replay = paceReplay(source.replay, target, index)
+      || paceReplay(source.replay, Math.min(GHOST_LIMITS.maxDurationMs, source.entry.timeMs + FALLBACK_DELAYS_MS[index]), index);
+    if (!replay) continue;
+    const targetMs = replay.durationMs;
     ghosts.push({ ...CHALLENGE_COLORS[index + 3], synthetic: true, targetMs, replay,
       entry: { id: `pace-${index + 1}-${source.entry.id}`, name: `配速幽灵 ${index + 1}`,
         nameEn: `Pace Ghost ${index + 1}`, timeMs: targetMs, playerId: 0, mode: 'ghost',
