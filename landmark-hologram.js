@@ -180,7 +180,7 @@ export function initLandmarkHologram(doc = globalThis.document) {
   function tick(time){
     frame=0;if(!active()){lastTime=0;return;}
     const delta=lastTime?Math.min(100,time-lastTime):0;lastTime=time;
-    if(!reduced&&!pointer&&time>=dragUntil)yaw=(yaw+delta*.00014)%TAU;
+    if(!reduced&&!pointer&&time>=dragUntil)yaw=(yaw+delta*.00028)%TAU;
     if(dirty||time-lastPaint>=1000/24){draw(time);lastPaint=time;}
     if(!reduced)frame=win.requestAnimationFrame(tick);
   }
