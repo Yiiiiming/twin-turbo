@@ -1,8 +1,8 @@
 # Twin Turbo
 
-A compact arcade racer with twelve circuits. Choose Chinese or English, race the AI in one full-width view or a friend in split screen, and challenge up to two saved ghosts.
+A compact arcade racer with twelve circuits. Choose Chinese or English, enter Ghost Challenge in one full-width view, or race a friend in split screen. Ghost Challenge matches up to three distinct human record holders and three slower pace ghosts; custom two-ghost selection remains available.
 
-The opening selection is Shanghai Skyline Spiral, one lap, against the AI. Its fastest-lap leaderboard and ghost picker use the same Shanghai circuit.
+The opening selection is London Riverside, one lap, in Ghost Challenge. Human opponents use the current circuit and matching lap/race replay category. Pace ghosts finish about 1, 2 and 3 seconds after the slowest selected human and never submit scores. The live AI opponent has been removed; ai.js remains only as a deterministic route-validation driver for development tests.
 
 At the finish, each human driver enters one nickname directly in the results panel to save the race, fastest lap and ghosts together. Failed saves can be retried there without leaving fullscreen.
 
@@ -10,7 +10,7 @@ At the finish, each human driver enters one nickname directly in the results pan
 
 ## Circuits and controls
 
-The first six circuits are Shanghai Skyline Spiral, London Riverside, Rio Coastal Rhythm, Austin River Run, Beijing Imperial Run and Paris Seine Loop. Austin includes the UT Tower and a roadside football squad. Paris includes the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf. Six harbor, forest, city and spiral circuits follow the city courses; Lighthouse Grand Prix has been retired.
+The first six circuits are London Riverside, Beijing Imperial Run, Shanghai Skyline Spiral, Rio Coastal Rhythm, Austin River Run and Paris Seine Loop. Austin includes the UT Tower and a roadside football squad. Paris includes the Eiffel Tower, the Arc de Triomphe, the Louvre Pyramid, Haussmann boulevards and two Seine crossings on the gilded Pont Alexandre III and the stone-arch Pont Neuf. Six harbor, forest, city and spiral circuits follow the city courses; Lighthouse Grand Prix has been retired.
 
 London adds four detailed roadside landmarks along its existing route: the Royal Opera House and glazed Floral Hall, the red terracotta Palace Theatre, the classical London Palladium, and Piccadilly Circus with curved illuminated panels and the Shaftesbury Memorial Fountain. These are compact architectural interpretations for the game, not a geographically exact reconstruction; track geometry, checkpoints, elevation and physics are unchanged.
 
@@ -20,7 +20,9 @@ Architectural references: [Royal Opera House history](https://www.rbo.org.uk/abo
 
 Additional references: [Buckingham Palace's East Wing](https://www.rct.uk/visit/buckingham-palace/history-of-the-east-wing-of-buckingham-palace), [Westminster Abbey architecture](https://www.westminster-abbey.org/history/explore-our-history/architecture), [British Museum architecture](https://www.britishmuseum.org/about-us/british-museum-story/architecture), [St Paul's Cathedral](https://www.stpauls.co.uk/explore-our-map), and [Globe Theatre](https://www.shakespearesglobe.com/discover/about-us/globe-theatre/).
 
-Every circuit supports one-lap sprints and three-lap races, AI/local play, two ghost colors, checkpoint gaps, and independent top-five total and lap records. AI races accept either keyboard layout; custom bindings, language and nicknames are stored in this browser. Flat-road cruising is 240 km/h, with uphill slowing and downhill gains.
+Every circuit supports one-lap sprints and three-lap races, Ghost Challenge/local play, checkpoint gaps, and independent top-five total and lap records. Each public board shows only the fastest result per normalized nickname; other attempts remain in storage and personal ghost search retains its best-20 view. Solo races accept either keyboard layout; custom bindings, language and nicknames are stored in this browser. Flat-road cruising is 240 km/h, with uphill slowing and downhill gains.
+
+One-lap races require a forward launch from the standing grid. Reversing behind the grid or circling before the first timing-line crossing resets the car to the same starting position at zero speed. The GO clock and remaining nitro are preserved; normal launches and three-lap flying laps are unchanged. No circuit geometry or record namespace changes in this update.
 
 ## Local development
 

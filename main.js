@@ -5,7 +5,7 @@ import { GhostClient } from './ghost-client.js';
 import { GhostRecorder, sampleReplay } from './ghost-replay.js';
 import { RaceEngine, TRACK, TRACKS, trackPoint, projectTrack, mod, OFFROAD_GRACE_SECONDS } from './engine.js';
 import { RaceRenderer, sceneWeights } from './renderer.js';
-import { RaceAI } from './ai.js';
+import { loadGhostChallenge } from './ghost-challenge.js';
 import { UnifiedRecordsClient } from './unified-records.js';
 
 const $ = id => document.getElementById(id);
@@ -17,9 +17,9 @@ let renderer;
 const keys = new Set();
 let controlStorage; try { controlStorage = window.localStorage; } catch {}
 const bindings = new ControlBindings(controlStorage);
-const i18n = createI18n({ document, storage: controlStorage, onChange: () => refreshTrackUI() });
+const i18n = createI18n({ document, storage: controlStorage, onChange: () => {refreshTrackUI();renderChallengeRoster();buildChallengeRacePanel();if(engine.state==='finished'&&raceMode==='ai')renderChallengeResults(engine.cars[0]);} });
 let bindingCapture = null;
-const ai = new RaceAI();
+
 const leaderboard = new UnifiedRecordsClient({ document, onSaved: () => {
   if (engine.state === 'finished') returnToMenu();
 }, onChallenge: async entry => {
@@ -29,16 +29,97 @@ const leaderboard = new UnifiedRecordsClient({ document, onSaved: () => {
   if (entry.city && entry.city !== TRACK.id) selectCircuit(entry.city);
   selectLaps(entry.kind === 'race' ? 3 : 1);
   openRaceSetup();
+  chooseManualGhosts();
   await ghostClient.challenge(entry);
 } });
 
 const ghostClient = new GhostClient({ document, recordsManaged: true, onSelection: selections => {
-  if (['menu','finished'].includes(engine.state)) $('ghost-race-label').textContent = selections.length
+  if (selectedMode !== 'ai' && ['menu','finished'].includes(engine.state)) $('ghost-race-label').textContent = selections.length
     ? selections.map(ghost => `${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」`).join('  /  ') : '';
 } });
 const ghostRecorder = new GhostRecorder();
 const splitTiming = new SplitTiming();
 let activeGhosts = [];
+let challengeSetup = null, challengeRequest = 0, challengeAbort = null, manualGhosts = false;
+let challengeRows = [];
+function cancelChallengeLoad() {
+  challengeRequest++; challengeAbort?.abort(); challengeAbort = null;
+}
+function challengeLabel(ghost) { return ghost.synthetic ? `${i18n.t('配速幽灵')} ${ghost.slotId - 2}` : ghost.entry.name; }
+function renderChallengeRoster() {
+  const roster = $('challenge-roster'); roster.replaceChildren();
+  for (const ghost of challengeSetup?.ghosts || []) {
+    const item = document.createElement('li'); item.className = 'challenge-driver'; item.style.setProperty('--ghost-color', ghost.color);
+    const name = document.createElement('strong'); name.textContent = challengeLabel(ghost); name.setAttribute('data-i18n-skip','');
+    const kind = document.createElement('small'); kind.textContent = i18n.t(ghost.synthetic ? '配速幽灵' : '人类纪录');
+    const identity = document.createElement('div'); identity.append(name,kind);
+    const time = document.createElement('span'); time.textContent = fmt(ghost.entry.timeMs/1000);
+    item.append(identity,time); roster.appendChild(item);
+  }
+}
+function updateSetupMode() {
+  const auto = selectedMode === 'ai' && !manualGhosts;
+  $('setup-start-rule').hidden = selectedLaps !== 1;
+  $('challenge-setup').hidden = !auto;
+  $('manual-ghost-setup').hidden = auto;
+  $('setup-auto').hidden = selectedMode !== 'ai' || auto;
+  $('setup-manual').hidden = !auto;
+  $('setup-launch').disabled = auto && Boolean(challengeSetup?.loading);
+  $('setup-launch').textContent = i18n.t(auto && challengeSetup?.ghosts?.length ? '开始挑战' : auto ? '自由计时' : '确认发车');
+  $('setup-skip').textContent = i18n.t(selectedMode === 'ai' ? '自由计时' : '不带幽灵，直接出发');
+}
+async function matchChallenge() {
+  cancelChallengeLoad(); const request = challengeRequest, city = TRACK.id, laps = selectedLaps;
+  challengeAbort = new AbortController(); challengeSetup = {city,laps,ghosts:[],loading:true};
+  $('challenge-status').textContent = i18n.t('正在匹配本图最快的三位车手…');
+  $('challenge-retry').hidden = true; $('challenge-shortfall').hidden=true; renderChallengeRoster(); updateSetupMode();
+  try {
+    const result = await loadGhostChallenge({city,laps,signal:challengeAbort.signal});
+    if(request !== challengeRequest || city !== TRACK.id || laps !== selectedLaps || manualGhosts || !$('race-setup-dialog').open)return;
+    challengeSetup = {...result,loading:false}; renderChallengeRoster();
+    $('challenge-status').textContent = i18n.t(result.humanCount
+      ? `已匹配 ${result.humanCount} 位人类幽灵和 ${result.paceCount} 位配速幽灵。`
+      : result.failedCount ? '暂时无法连接幽灵榜，可以重试或自由计时。' : '当前地图还没有可用的人类幽灵，可以先自由计时。');
+    $('challenge-shortfall').hidden = result.humanCount === 0 || result.humanCount >= 3;
+    $('challenge-retry').hidden = false;
+  } catch {
+    if(request !== challengeRequest)return;
+    challengeSetup = {city,laps,ghosts:[],loading:false,error:true};
+    $('challenge-status').textContent = i18n.t('暂时无法连接幽灵榜，可以重试或自由计时。');
+    $('challenge-retry').hidden = false;
+  }
+  updateSetupMode();
+}
+function chooseManualGhosts() {
+  cancelChallengeLoad(); manualGhosts = true; updateSetupMode(); void ghostClient.openPicker(selectedLaps);
+}
+function buildChallengeRacePanel() {
+  $('challenge-live-list').replaceChildren(); challengeRows = [];
+  for (const ghost of activeGhosts) {
+    const row = document.createElement('li'); row.style.setProperty('--ghost-color',ghost.color);
+    const name = document.createElement('span'); name.textContent=challengeLabel(ghost); name.setAttribute('data-i18n-skip','');
+    const time = document.createElement('b'); time.textContent=fmt(ghost.entry.timeMs/1000);
+    row.append(name,time); $('challenge-live-list').appendChild(row); challengeRows.push(row);
+  }
+}
+function challengeElapsed(car) { return (selectedLaps===3 ? engine.time : car._started ? car.finished ? car.lastLap : car.lapTime : 0)*1000; }
+function renderChallengeResults(car) {
+  const timeMs = Math.round((engine.laps===3 ? car.finishTime : car.lastLap)*1000);
+  const rows = activeGhosts.map((ghost,index)=>({name:challengeLabel(ghost),timeMs:ghost.entry.timeMs,color:ghost.color,order:index,human:false}));
+  rows.push({name:i18n.t('你'),timeMs,color:colors[0],order:rows.length,human:true});
+  rows.sort((a,b)=>a.timeMs-b.timeMs||a.order-b.order);
+  const place = rows.findIndex(row=>row.human)+1;
+  $('winner-name').textContent = i18n.t(activeGhosts.length ? `第 ${place} 名 · 挑战完成` : '自由计时完成');
+  $('winner-name').style.color=colors[0];
+  $('result-subtitle').textContent=i18n.t(engine.laps===1?'以起终点之间的单圈用时比较幽灵。':'以从 GO 开始的整场用时比较幽灵。');
+  $('challenge-results-list').replaceChildren();
+  for(const [index,result] of rows.entries()) {
+    const row=document.createElement('li'); row.className='challenge-result-row'+(result.human?' is-you':''); row.style.setProperty('--ghost-color',result.color);
+    const rank=document.createElement('small');rank.textContent=String(index+1).padStart(2,'0');
+    const name=document.createElement('strong');name.textContent=result.name;name.setAttribute('data-i18n-skip','');
+    const time=document.createElement('span');time.textContent=fmt(result.timeMs/1000);row.append(rank,name,time);$('challenge-results-list').appendChild(row);
+  }
+}
 void ghostClient.init();
 
 const colors = ['#51dfe5', '#ff9870'];
@@ -48,6 +129,7 @@ let selectedColor = 'cyan';
 let lastTime = performance.now(), lastState = '', lastCount = 0;
 let goUntil = 0, soundEnabled = false, audio = null, audioNodes = [];
 let lastLaps = [0, 0], notices = ['', ''], noticeUntil = [0, 0], toastTime = 0;
+let lastLaunchResetCounts = [0, 0];
 const tau = Math.PI * 2;
 const fmt = value => {
   const centiseconds = Math.round(Math.max(0, value || 0) * 100);
@@ -77,6 +159,14 @@ function drawMiniMap(c, x, y, playerId) {
   const a = trackPoint(TRACK.startDistance, -60), b = trackPoint(TRACK.startDistance, 60);
   c.strokeStyle = '#f5ecc8'; c.lineWidth = 36 * cityScale;
   c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+  const player=engine.cars.find(car=>car.id===playerId);
+  if(player && ['racing','paused'].includes(engine.state))for(const ghost of activeGhosts) {
+    if(ghost.replay.kind!=='race'&&!player._started)continue;
+    const elapsed=(ghost.replay.kind==='race'?engine.time:player.lapTime)*1000;
+    if(raceMode==='ai'&&elapsed>ghost.replay.durationMs)continue;
+    const pose=sampleReplay(ghost.replay,elapsed);if(!Number.isFinite(pose.x))continue;
+    c.beginPath();c.arc(pose.x,pose.y,25*cityScale,0,tau);c.fillStyle=ghost.color;c.fill();
+  }
   for (const car of engine.cars) {
     c.beginPath(); c.arc(car.x, car.y, (car.id === playerId ? 48 : 35) * cityScale, 0, tau);
     c.fillStyle = colors[car.id - 1]; c.fill();
@@ -129,6 +219,11 @@ function drawHUD(now) {
 }
 function updateRaceNotices() {
   for (const [i, car] of engine.cars.entries()) {
+    if (car.launchResetCount > lastLaunchResetCounts[i]) {
+      notices[i] = '发车前请向前行驶，已回到起跑位。';
+      noticeUntil[i] = toastTime + 3;
+    }
+    lastLaunchResetCounts[i] = car.launchResetCount;
     if (car.lap > lastLaps[i]) {
       notices[i] = `第 ${car.lap} 圈完成 · ${fmt(car.lastLap)}`;
       noticeUntil[i] = toastTime + 3; lastLaps[i] = car.lap; tone(660 + i * 110, .11, .045);
@@ -148,7 +243,7 @@ ghostClient.setTrack(TRACK.id);
 renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
 engine.setObstacles(renderer.obstacles || []);
 renderer.resetCameras(engine);
-ai.reset();
+
 keys.clear();
 void leaderboard.init(TRACK.id);
 
@@ -204,7 +299,7 @@ for(const [index,track]of Object.values(TRACKS).entries()) {
 }
 function selectCircuit(id) {
   if(engine.state!=='menu'||!Object.hasOwn(TRACKS,id))return;
-  keys.clear();engine.selectTrack(id);renderer.rebuild(engine);applyPlayerColors();ai.reset();
+  cancelChallengeLoad();challengeSetup=null;keys.clear();engine.selectTrack(id);renderer.rebuild(engine);applyPlayerColors();
   ghostRecorder.reset();splitTiming.reset();activeGhosts=[];lastRescueCounts=[0,0];renderer.setGhostPoses?.([]);
   ghostClient.setTrack(id);ghostClient.setLaps(selectedLaps);void leaderboard.setTrack(id);
   lastLaps=[0,0];notices=['',''];lastState='';refreshTrackUI();
@@ -226,20 +321,29 @@ function updateSplitUI(car) {
   panel.classList.toggle('hidden', !visible);
   if (!visible) return;
   $('split-point'+car.id).textContent = `第 ${split.lap} 圈 · ${split.index === 4 ? '终点' : `计时点 0${split.index}`}`;
-  const opponent = split.opponentId === 2 && raceMode === 'ai' ? 'AI' : '对手';
+  const comparisons=(split.ghostDeltas||[]).filter(value=>Number.isFinite(value.deltaMs));
+  const ahead=comparisons.filter(value=>value.deltaMs>=0).sort((a,b)=>a.deltaMs-b.deltaMs);
+  const nearest=ahead[0] || [...comparisons].sort((a,b)=>b.deltaMs-a.deltaMs)[0];
+  const ghost=activeGhosts.find(value=>value.slotId===nearest?.slotId);
+  const comparison=raceMode==='ai'?nearest?.deltaMs:split.deltaMs;
+  const target=raceMode==='ai'?(ghost?challengeLabel(ghost):i18n.t('幽灵')):'对手';
   const delta = $('split-gap'+car.id);
-  delta.textContent = splitLabel(split.deltaMs, opponent);
-  delta.classList.toggle('split-ahead', split.deltaMs !== null && split.deltaMs <= -5);
-  delta.classList.toggle('split-behind', split.deltaMs !== null && split.deltaMs >= 5);
+  delta.hidden=raceMode==='ai'&&!nearest;
+  delta.textContent = splitLabel(comparison, target);
+  delta.classList.toggle('split-ahead', Number.isFinite(comparison) && comparison <= -5);
+  delta.classList.toggle('split-behind', Number.isFinite(comparison) && comparison >= 5);
   const ghostLine = $('split-ghost'+car.id); ghostLine.replaceChildren();
-  for (const delta of split.ghostDeltas || []) {
+  for (const delta of (split.ghostDeltas || []).slice(0,3)) {
     if (delta.deltaMs === null) continue;
     const label = document.createElement('span'); label.style.color = delta.color;
-    label.textContent = splitLabel(delta.deltaMs, `${delta.colorLabel}幽灵`); ghostLine.appendChild(label);
+    const ghost=activeGhosts.find(value=>value.slotId===delta.slotId);
+    label.textContent = splitLabel(delta.deltaMs, ghost?challengeLabel(ghost):`${delta.colorLabel}幽灵`); ghostLine.appendChild(label);
   }
 }
 function updateUI(now) {
   $('timer').textContent=fmt(engine.time);
+  $('challenge-live').hidden = raceMode !== 'ai' || !activeGhosts.length || !['racing','paused'].includes(engine.state);
+  if(raceMode==='ai' && engine.cars[0])challengeRows.forEach((row,index)=>row.classList.toggle('ghost-finished',challengeElapsed(engine.cars[0])>=activeGhosts[index].entry.timeMs));
   const statuses={menu:'等待发车',countdown:'准备出发',racing:'比赛进行中',paused:'比赛已暂停',finished:'比赛结束'};
   const finishers = engine.cars.filter(car => car.finished).sort((a, b) => a.finishTime - b.finishTime
     || (a === engine.winner ? -1 : b === engine.winner ? 1 : a.id - b.id));
@@ -278,6 +382,8 @@ function updateUI(now) {
       ghostClient.endRace();
       leaderboard.setRaceActive(false);
       leaderboard.showResults(raceRecords(finishers));
+      $('result-driver2-row').hidden=raceMode==='ai';
+      $('challenge-results').hidden=raceMode!=='ai'||!activeGhosts.length;
       const winner=engine.winner;
       $('winner-name').textContent=names[winner.id-1]+'获胜！';
       $('winner-name').style.color=colors[winner.id-1];
@@ -289,6 +395,7 @@ function updateUI(now) {
         $('finish-time'+suffix).textContent=fmt(car.finishTime);
         $('best-lap'+suffix).textContent=car.bestLap===null?'—':fmt(car.bestLap);
       });
+      if(raceMode==='ai')renderChallengeResults(engine.cars[0]);
       leaderboard.cards.find(card=>!card.done)?.input.focus({preventScroll:true});
       keys.clear();tone(523,.2,.06);setTimeout(()=>tone(659,.2,.06),140);setTimeout(()=>tone(784,.35,.06),280);
 
@@ -303,30 +410,41 @@ function updateUI(now) {
 
 function initAudio(){if(audio)return;const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;audio=new Audio();for(let i=0;i<2;i++){const oscillator=audio.createOscillator(),filter=audio.createBiquadFilter(),gain=audio.createGain();oscillator.type='sawtooth';filter.type='lowpass';filter.frequency.value=360;gain.gain.value=0;oscillator.connect(filter);filter.connect(gain);gain.connect(audio.destination);oscillator.start();audioNodes.push({oscillator,gain,filter});}}
 function tone(frequency,length,volume){if(!soundEnabled||!audio)return;const oscillator=audio.createOscillator(),gain=audio.createGain();oscillator.type='sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(volume,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+length);oscillator.connect(gain);gain.connect(audio.destination);oscillator.start();oscillator.stop(audio.currentTime+length);}
-function updateAudio(){if(!audio)return;audioNodes.forEach((node,i)=>{const car=engine.cars[i];node.oscillator.frequency.setTargetAtTime(36+Math.abs(car.speed)*.24+(car.boosting?15:0),audio.currentTime,.12);node.filter.frequency.setTargetAtTime(160+Math.abs(car.speed)*1.3,audio.currentTime,.15);node.gain.gain.setTargetAtTime(soundEnabled&&engine.state==='racing'?.012+Math.abs(car.speed)*.00005:0,audio.currentTime,.08);});}
+function updateAudio(){if(!audio)return;audioNodes.forEach((node,i)=>{const car=engine.cars[i];if(!car){node.gain.gain.setTargetAtTime(0,audio.currentTime,.08);return;}node.oscillator.frequency.setTargetAtTime(36+Math.abs(car.speed)*.24+(car.boosting?15:0),audio.currentTime,.12);node.filter.frequency.setTargetAtTime(160+Math.abs(car.speed)*1.3,audio.currentTime,.15);node.gain.gain.setTargetAtTime(soundEnabled&&engine.state==='racing'?.012+Math.abs(car.speed)*.00005:0,audio.currentTime,.08);});}
 function begin(skipGhosts = false) {
   if ($('language-dialog').open || $('help-dialog').open || $('bindings-dialog').open || leaderboard.busyDialog || !renderer.available) return;
-  $('race-setup-dialog').close();
+  const automatic=selectedMode==='ai'&&!manualGhosts;
+  if(!skipGhosts && automatic && challengeSetup?.loading)return;
+  const opponents=automatic&&!skipGhosts ? challengeSetup?.ghosts||[] : null;
+  cancelChallengeLoad(); $('race-setup-dialog').close();
   if (skipGhosts) ghostClient.node('ghost-enabled').checked = false;
   leaderboard.newRace(); leaderboard.setRaceActive(true);
-  activeGhosts = ghostClient.startRace(); ghostRecorder.reset(); splitTiming.reset(activeGhosts);
-  $('ghost-race-label').textContent = activeGhosts.map(ghost=>`${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」 · ${fmt(ghost.entry.timeMs/1000)}`).join('  /  ');
-  raceMode=selectedMode; renderer.setSinglePlayer(raceMode==='ai'); engine.start(selectedLaps); applyPlayerColors(); ai.reset(); lastRescueCounts=[0,0];
-  keys.clear(); lastLaps=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine); goUntil=0;
+  const manualSelections = ghostClient.startRace();
+  activeGhosts = skipGhosts ? [] : opponents || manualSelections;
+  ghostRecorder.reset(); splitTiming.reset(activeGhosts);
+  $('ghost-race-label').textContent = selectedMode==='ai' ? i18n.t(activeGhosts.length?'幽灵挑战':'自由计时')
+    : activeGhosts.map(ghost=>`${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」 · ${fmt(ghost.entry.timeMs/1000)}`).join('  /  ');
+  raceMode=selectedMode; if(engine.cars.length!==(raceMode==='ai'?1:2))engine.setPlayerCount(raceMode==='ai'?1:2); renderer.setSinglePlayer(raceMode==='ai'); engine.start(selectedLaps); applyPlayerColors(); lastRescueCounts=[0,0];
+  buildChallengeRacePanel();
+  keys.clear(); lastLaps=[0,0]; lastLaunchResetCounts=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine); goUntil=0;
   canvas.focus({preventScroll:true}); if(soundEnabled){initAudio();audio?.resume();}
 }
 function openRaceSetup() {
   if ($('language-dialog').open || $('help-dialog').open || $('bindings-dialog').open || !renderer.available) return;
   if (['racing','countdown'].includes(engine.state)) engine.pause();
-  keys.clear(); ghostClient.menu();
-  $('race-setup-summary').textContent = `${i18n.t(selectedMode === 'ai' ? `单人 · ${selectedColor === 'orange' ? '橙色风暴' : '青色闪电'}对战 AI` : '本地双人')} · ${trackName()} · ${i18n.t(`${selectedLaps} 圈`)}`;
-  void ghostClient.openPicker(selectedLaps);
+  keys.clear(); ghostClient.menu(); manualGhosts=selectedMode!=='ai';
+  $('race-setup-summary').textContent = `${i18n.t(selectedMode==='ai'?'幽灵挑战':'本地双人')} · ${trackName()} · ${i18n.t(`${selectedLaps} 圈`)}`;
   if (!$('race-setup-dialog').open) $('race-setup-dialog').showModal();
+  updateSetupMode();
+  if(selectedMode==='ai')void matchChallenge();else void ghostClient.openPicker(selectedLaps);
 }
 $('setup-launch').addEventListener('click',()=>begin());
 $('setup-skip').addEventListener('click',()=>begin(true));
 $('setup-close').addEventListener('click',()=>$('race-setup-dialog').close());
-$('race-setup-dialog').addEventListener('close',()=>{keys.clear();if(['racing','countdown','paused'].includes(engine.state))ghostClient.startRace();});
+$('setup-manual').addEventListener('click',chooseManualGhosts);
+$('setup-auto').addEventListener('click',()=>{manualGhosts=false;updateSetupMode();void matchChallenge();});
+$('challenge-retry').addEventListener('click',()=>void matchChallenge());
+$('race-setup-dialog').addEventListener('close',()=>{cancelChallengeLoad();keys.clear();if(['racing','countdown','paused'].includes(engine.state))ghostClient.startRace();});
 function togglePause(){
   if (engine.state === 'paused') {
     engine.resume();
@@ -345,12 +463,12 @@ function raceRecords(cars = engine.cars) {
   }));
 }
 function returnToMenu() {
-  ghostClient.menu(); leaderboard.setRaceActive(false);
+  cancelChallengeLoad();challengeSetup=null;ghostClient.menu(); leaderboard.setRaceActive(false);
   if (!['finished','menu'].includes(engine.state)) leaderboard.showResults(raceRecords());
-  ghostRecorder.reset(); splitTiming.reset(); activeGhosts=[]; renderer.setGhostPoses?.([]);
-  engine.reset(); applyPlayerColors(); ai.reset(); lastRescueCounts=[0,0]; keys.clear(); renderer.resetCameras(engine);
+  ghostRecorder.reset(); splitTiming.reset(); activeGhosts=[]; buildChallengeRacePanel(); renderer.setGhostPoses?.([]);
+  engine.reset(); applyPlayerColors();  lastRescueCounts=[0,0]; keys.clear(); renderer.resetCameras(engine);
   const selected = ghostClient.node('ghost-enabled').checked ? ghostClient.selections() : [];
-  $('ghost-race-label').textContent = selected.map(ghost => `${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」`).join('  /  ');
+  $('ghost-race-label').textContent = (selectedMode==='ai'?[]:selected).map(ghost => `${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」`).join('  /  ');
   updateUI(performance.now()/1000);
 }
 async function openRecords(event) {
@@ -387,7 +505,7 @@ function applyPlayerColors() {
   const flipped = selectedMode === 'ai' && selectedColor === 'orange';
   const indices = flipped ? [1,0] : [0,1];
   const palette = ['#51dfe5','#ff9870'], labels = ['青色闪电','橙色风暴'];
-  engine.cars.forEach((car,i)=>{car.colorIndex=indices[i];colors[i]=palette[indices[i]];names[i]=(selectedMode==='ai'&&i===1?'AI · ':'')+labels[indices[i]];});
+  engine.cars.forEach((car,i)=>{car.colorIndex=indices[i];colors[i]=palette[indices[i]];names[i]=labels[indices[i]];});
   document.querySelectorAll('.player-card').forEach((node,i)=>{node.classList.toggle('cyan',indices[i]===0);node.classList.toggle('orange',indices[i]===1);});
   document.querySelectorAll('.control-player').forEach((node,i)=>{node.classList.toggle('cyan',indices[i]===0);node.classList.toggle('orange',indices[i]===1);});
   for (const id of [1,2]) {
@@ -409,20 +527,20 @@ function refreshBindings() {
   });
   document.querySelectorAll('[data-control-player]').forEach(node=>node.textContent=bindings.label(Number(node.dataset.controlPlayer),node.dataset.controlAction));
   canvas.setAttribute('aria-label',selectedMode==='ai'?'单人完整视野斜后方赛车。自定义按键见下方操作说明。':'左右分屏斜后方赛车。自定义按键见下方操作说明。');
-  $('ai-control-note').textContent='AI 自动驾驶 · 遵循相同物理规则';
+  $('ai-control-note').textContent='幽灵均不碰撞；你完赛后立即结算。';
 }
 function updateMode() {
-  const solo=selectedMode==='ai'; applyPlayerColors();
+  const solo=selectedMode==='ai'; if(engine.cars.length!==(solo?1:2))engine.setPlayerCount(solo?1:2); applyPlayerColors();
   renderer.setSinglePlayer(solo); document.body.classList.toggle('solo-mode',solo);
   $('race-arena').setAttribute('aria-label',solo?'单人赛道，镜头跟随你的赛车':'左右分屏赛道，左侧玩家一，右侧玩家二');
-  $('player2-label').textContent=solo?'AI DRIVER':'PLAYER 02'; $('control-player2-chip').textContent=solo?'AI':'P2';
-  $('mode-label').textContent=solo?'单人挑战 AI':'双人分屏'; $('mode-english').textContent=solo?'SINGLE PLAYER':'LOCAL MULTIPLAYER';
-  $('mode-description').textContent=solo?`你驾驶${selectedColor==='orange'?'橙色':'青色'}赛车，与 AI 较量。WASD 或方向键均可驾驶。`:'与身边的朋友，共用一块键盘。';
+  $('player2-label').textContent=solo?'GHOST CHALLENGE':'PLAYER 02'; $('control-player2-chip').textContent=solo?'GHOST':'P2';
+  $('mode-label').textContent=solo?'幽灵挑战':'双人分屏'; $('mode-english').textContent=solo?'SINGLE PLAYER':'LOCAL MULTIPLAYER';
+  $('mode-description').textContent=solo?`你驾驶${selectedColor==='orange'?'橙色':'青色'}赛车，与人类纪录和配速幽灵较量。WASD 或方向键均可驾驶。`:'与身边的朋友，共用一块键盘。';
   $('player-color-select').classList.toggle('hidden',!solo);
-  $('player-color-description').textContent=`你驾驶${selectedColor==='orange'?'橙色':'青色'}赛车，AI 使用另一种颜色。`;
+  $('player-color-description').textContent='选择你喜欢的车色。';
   $('player1-alternate-controls').classList.toggle('hidden',!solo);
   $('player2-controls').classList.toggle('hidden',solo); $('ai-control-note').classList.toggle('hidden',!solo);
-  $('help-mode-description').textContent=solo?'镜头全屏跟随你的赛车，与 AI 在同一赛道较量。两套键位均控制你的赛车：WASD / 左 Shift / Q，或方向键 / Enter / 斜杠；也可在「自定义按键」中修改。两车遵循相同物理和赛道规则，双方完赛后结算。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
+  $('help-mode-description').textContent=solo?'镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶，完赛后结算。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
   document.querySelectorAll('[data-mode]').forEach(button=>{const active=button.dataset.mode===selectedMode;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   document.querySelectorAll('[data-player-color]').forEach(button=>{const active=button.dataset.playerColor===selectedColor;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   refreshBindings();
@@ -459,7 +577,7 @@ async function toggleFullscreen() {
 $('fullscreen').addEventListener('click', toggleFullscreen);
 $('fullscreen-exit').addEventListener('click', toggleFullscreen);
 const controlKeys={has:code=>bindings.recognizes(code)||['Space','Escape'].includes(code)};
-const player2Keys = new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Slash']);
+
 function typingTarget(event) {
   return event.isComposing || event.keyCode === 229
     || event.target?.closest?.('input, textarea, select, [contenteditable]');
@@ -499,9 +617,6 @@ function loop(timestamp) {
   toastTime += engine.state === 'racing' ? dt : 0;
   if (!renderer.available) { keys.clear(); engine.pause(); }
   let frameKeys = bindings.frameKeys(keys, raceMode === 'ai');
-  if (raceMode === 'ai' && engine.state === 'racing') {
-    for (const code of ai.update(engine, dt)) if (player2Keys.has(code) && code !== 'Slash') frameKeys.add(code);
-  }
   ghostRecorder.sample(engine, raceMode === 'ai' ? [1] : [1, 2]);
   splitTiming.sample(engine);
   engine.step(dt, frameKeys);
@@ -515,7 +630,7 @@ function loop(timestamp) {
   }
   splitTiming.sample(engine);
   ghostRecorder.sample(engine, raceMode === 'ai' ? [1] : [1, 2]);
-  renderer.setGhostPoses?.(engine.cars.map(car => !car.finished && ['racing','paused'].includes(engine.state) ? activeGhosts.filter(ghost=>ghost.replay.kind==='race'||car._started).map(ghost => ({...sampleReplay(ghost.replay,(ghost.replay.kind==='race'?engine.time:car.lapTime)*1000),slotId:ghost.slotId})).filter(pose=>Number.isFinite(pose.x)) : []));
+  renderer.setGhostPoses?.(engine.cars.map(car => !car.finished && ['racing','paused'].includes(engine.state) ? activeGhosts.filter(ghost=>(ghost.replay.kind==='race'||car._started) && (raceMode!=='ai'||challengeElapsed(car)<=ghost.replay.durationMs)).map(ghost => ({...sampleReplay(ghost.replay,(ghost.replay.kind==='race'?engine.time:car.lapTime)*1000),slotId:ghost.slotId})).filter(pose=>Number.isFinite(pose.x)) : []));
   updateRaceNotices();
   renderer.render(engine, dt, now);
   drawHUD(now);

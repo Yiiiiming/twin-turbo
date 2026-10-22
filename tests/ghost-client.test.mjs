@@ -250,13 +250,13 @@ test('personal ghost search is immediately available and opting to search enable
   assert.equal(h.get('ghost-load').hidden, false);
 });
 
-test('pre-race board preserves repeated nicknames and deduplicates only identical replay IDs', async () => {
+test('pre-race board selects each nickname’s fastest replay while preserving both colored challenges', async () => {
   const h = setup(); h.client.recordsManaged = true; await h.client.init();
   h.queue.push(response({ entries: [entry('较慢', 'slow', 44000), entry('<b>最快</b>', 'fast', 40000),
     entry('较慢', 'duplicate', 45000), entry('较慢', 'slow', 44000), raceEntry(), { ...entry('AI'), mode: 'ai', playerId: 2 }] }));
   await h.client.openPicker(1);
   assert.match(h.requests[0].url, /coast-ghost-v1/);
-  assert.equal(h.get('ghost-picker-list').children.length, 3); assert.equal(h.client.pickerButtons.length, 6);
+  assert.equal(h.get('ghost-picker-list').children.length, 2); assert.equal(h.client.pickerButtons.length, 4);
   assert.equal(h.client.pickerButtons[0].entry.name, '<b>最快</b>'); assert.equal(h.document.htmlWrites.length, 0);
   assert.match(h.get('ghost-picker-status').textContent, /最快单圈/);
   h.queue.push(response({ entry: entry('<b>最快</b>', 'fast', 40000), replay: replay(40000) }));
@@ -379,4 +379,18 @@ for(const city of ['coast-austin','coast-shanghai','coast-beijing'])for(const la
   assert.equal(h.client.selections().length,0);assert.match(h.get('ghost-status').textContent,/版本/);
   h.queue.push(response({city,version,entry:values[19],replay:laps===3?fullReplay:lapReplay}));await h.client.loadSelected();
   assert.equal(h.client.selections()[0]?.entry.id,values[19].id,'twentieth result is actually loadable, not just displayed');
+});
+
+
+test('lap and three-lap ghost leaderboards fill five unique normalized names without reducing personal search', async () => {
+  for (const laps of [1, 3]) {
+    const h = setup(); h.client.recordsManaged = true; await h.client.init();
+    const make = laps === 3 ? raceEntry : entry, baseTime = laps === 3 ? 126000 : 42000;
+    const values = ['ＡＬＩＣＥ', 'Alice', 'Bob', 'Carol', 'Dora', 'Eve', 'Fred'].map((name, index) => make(name, `public-${index}`, baseTime + index * 1000));
+    h.queue.push((laps === 3 ? raceResponse : response)({ entries: values })); await h.client.openPicker(laps);
+    const chosen = h.client.pickerButtons.filter((_, i) => i % 2 === 0).map(item => item.entry);
+    assert.deepEqual(chosen.map(item => item.name), ['ＡＬＩＣＥ', 'Bob', 'Carol', 'Dora', 'Eve']);
+    assert.equal(h.get('ghost-picker-list').children.length, 5);
+    assert.equal(chosen[0].id, 'public-0');
+  }
 });

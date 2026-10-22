@@ -177,7 +177,9 @@ function createCar(id) {
     offroad: false, offroadTime: 0, steer: 0, lastSkid: false, impact: 0,
     finished: false, finishTime: null, missedCheckpoint: false, rescueCooldown: 0,
     rescueCount: 0, rescueReason: null,
+    launchResetCount: 0, launchResetReason: null,
     _lane: lane, _gridS: gridS, _started: false, _nextCheckpoint: 0,
+    _launchPathLength: 0,
     _lastTrackS: p.s, _lastX: p.x, _lastY: p.y,
     _lastCheckpointS: gridS,
     _lapStartTime: 0,
@@ -185,8 +187,9 @@ function createCar(id) {
 }
 
 export class RaceEngine {
-  constructor({ laps = 3, obstacles = [] } = {}) {
+  constructor({ laps = 3, obstacles = [], playerCount = 2 } = {}) {
     this.laps = clamp(Math.round(laps) || 3, 1, 9);
+    this.playerCount = playerCount === 1 ? 1 : 2;
     this.obstacleWorld = new ObstacleWorld(obstacles, { carRadius: TRACK.carRadius });
     this.reset();
   }
@@ -206,8 +209,17 @@ export class RaceEngine {
     return this.reset();
   }
 
+  /** Ghost opponents are visual replays; solo play has one physical vehicle. */
+  setPlayerCount(count) {
+    if (count !== 1 && count !== 2) throw new RangeError('A race supports one or two human cars.');
+    if (count === this.playerCount) return this;
+    if (!['menu', 'finished'].includes(this.state)) throw new Error('Change players before starting the race.');
+    this.playerCount = count;
+    return this.reset();
+  }
+
   reset() {
-    this.cars = [createCar(1), createCar(2)];
+    this.cars = Array.from({ length: this.playerCount }, (_, index) => createCar(index + 1));
     this.state = 'menu';
     this.countdown = 3;
     this.time = 0;
@@ -304,8 +316,24 @@ export class RaceEngine {
     car.rescueCount += 1; car.rescueReason = reason;
     car.offroad = false; car.offroadTime = 0; car.lastSkid = false; car.impact = 0;
     car._lastTrackS = p.s; car._lastX = p.x; car._lastY = p.y;
+    if (!car._started) car._launchPathLength = 0;
     car.missedCheckpoint = false;
     this._updateProgress(car, p.s);
+  }
+
+  /** A one-lap attempt must approach its timing line from the standing grid. */
+  _resetLaunch(car, reason) {
+    const p = trackPoint(car._gridS, car._lane);
+    car.x = p.x; car.y = p.y; car.angle = p.angle;
+    car.elevation = p.elevation; car.slope = p.slope;
+    car.speed = 0; car.boosting = false; car.steer = 0;
+    car.offroad = false; car.offroadTime = 0; car.lastSkid = false; car.impact = 0;
+    car._lastTrackS = p.s; car._lastX = p.x; car._lastY = p.y;
+    car._lastCheckpointS = car._gridS; car._launchPathLength = 0;
+    car.progress = 0; car.lapTime = 0; car.missedCheckpoint = false;
+    car.launchResetCount += 1; car.launchResetReason = reason;
+    // Keep the GO clock and remaining nitro: resetting cannot create fuel,
+    // rewind the race, or turn a rolling start into a recorded standing start.
   }
 
   /** Browser frame dt is clamped; fixed-size substeps keep contact stable. */
@@ -437,7 +465,7 @@ export class RaceEngine {
   _collide() {
     const [a, b] = this.cars;
     // A completed car is no longer an active obstacle at the finish line.
-    if (a.finished || b.finished) return;
+    if (!a || !b || a.finished || b.finished) return;
     if (a.elevation + a.height <= b.elevation || b.elevation + b.height <= a.elevation) return;
     let dx = b.x - a.x, dy = b.y - a.y;
     const distance = Math.hypot(dx, dy);
@@ -476,6 +504,19 @@ export class RaceEngine {
     }
     const delta = signedDistance(car._lastTrackS, p.s);
     const displacement = Math.hypot(car.x - car._lastX, car.y - car._lastY);
+    if (this.laps === 1 && !car._started) {
+      car._launchPathLength += displacement;
+      const launchProgress = signedDistance(car._gridS, p.s);
+      // The rear boundary prevents reverse run-ups. The path budget also
+      // prevents building speed sideways or in circles before the first gate,
+      // while allowing normal steering corrections over the short approach.
+      const detourAllowance = Math.max(3, Math.max(0, launchProgress) * .18);
+      const backwards = launchProgress < -.05;
+      if (backwards || car._launchPathLength - Math.max(0, launchProgress) > detourAllowance) {
+        this._resetLaunch(car, backwards ? 'backward' : 'detour');
+        return;
+      }
+    }
     // During the grace period, continuous forward driving still earns ordered
     // checkpoints. A brief excursion must not leave an invisible missed gate
     // behind after the driver returns. Bounded progress and actual movement

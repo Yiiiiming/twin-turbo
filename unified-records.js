@@ -1,11 +1,11 @@
-import { leaderboardVersionForCity, LEADERBOARD_CITIES, normalizeEntries, normalizeName } from './leaderboard.js';
+import { leaderboardVersionForCity, LEADERBOARD_CITIES, normalizeEntries, normalizeName, leaderboardNameKey } from './leaderboard.js';
 import { validGhostReplay } from './ghost-client.js';
 import { GHOST_VERSION, RACE_GHOST_VERSION, ghostVersionForCity, validateRaceReplay } from './ghost-replay.js';
 
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 const CITY = 'coast';
 const browserFetch = (...args) => globalThis.fetch(...args);
-const nameKey = value => normalizeName(value).normalize('NFKC').toLowerCase();
+const nameKey = leaderboardNameKey;
 const human = result => result && [1, 2].includes(result.playerId) && ['local', 'ai'].includes(result.mode)
   && !(result.mode === 'ai' && result.playerId === 2) && result.isAI !== true && result.isHuman !== false;
 const validGhostEntry = entry => human(entry) && typeof entry.id === 'string' && entry.id.length > 0 && entry.id.length <= 128
@@ -16,9 +16,9 @@ const validRaceEntry = entry => validGhostEntry(entry) && entry.kind === 'race' 
 const lapCategory = (data, laps = 1, city = CITY) => data?.version === ghostVersionForCity(city, laps) && data?.city === city;
 const totalCategory = (data, laps, city = CITY) => data?.version === leaderboardVersionForCity(city) && data?.city === city && data?.laps === laps;
 const cleanLaps = (entries, laps = 1) => {
-  const seen = new Set();
+  const seen = new Set(), names = new Set();
   return (Array.isArray(entries) ? entries : []).filter(laps === 3 ? validRaceEntry : validLapEntry).map(entry => ({ ...entry, kind: laps === 3 ? 'race' : 'lap', laps })).sort((a, b) => a.timeMs - b.timeMs)
-    .filter(entry => { const key = entry.id; if (seen.has(key)) return false; seen.add(key); return true; }).slice(0, 5);
+    .filter(entry => { const key = entry.id, name = nameKey(entry.name); if (seen.has(key)) return false; seen.add(key); if (names.has(name)) return false; names.add(name); return true; }).slice(0, 5);
 };
 const timeLabel = ms => {
   const cs = Math.round(ms / 10);
@@ -29,7 +29,7 @@ const uuid = () => globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx
 });
 const copyReplay = replay => ({ version: 1, ...(replay.kind === 'race' ? { kind: 'race', laps: 3, lapEndsMs: [...replay.lapEndsMs] } : {}),
   durationMs: replay.durationMs, frames: replay.frames.map(frame => [...frame]) });
-const terminal = state => ['none', 'saved', 'not-ranked', 'retained', 'archived'].includes(state);
+const terminal = state => ['none', 'saved', 'not-ranked', 'retained', 'archived', 'rejected'].includes(state);
 
 /** One record area, one name per human, independently retryable online saves. */
 export class UnifiedRecordsClient {
@@ -116,7 +116,7 @@ export class UnifiedRecordsClient {
       row.appendChild(this.el('td', 'record-rank', String(index + 1).padStart(2, '0')));
       const identity = this.el('td', 'record-identity');
       const nickname = this.el('strong', '', normalizeName(entry.name)); nickname.setAttribute('translate', 'no'); identity.appendChild(nickname);
-      identity.appendChild(this.el('small', '', entry.mode === 'ai' ? '单人挑战 AI' : '本地双人')); row.appendChild(identity);
+      identity.appendChild(this.el('small', '', entry.mode === 'ai' ? '单人' : '本地双人')); row.appendChild(identity);
       row.appendChild(this.el('td', 'record-time record-total-time', timeLabel(entry.timeMs)));
       const challenge = this.el('td', 'record-ghost-cell');
       if (ghost) {
@@ -149,8 +149,8 @@ export class UnifiedRecordsClient {
       if (request !== this.boardRequest) return;
       this.render(); const failed = details.some(result => result.status === 'rejected');
       this.node('records-status').textContent = !this.entries.length ? '还没有成绩，完成比赛或有效单圈后保存，留下第一条记录。'
-        : category === 'lap' ? '最快单圈前五 · 每次成绩独立排名，同一昵称可多次上榜。'
-          : `${category} 圈整场前五 · 每次完赛独立排名，同一昵称可多次上榜。${failed ? ' 部分幽灵暂未读取，可重试。' : ''}`;
+        : category === 'lap' ? '最快单圈前五 · 每个昵称只展示最快成绩，其他成绩保留在历史记录中。'
+          : `${category} 圈整场前五 · 每个昵称只展示最快成绩，其他成绩保留在历史记录中。${failed ? ' 部分幽灵暂未读取，可重试。' : ''}`;
       this.node('records-retry').hidden = !failed;
     } catch (error) {
       if (request !== this.boardRequest) return;
@@ -215,7 +215,7 @@ export class UnifiedRecordsClient {
       if (card.token !== this.raceToken) return;
       if (part === 'total') {
         if (!totalCategory(data, card.laps, card.city) || data.saved !== true) throw new Error('未确认总成绩。');
-        card.total.state = 'saved';
+        card.total.state = 'saved'; card.total.rank = data.rank;
       } else {
         if (!lapCategory(data, ghostLaps, card.city) || typeof data.saved !== 'boolean' || !(ghostLaps === 3 ? validRaceEntry(data.entry) : validLapEntry(data.entry))
           || nameKey(data.entry.name) !== nameKey(name) || data.entry.timeMs > replay.durationMs
@@ -230,7 +230,8 @@ export class UnifiedRecordsClient {
       }
     } catch (error) {
       if (card.token !== this.raceToken) return;
-      card[part].state = part === 'total' && error.status === 409 && error.payload?.error === 'rank_changed'
+      card[part].state = part === 'lap' && [400, 422].includes(error.status) && error.payload?.error === 'invalid_single_lap_start' ? 'rejected'
+        : part === 'total' && error.status === 409 && error.payload?.error === 'rank_changed'
         && totalCategory(error.payload, card.laps, card.city) ? 'not-ranked' : 'error';
     }
   }
@@ -240,22 +241,29 @@ export class UnifiedRecordsClient {
     if (!name) { card.message.textContent = '请输入昵称，最多 16 个字符。'; card.input.focus(); return; }
     card.submissionName = name; card.input.value = name; this.remember(card.playerId, name);
     card.submitting = true; card.button.disabled = true; card.input.disabled = true; card.message.textContent = '正在保存成绩与幽灵…';
-    await Promise.all([this.savePart(card, 'total', name), this.savePart(card, 'lap', name), this.savePart(card, 'race', name)]);
+    // The linked total supplies the lap's start evidence. Wait for its write
+    // before sending telemetry; an unavailable total must not lose a good ghost.
+    await this.savePart(card, 'total', name);
+    if (card.token !== this.raceToken) return;
+    await Promise.all([this.savePart(card, 'lap', name), this.savePart(card, 'race', name)]);
     if (card.token !== this.raceToken) return;
     card.submitting = false; card.done = terminal(card.total.state) && terminal(card.lap.state) && terminal(card.race.state);
     const messages = [];
-    if (card.total.state === 'saved') messages.push('整场成绩已保存');
+    if (card.total.state === 'saved') messages.push(card.total.rank === null ? '整场成绩已保存至历史记录，本次未进入排行榜' : '整场成绩已保存');
     if (card.total.state === 'not-ranked') messages.push('整场成绩未进前五');
     if (card.lap.state === 'saved') messages.push('最快单圈与幽灵已保存');
+    if (card.lap.state === 'rejected') messages.push('这次单圈起步不符合规则，幽灵未保存；请从起跑位向前重新比赛');
     if (card.lap.state === 'archived' || card.race.state === 'archived') messages.push('幽灵未进入当前地图与圈数的个人前 20，成绩保存不受影响');
     if (card.lap.state === 'retained') messages.push(`已保留更快的单圈与幽灵 ${timeLabel(card.lap.entry.timeMs)}`);
     if (card.race.state === 'saved') messages.push('三圈整场幽灵已保存');
     if (card.race.state === 'retained') messages.push(`已保留更快的三圈幽灵 ${timeLabel(card.race.entry.timeMs)}`);
     const failed = [['total', '整场成绩'], ['lap', '单圈与幽灵'], ['race', '三圈幽灵']].filter(([part]) => card[part].state === 'error').map(([, label]) => label);
     if (!card.done) messages.push(`${failed.join('、')}暂未确认；重试只补存这一部分，昵称不用重填`);
-    card.message.textContent = messages.join('；') + '。'; card.button.textContent = card.done ? '已完成' : '重试未保存部分';
+    card.message.textContent = messages.join('；') + '。'; card.button.textContent = card.done ? card.lap.state === 'rejected' ? '需重新比赛' : '已完成' : '重试未保存部分';
     card.button.disabled = this.locked || card.done; card.input.disabled = true;
-    if (card.done && card.token === this.raceToken && this.cards.length > 0 && this.cards.every(result => result.done)) this.onSaved();
+    // Keep a rejected attempt visible even if the other driver saves later.
+    if (card.done && card.token === this.raceToken && this.cards.length > 0
+      && this.cards.every(result => result.done && result.lap.state !== 'rejected')) this.onSaved();
     // Refresh the selected category, never switch tabs after a late save response.
     if (['total', 'lap', 'race'].some(part => ['saved', 'retained'].includes(card[part].state))) await this.load();
   }

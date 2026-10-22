@@ -15,6 +15,7 @@ import { londonMagicPlacements, londonMagicBlend } from './london-magic-layout.j
 import { addLondonMagicScenery, addMagicCharacter, addMagicFlyingCar } from './london-magic-models.js';
 import { londonMagicState, magicBodyMatrix, magicArmMatrix, MagicEffects } from './london-magic-effects.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
+import { CHALLENGE_COLORS } from './ghost-challenge.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
 
@@ -1128,6 +1129,7 @@ export class RaceRenderer {
     const world=buildWorld();
     this.obstacles=world.obstacles;
     this.meshes={terrain:upload(gl,world.terrain),road:upload(gl,buildRoad()),water:upload(gl,world.water),props:upload(gl,world.props),magic:world.magic.data.length?upload(gl,world.magic):{count:0},cars:[upload(gl,carMesh('#57dbe6')),upload(gl,carMesh('#ff9870'))],ghost:upload(gl,ghostCarMesh()),ghostGold:upload(gl,ghostCarMesh('#ffd166')),flames:upload(gl,flameMesh()),shadow:upload(gl,shadowMesh())};
+    this.ghostMeshes = [this.meshes.ghost, this.meshes.ghostGold];
     this.trackId=TRACK.id;
     this.worldMatrix=identity();
     this.textures={};
@@ -1254,10 +1256,11 @@ export class RaceRenderer {
   }
   // Each driver's view follows its own lap clock. This state never enters physics.
   setGhostPoses(poses = []) {
+    const count = this.singlePlayer ? CHALLENGE_COLORS.length : 2;
     this.ghostPoses = [0,1].map(index => {
       const group = Array.isArray(poses[index]) ? poses[index] : [poses[index]];
       return group.filter(pose=>pose && ['x','y','angle','elevation'].every(key=>Number.isFinite(pose[key])))
-        .slice(0,2).map(pose=>({...pose,slotId:pose.slotId===1?1:0}));
+        .slice(0,count).map(pose=>({...pose,slotId:Number.isInteger(pose.slotId)&&pose.slotId>=0&&pose.slotId<count?pose.slotId:0}));
     });
   }
   resetCameras(engine,playerId) {
@@ -1340,7 +1343,12 @@ export class RaceRenderer {
         Math.hypot(b.x-camera.eye[0],b.y-camera.eye[2])-Math.hypot(a.x-camera.eye[0],a.y-camera.eye[2]));
       if (ghosts.length) {
         gl.enable(gl.BLEND); gl.depthMask(false);
-        for (const ghost of ghosts) this._mesh(ghost.slotId===1 ? this.meshes.ghostGold : this.meshes.ghost, modelMatrix(ghost.x,ghost.elevation+1.5,ghost.y,ghost.angle));
+        for (const ghost of ghosts) {
+          // Extra colors upload only when a challenge uses them; local two-car
+          // races keep their existing two ghost meshes and geometry footprint.
+          const mesh = this.ghostMeshes[ghost.slotId] ||= upload(gl, ghostCarMesh(CHALLENGE_COLORS[ghost.slotId].color));
+          this._mesh(mesh, modelMatrix(ghost.x,ghost.elevation+1.5,ghost.y,ghost.angle));
+        }
         gl.depthMask(true); gl.disable(gl.BLEND);
       }
     }

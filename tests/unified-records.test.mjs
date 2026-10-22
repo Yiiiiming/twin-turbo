@@ -73,33 +73,37 @@ test('one table switches sprint, three-lap and fastest lap rankings with exactly
   await h.client.load(5); assert.equal(h.client.category, 'lap');
 });
 
-test('one nickname can occupy multiple single-lap ranks; only duplicated record ids are deduplicated', async () => {
+test('fastest lap ranks one normalized nickname and challenges its fastest replay', async () => {
   const h = setup();
-  h.handler = () => response(lp({ entries: [lap('<b>Emery</b>', 'one'), lap('<b>Emery</b>', 'two', 43000), lap('<b>Emery</b>', 'one')] }));
+  h.handler = () => response(lp({ entries: [lap('<b>Emery</b>', 'slow', 43000), lap('<b>EMERY</b>', 'fast', 42000),
+    lap('<b>EMERY</b>', 'fast', 42000), lap('另一位', 'other', 44000)] }));
   await h.client.load('lap');
   assert.equal(h.client.entries.length, 2); assert.equal(h.client.challengeButtons.length, 2);
-  assert.match(h.get('records-list').textContent, /<b>Emery<\/b>/);
-  assert.deepEqual(h.client.entries.map(entry => entry.id), ['one', 'two']);
-  await h.client.challengeButtons[1].dispatch('click'); assert.equal(h.challenges[0].id, 'two');
+  assert.match(h.get('records-list').textContent, /<b>EMERY<\/b>/);
+  assert.deepEqual(h.client.entries.map(entry => entry.id), ['fast', 'other']);
+  await h.client.challengeButtons[0].dispatch('click'); assert.equal(h.challenges[0].id, 'fast');
+  assert.match(h.get('records-status').textContent, /每个昵称只展示最快成绩/);
 });
 
-test('all categories cap at five independent attempts and the time heading follows the selected ranking', async () => {
+test('all categories select five distinct personal bests after duplicate names are removed', async () => {
   const h = setup();
   h.handler = req => {
+    const names = ['ＡＬＩＣＥ', 'Alice', 'Bob', 'Carol', 'Dora', 'Eve', 'Fred', 'George'];
     if (req.url.pathname === '/api/leaderboard') {
       const laps = Number(req.url.searchParams.get('laps'));
-      return response(tp({ entries: Array.from({ length: 8 }, (_, index) => ({ ...total('同一车手', `total-${index}`, laps), timeMs: 150000 - index * 1000 })) }, laps));
+      return response(tp({ entries: names.map((name, index) => ({ ...total(name, `total-${index}`, laps), timeMs: 150000 + index * 1000 })) }, laps));
     }
-    if (req.url.pathname === '/api/laps') return response(lp({ entries: Array.from({ length: 8 }, (_, index) => lap('同一车手', `lap-${index}`, 50000 - index * 1000)) }));
+    if (req.url.pathname === '/api/laps') return response(lp({ entries: names.map((name, index) => lap(name, `lap-${index}`, 50000 + index * 1000)) }));
     return response({ error: 'not_found' }, 404);
   };
   for (const category of [3, 'lap', 1]) {
     await h.client.load(category);
     assert.equal(h.client.entries.length, 5);
     assert.equal(h.get('records-list').children.length, 5);
-    assert.ok(h.client.entries.every(entry => entry.name === '同一车手'));
-    assert.deepEqual(h.client.entries.map(entry => entry.id), [7, 6, 5, 4, 3].map(index => `${category === 'lap' ? 'lap' : 'total'}-${index}`));
+    assert.deepEqual(h.client.entries.map(entry => entry.name), ['ＡＬＩＣＥ', 'Bob', 'Carol', 'Dora', 'Eve']);
+    assert.deepEqual(h.client.entries.map(entry => entry.id), [0, 2, 3, 4, 5].map(index => `${category === 'lap' ? 'lap' : 'total'}-${index}`));
     assert.equal(h.get('records-time-heading').textContent, category === 'lap' ? '单圈用时' : '整场用时');
+    assert.match(h.get('records-status').textContent, /其他成绩保留在历史记录/);
   }
 });
 
@@ -158,7 +162,7 @@ test('when the total saves but the ghost response is lost, retry sends only the 
   assert.deepEqual(posted(h)[2].body, before); assert.equal(card.done, true);
 });
 
-test('when the ghost saves first, total retry keeps its id and does not reupload the replay', async () => {
+test('a failed total still allows ghost preservation, and total retry does not reupload the replay', async () => {
   const h = setup(); await h.client.init(); let attempts = 0;
   h.handler = req => {
     if (req.method !== 'POST') return;
@@ -169,6 +173,90 @@ test('when the ghost saves first, total retry keeps its id and does not reupload
   assert.equal(card.total.state, 'error'); assert.equal(card.lap.state, 'saved');
   const before = posted(h)[0].body; await h.client.save(card);
   assert.deepEqual(posted(h)[2].body, before); assert.equal(posted(h).filter(req => req.url.pathname === '/api/laps').length, 1);
+});
+
+for (const laps of [1, 3]) test(`${laps}-lap saving waits for the total write before uploading linked ghosts`, async () => {
+  const h = setup(), totalWrite = deferred(), lapWrite = deferred(), raceWrite = deferred();
+  await h.client.init();
+  h.handler = req => req.method !== 'POST' ? undefined : req.url.pathname === '/api/records' ? totalWrite.promise
+    : req.body.version === RACE_GHOST_VERSION ? raceWrite.promise : lapWrite.promise;
+  h.client.showResults([result({ laps, timeMs: laps === 1 ? 43000 : 140000, ...(laps === 3 ? { raceReplay: fullRace() } : {}) })]);
+  const card = h.client.cards[0]; card.input.value = '有序保存';
+  const saving = h.client.save(card); await tick();
+  assert.deepEqual(posted(h).map(req => req.url.pathname), ['/api/records']);
+  assert.equal(card.lap.state, 'pending', 'the server must receive the total before it evaluates launch telemetry');
+  totalWrite.resolve(response(tp({ saved: true }, laps))); await tick();
+  assert.equal(card.total.state, 'saved');
+  const ghosts = posted(h).slice(1);
+  assert.equal(ghosts.length, laps === 3 ? 2 : 1, 'lap and three-lap telemetry can upload in parallel after the total settles');
+  assert.ok(ghosts.every(req => req.body.totalRecordId === posted(h)[0].body.id));
+  const lapRequest = ghosts.find(req => req.body.version === GHOST_VERSION);
+  lapWrite.resolve(savedLap(lapRequest.body));
+  if (laps === 3) {
+    const request = ghosts.find(req => req.body.version === RACE_GHOST_VERSION);
+    raceWrite.resolve(response(rp({ saved: true, entry: { ...raceEntry(request.body.name, request.body.id, request.body.timeMs), totalRecordId: request.body.totalRecordId } })));
+  }
+  await saving; assert.equal(card.done, true); assert.equal(h.savedCalls, 1);
+});
+
+for (const status of [400, 422]) test(`a typed ${status} launch rejection preserves the total, stays visible and never retries the rejected ghost`, async () => {
+  const h = setup(); await h.client.init();
+  h.handler = req => req.method !== 'POST' ? undefined : req.url.pathname === '/api/records'
+    ? response(tp({ saved: true }, 1)) : response({ error: 'invalid_single_lap_start' }, status);
+  h.client.showResults([result({ laps: 1, timeMs: 43000 })]);
+  const card = h.client.cards[0]; card.input.value = '起跑检查'; await h.client.save(card);
+  assert.equal(card.total.state, 'saved'); assert.equal(card.lap.state, 'rejected'); assert.equal(card.done, true);
+  assert.match(card.message.textContent, /整场成绩已保存/);
+  assert.match(card.message.textContent, /这次单圈起步不符合规则，幽灵未保存；请从起跑位向前重新比赛。/);
+  assert.doesNotMatch(card.message.textContent, /重试|暂未确认/);
+  assert.equal(card.button.textContent, '需重新比赛'); assert.equal(card.button.disabled, true);
+  assert.equal(h.get('records-results').hidden, false); assert.equal(h.savedCalls, 0, 'the result must remain open so the player sees the reason');
+  assert.equal(h.client.lapCache.has(card.lap.id), false, 'a rejected replay cannot become a challenge');
+  await h.client.save(card); assert.equal(posted(h).length, 2); assert.equal(h.savedCalls, 0);
+});
+
+test('another driver saving later cannot dismiss a rejected launch notice', async () => {
+  const h = setup(); await h.client.init();
+  h.handler = req => req.method !== 'POST' ? undefined : req.url.pathname === '/api/records'
+    ? response(tp({ saved: true }, 1)) : response({ error: 'invalid_single_lap_start' }, 422);
+  h.client.showResults([result({ laps: 1, timeMs: 43000 }), result({ playerId: 2, laps: 1, timeMs: 45000, replay: null })]);
+  for (const card of h.client.cards) { card.input.value = `车手${card.playerId}`; await h.client.save(card); }
+  assert.ok(h.client.cards.every(card => card.done)); assert.equal(h.savedCalls, 0);
+  assert.match(h.client.cards[0].message.textContent, /请从起跑位向前重新比赛/);
+});
+
+test('retry after a total failure only retries that total when its lap was permanently rejected', async () => {
+  const h = setup(); await h.client.init(); let totalAttempts = 0;
+  h.handler = req => req.method !== 'POST' ? undefined : req.url.pathname === '/api/records'
+    ? ++totalAttempts === 1 ? response({ error: 'temporary_failure' }, 503) : response(tp({ saved: true }, 1))
+    : response({ error: 'invalid_single_lap_start' }, 422);
+  h.client.showResults([result({ laps: 1, timeMs: 43000 })]); const card = h.client.cards[0]; card.input.value = '只补总成绩';
+  await h.client.save(card); assert.equal(card.done, false); assert.equal(card.lap.state, 'rejected');
+  assert.equal(card.button.disabled, false); assert.match(card.message.textContent, /整场成绩暂未确认/);
+  await h.client.save(card); assert.equal(card.done, true); assert.equal(card.total.state, 'saved');
+  assert.deepEqual(posted(h).map(req => req.url.pathname), ['/api/records', '/api/laps', '/api/records']);
+  assert.equal(h.savedCalls, 0);
+});
+
+test('nonterminal or unrecognized errors remain retryable instead of becoming launch rejections', async () => {
+  for (const [status, error] of [[503, 'invalid_single_lap_start'], [422, 'temporary_failure']]) {
+    const h = setup(); await h.client.init();
+    h.handler = req => req.method !== 'POST' ? undefined : req.url.pathname === '/api/records'
+      ? response(tp({ saved: true }, 1)) : response({ error }, status);
+    h.client.showResults([result({ laps: 1, timeMs: 43000 })]); const card = h.client.cards[0]; card.input.value = '可重试';
+    await h.client.save(card); assert.equal(card.lap.state, 'error'); assert.equal(card.done, false);
+    assert.equal(card.button.disabled, false); assert.match(card.message.textContent, /重试只补存/);
+  }
+});
+
+test('starting a new race while the total saves cancels its not-yet-uploaded ghost', async () => {
+  const h = setup(), totalWrite = deferred(); await h.client.init();
+  h.handler = req => req.method === 'POST' ? totalWrite.promise : undefined;
+  h.client.showResults([result()]); const card = h.client.cards[0]; card.input.value = '上一场';
+  const saving = h.client.save(card); await tick(); h.client.newRace();
+  totalWrite.resolve(response(tp({ saved: true }))); await saving;
+  assert.deepEqual(posted(h).map(req => req.url.pathname), ['/api/records']); assert.equal(h.savedCalls, 0);
+  assert.equal(h.client.cards.length, 0);
 });
 
 test('outside top five is a terminal total outcome while the personal ghost is still saved', async () => {
@@ -472,4 +560,18 @@ test('Beijing stadium rejects a stale old-route total board and old-route save c
  h.client.showResults([result({city:'coast-beijing',laps:1,timeMs:70000,replay:null})]);const card=h.client.cards[0];card.input.value='新赛道';
  await h.client.save(card);assert.equal(card.total.state,'error');assert.equal(card.done,false);
  assert.equal(posted(h).at(-1).body.version,leaderboardVersionForCity('coast-beijing'));
+});
+
+
+test('a total saved outside the personal-best board finishes normally and is described as historical', async () => {
+  const h = setup();
+  h.handler = req => req.url.pathname === '/api/records' && req.method === 'POST'
+    ? response(tp({ saved: true, rank: null })) : undefined;
+  h.client.showResults([result({ replay: null })]);
+  const card = h.client.cards[0]; card.input.value = 'Alice';
+  await h.client.save(card);
+  assert.equal(card.total.state, 'saved'); assert.equal(card.done, true); assert.equal(h.savedCalls, 1);
+  assert.match(card.message.textContent, /保存至历史记录/);
+  assert.equal(posted(h).length, 1);
+  await h.client.save(card); assert.equal(posted(h).length, 1, 'a saved history result is not retried');
 });

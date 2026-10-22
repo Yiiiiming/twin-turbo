@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { TRACK, TRACKS, setTrack, trackPoint, projectTrack, mod } from '../engine.js';
 import { RaceAI } from '../ai.js';
 import { GHOST_VERSION } from '../ghost-client.js';
-import { validateReplay, validateRaceReplay, RACE_GHOST_VERSION } from '../ghost-replay.js';
+import { validateReplay, validateRaceReplay, RACE_GHOST_VERSION, ghostVersionForCity } from '../ghost-replay.js';
 import { LEADERBOARD_VERSION } from '../leaderboard.js';
 
 const sourceURL = new URL('../main.js', import.meta.url);
@@ -220,6 +220,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     .replace("from './i18n.js'", `from '${new URL('../i18n.js', import.meta.url).href}'`)
     .replace("from './controls.js'", `from '${new URL('../controls.js', import.meta.url).href}'`)
     .replace("from './split-timing.js'", `from '${new URL('../split-timing.js', import.meta.url).href}'`)
+    .replace("from './ghost-challenge.js'", `from '${new URL('../ghost-challenge.js', import.meta.url).href}'`)
     .replace("from './ghost-client.js'", `from '${new URL('../ghost-client.js', import.meta.url).href}'`)
     .replace("from './ghost-replay.js'", `from '${new URL('../ghost-replay.js', import.meta.url).href}'`)
     .replace("from './engine.js'", `from '${engineURL.href}'`)
@@ -230,11 +231,11 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     .replace("from './leaderboard-client.js'", `from '${new URL('../leaderboard-client.js', import.meta.url).href}'`);
   // Load shipped application source unmodified except dependency resolution and
   // read-only test exports. No duplicated event handlers or production hooks.
-  const entry = `${source}\nexport { engine, keys, renderer, ai, bindings, leaderboard, ghostClient, ghostRecorder, splitTiming, i18n, trackCards };\n// test instance ${++instance}`;
+  const entry = `${source}\nexport { engine, keys, renderer, bindings, leaderboard, ghostClient, ghostRecorder, splitTiming, i18n, trackCards, activeGhosts, challengeSetup };\n// test instance ${++instance}`;
   const application = await import(`data:text/javascript;base64,${Buffer.from(entry).toString('base64')}`);
   const ui = {
-    ...application, nodes, allNodes, document, window, lapButtons, lapLabels, modeButtons, html, requests,
-    async flush() { for (let pass = 0; pass < 12; pass++) await Promise.resolve(); },
+    ...application, application, nodes, allNodes, document, window, lapButtons, lapLabels, modeButtons, html, requests,
+    async flush() { for (let pass = 0; pass < 60; pass++) await Promise.resolve(); },
     frame(dt = 1 / 60) {
       clock += dt * 1000;
       assert.equal(frames.length, 1, 'one animation loop is scheduled');
@@ -244,6 +245,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     advance(seconds) { for (let i = 0; i < Math.ceil(seconds * 60); i++) this.frame(); },
     click(id) { return nodes.get(id).click(); },
     launch(id = 'start') { const event = this.click(id); if (nodes.get('race-setup-dialog').open) this.click('setup-launch'); return event; },
+    async launchPrepared(id = 'start') { this.click(id); await this.flush(); this.click('setup-launch'); },
     key(code, options = {}) { return window.dispatch('keydown', { code, target: document.activeElement, ...options }); },
     keyup(code, options = {}) { return window.dispatch('keyup', { code, target: document.activeElement, ...options }); },
   };
@@ -276,7 +278,8 @@ test('real main.js delegates scene rendering and draws two player maps on the se
   assert.equal(ui.renderer.renderCount, 1);
   assert.equal(ui.renderer.lastRender.engine, ui.engine);
   assert.equal(ui.renderer.resetCalls.length, 1);
-  assert.notEqual(ui.renderer.resetCalls[0].cars[0].y, ui.renderer.resetCalls[0].cars[1].y);
+  assert.equal(ui.engine.cars.length, 2);
+  assert.notEqual(ui.engine.cars[0].y, ui.engine.cars[1].y, 'explicit local mode restores both separated start slots');
   assert.equal(ui.renderer.resetCalls[0].playerId, undefined, 'initial setup resets both cameras');
   assert.equal(ui.nodes.get('game').context, undefined, 'main.js must not acquire a 2D context on its WebGL canvas');
   const hudContext = ui.nodes.get('hud').context;
@@ -439,7 +442,7 @@ test('custom bindings reject conflicts and reserved keys, then drive the real pl
   assert.ok(ui.engine.cars[0].speed > 70);
 });
 
-test('single-player orange changes appearance and labels while retaining P1 controls and independent AI', async t => {
+test('single-player orange retains both control layouts with one real car and no physical AI', async t => {
   const ui = await loadUI(t);
   ui.click('open-bindings');
   const p2Accelerate = ui.document.querySelectorAll('[data-bind-player][data-bind-action]')
@@ -450,15 +453,15 @@ test('single-player orange changes appearance and labels while retaining P1 cont
   orange.click();
   assert.equal(orange.getAttribute('aria-pressed'), 'true');
   assert.match(ui.nodes.get('player1-name').textContent, /橙色风暴/);
-  assert.match(ui.nodes.get('player2-name').textContent, /AI.*青色闪电/);
-  ui.launch(); ui.advance(3.1);
+  assert.equal(ui.engine.cars.length, 1);
+  await ui.launchPrepared(); ui.advance(3.1);
   assert.equal(ui.engine.cars[0].id, 1); assert.equal(ui.engine.cars[0].colorIndex, 1);
-  assert.equal(ui.engine.cars[1].id, 2); assert.equal(ui.engine.cars[1].colorIndex, 0);
-  assert.equal(ui.engine.cars[0]._lane, -18); assert.equal(ui.engine.cars[1]._lane, 22);
+  assert.equal(ui.engine.cars[0]._lane, -18);
   ui.key('KeyW'); ui.advance(.4);
   assert.ok(ui.engine.cars[0].speed > 70, 'P1 driving controls still drive the human orange car');
-  assert.ok(ui.engine.cars[1].speed > 70, 'AI drives via canonical controls despite remapping P2 acceleration');
-  assert.ok(ui.ai.elapsed > 0);
+  ui.keyup('KeyW'); ui.key('KeyK'); ui.advance(.2);
+  assert.ok(ui.engine.cars[0].speed > 100, 'remapped alternate acceleration also drives the human');
+  assert.equal(ui.engine.cars.length, 1, 'no hidden physical opponent can collide or finish');
 });
 
 test('lap selection, start focus, countdown HUD and both keyboard drivers use actual handlers', async t => {
@@ -549,32 +552,30 @@ test('focused buttons retain native Enter and Space activation, canvas Enter rem
   ui.click('help'); assert.equal(ui.nodes.get('help-dialog').open, true);
 });
 
-test('single-player mode drives only player 2 through AI controls and freezes the AI while paused', async t => {
+test('single-player routes both keyboard layouts to one human car and pauses its race clock', async t => {
   const ui = await loadUI(t);
   assert.equal(ui.modeButtons.find(button => button.dataset.mode === 'local').getAttribute('aria-pressed'), 'true');
   ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
-  assert.equal(ui.nodes.get('player2-name').textContent, 'AI · 橙色风暴');
+  assert.equal(ui.nodes.get('mode-label').textContent, '幽灵挑战');
   assert.equal(ui.nodes.get('player2-controls').classList.contains('hidden'), true);
-  ui.launch(); ui.advance(3.1);
+  await ui.launchPrepared(); ui.advance(3.1);
   ui.key('ArrowUp'); ui.key('ArrowLeft'); ui.key('Enter');
   assert.deepEqual([...ui.bindings.frameKeys(ui.keys, true)].sort(), ['KeyA', 'KeyW', 'ShiftLeft'], 'both physical layouts map solely to human canonical controls in solo mode');
   ui.keyup('ArrowUp'); ui.keyup('ArrowLeft'); ui.keyup('Enter');
-  assert.equal(ui.engine.cars[1].rescueCooldown, 0);
   ui.key('KeyW'); ui.advance(.4);
-  assert.ok(ui.engine.cars[0].speed > 0); assert.ok(ui.engine.cars[1].speed > 0);
-  const elapsed = ui.ai.elapsed;
+  assert.equal(ui.engine.cars.length, 1); assert.ok(ui.engine.cars[0].speed > 0);
+  const time = ui.engine.time, position = { x: ui.engine.cars[0].x, y: ui.engine.cars[0].y };
   ui.key('Escape'); ui.advance(.2);
-  assert.equal(ui.ai.elapsed, elapsed);
-  ui.click('resume'); ui.frame(); assert.ok(ui.ai.elapsed > elapsed);
+  assert.equal(ui.engine.time, time); assert.deepEqual({ x: ui.engine.cars[0].x, y: ui.engine.cars[0].y }, position);
+  ui.click('resume'); ui.frame(); assert.ok(ui.engine.time > time);
 });
 
 test('finish overlay directly offers the sole nickname form without leaving fullscreen or stealing input shortcuts', async t => {
   const ui = await loadUI(t);
   ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
-  ui.launch(); ui.advance(3.1);
+  await ui.launchPrepared(); ui.advance(3.1);
   const winner = ui.engine.cars[0];
   Object.assign(winner, { finished: true, lap: 3, finishTime: 120.125, bestLap: 39.8 });
-  Object.assign(ui.engine.cars[1], { finished: true, lap: 3, finishTime: 130.2, bestLap: 42.1 });
   ui.engine.winner = winner; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
   assert.equal(ui.leaderboard.cards.length, 1);
   assert.equal(ui.nodes.get('records-results').hidden, false);
@@ -603,30 +604,8 @@ test('finish overlay directly offers the sole nickname form without leaving full
   assert.equal(ui.leaderboard.cards.length, 1, 'returning to menu preserves the unsaved result');
   assert.equal(ui.leaderboard.cards[0], card);
   assert.equal(ui.nodes.get('records-results').parentElement,ui.nodes.get('records-pending-host'),'unsaved forms stay accessible after returning to the menu');
-  ui.launch(); ui.frame();
+  await ui.launchPrepared(); ui.frame();
   assert.equal(ui.leaderboard.cards.length, 0, 'starting a new race clears prior results');
-});
-
-test('an AI victory lets the human finish, then offers only the human record', async t => {
-  const ui = await loadUI(t);
-  ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
-  ui.launch(); ui.advance(3.1);
-  const winner = ui.engine.cars[1];
-  Object.assign(winner, { finished: true, lap: 3, finishTime: 139, bestLap: 46 });
-  ui.engine.winner = winner; ui.engine.time = 139; ui.frame(); await ui.flush();
-  assert.equal(ui.engine.state, 'racing');
-  assert.equal(ui.leaderboard.cards.length, 0);
-  assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 0);
-  assert.equal(ui.nodes.get('finisher2').classList.contains('hidden'), false);
-  ui.key('KeyW'); ui.advance(.3);
-  assert.ok(ui.engine.cars[0].speed > 0);
-  Object.assign(ui.engine.cars[0], { finished: true, lap: 3, finishTime: 143.8, bestLap: 46.5 });
-  ui.engine.state = 'finished'; ui.frame(); await ui.flush();
-  assert.equal(ui.leaderboard.cards.length, 1);
-  assert.equal(ui.leaderboard.cards[0].playerId, 1);
-  assert.equal(ui.requests.filter(request => request.url.includes('/api/qualify')).length, 0);
-  assert.equal(ui.nodes.get('winner-name').textContent, 'AI · 橙色风暴获胜！');
-  assert.equal(ui.nodes.get('result-driver2').textContent, '青色闪电');
 });
 
 test('both human finishers get independent name cards in finish order even when player 2 wins', async t => {
@@ -902,7 +881,7 @@ for (const search of ['', '?city=london']) {
       assert.equal(new URL(request.url).searchParams.get('city'), 'coast-london');
       assert.equal(new URL(request.url).searchParams.get('version'), request.url.includes('/api/laps') ? GHOST_VERSION : LEADERBOARD_VERSION);
     }
-    ui.launch();
+    await ui.launchPrepared();
     ui.advance(3.4);
     assert.equal(ui.engine.state, 'racing');
     assert.equal(TRACK.id, 'coast-london');
@@ -981,7 +960,7 @@ test('checkpoint HUD reports a real same-point gap, ghost comparison, and resets
       passedFirst=true;assert.equal(ui.nodes.get('split1').classList.contains('hidden'),false);
       assert.match(ui.nodes.get('split-point1').textContent,/第 1 圈 · 计时点 01/);
       assert.equal(ui.nodes.get('split-gap1').textContent,'对手尚未通过');
-      assert.match(ui.nodes.get('split-ghost1').children.map(node=>node.textContent).join(' '),/领先紫色幽灵 −[0-9.]+ 秒/);
+      assert.match(ui.nodes.get('split-ghost1').children.map(node=>node.textContent).join(' '),/领先Split Racer −[0-9.]+ 秒/);
     }
     if(one&&two){
       compared=true;assert.equal(ui.nodes.get('split-gap1').textContent,'领先对手 −0.10 秒');
@@ -998,13 +977,13 @@ test('checkpoint HUD reports a real same-point gap, ghost comparison, and resets
 });
 
 
-test('AI mode accepts either steering layout for the selected human color and keeps the AI independent', async t => {
+test('Ghost Challenge accepts either steering layout for the selected human color', async t => {
   const ui = await loadUI(t);
   ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
   ui.document.querySelectorAll('[data-player-color]').find(button => button.dataset.playerColor === 'orange').click();
-  ui.launch(); ui.advance(3.1); ui.key('ArrowUp'); ui.advance(.4);
+  await ui.launchPrepared(); ui.advance(3.1); ui.key('ArrowUp'); ui.advance(.4);
   assert.ok(ui.engine.cars[0].speed > 70, 'up arrow accelerates the human orange car');
-  assert.ok(ui.engine.cars[1].speed > 70, 'AI still drives itself');
+  assert.equal(ui.engine.cars.length, 1, 'all steering input affects only the human');
   ui.key('ArrowRight'); ui.frame(); assert.ok(ui.engine.cars[0].steer > 0);
   ui.keyup('ArrowRight'); ui.key('ArrowLeft'); ui.advance(.2); assert.ok(ui.engine.cars[0].steer < 0);
   ui.keyup('ArrowLeft'); ui.keyup('ArrowUp');
@@ -1101,12 +1080,12 @@ test('changing a harbor circuit resets its opponents, recording, splits and lead
   for(const {button,preview}of ui.trackCards.values()){assert.equal(button.tagName,'BUTTON');assert.equal(preview.tagName,'SVG');assert.ok(preview.querySelector('path').getAttribute('d').startsWith('M'));}
   ui.ghostClient.select({entry:{id:'prior-lap',name:'旧赛道记录',timeMs:42000,playerId:1,mode:'local'},
     replay:{version:1,durationMs:42000,frames:[[0,100,100,0,0],[42000,100,100,0,0]]}});
-  ui.ai.elapsed=99;ui.ghostRecorder.racers.set(1,{best:{durationMs:42000}});ui.splitTiming.racers.set(1,{});
+  ui.ghostRecorder.racers.set(1,{best:{durationMs:42000}});ui.splitTiming.racers.set(1,{});
   ui.leaderboard.showResults([{playerId:1,mode:'local',city:'coast',laps:3,finished:true,timeMs:140000}]);
   assert.equal(ui.leaderboard.cards.length,1);
   ui.trackCards.get('coast-bay').button.click();await ui.flush();ui.frame();
   assert.equal(TRACK.id,'coast-bay');assert.equal(ui.ghostClient.city,'coast-bay');assert.equal(ui.leaderboard.city,'coast-bay');
-  assert.equal(ui.ai.elapsed,0);assert.equal(ui.ghostClient.selections().length,0);assert.equal(ui.leaderboard.cards.length,0);
+  assert.equal(ui.ghostClient.selections().length,0);assert.equal(ui.leaderboard.cards.length,0);
   assert.equal(ui.ghostRecorder.bestReplay(1),null);assert.equal(ui.splitTiming.latest(1),null);
   assert.equal(ui.renderer.rebuildCalls.length,1);assert.ok(ui.renderer.ghostPoses.every(poses=>poses.length===0));
   assert.equal(ui.nodes.get('track-title').textContent,TRACK.name);assert.equal(ui.trackCards.get('coast-bay').button.getAttribute('aria-pressed'),'true');
@@ -1121,7 +1100,7 @@ test('changing a harbor circuit resets its opponents, recording, splits and lead
   assert.equal(ui.renderer.rebuildCalls.length,2);
 });
 
-test('every harbor map starts local and AI races in both one-lap sprint and three-lap modes',async t=>{
+test('every harbor map starts local and Ghost Challenge races in both one-lap sprint and three-lap modes',async t=>{
   const ui=await loadUI(t);
   assert.deepEqual(ui.lapButtons.map(button=>Number(button.dataset.laps)).sort(),[1,3]);
   assert.doesNotMatch(ui.html,/data-laps="5"|id="records-tab-5"/);
@@ -1138,9 +1117,9 @@ test('every harbor map starts local and AI races in both one-lap sprint and thre
     ui.click('setup-skip');ui.advance(3.1);assert.equal(ui.engine.state,'racing');assert.equal(ui.engine.laps,laps);
     ui.key('ArrowUp');if(mode==='local')ui.key('KeyW');ui.advance(.3);
     assert.ok(ui.engine.cars.every(car=>car.speed>50),`${id}/${mode}/${laps} both racers move`);
-    if(mode==='ai')assert.ok(ui.ai.elapsed>0);
+    assert.equal(ui.engine.cars.length,mode==='ai'?1:2,'physical car count follows the selected mode');
     ui.key('Escape');ui.click('pause-menu');ui.frame();assert.equal(ui.engine.state,'menu');
-    assert.equal(ui.ai.elapsed,0);assert.ok(ui.engine.cars.every(car=>car.lap===0&&car.speed===0));
+    assert.ok(ui.engine.cars.every(car=>car.lap===0&&car.speed===0));
   }
 });
 
@@ -1169,7 +1148,7 @@ test('leaderboard map browsing is independent of the current race and keeps unsa
   assert.equal(ui.leaderboard.city,'coast-pines');assert.equal(ui.engine.state,'finished');
 });
 
-test('fresh product defaults to London, AI sprint and the fastest-lap board, with both complete keyboard layouts on the human side',async t=>{
+test('fresh product defaults to London, Ghost Challenge sprint and the fastest-lap board, with both complete keyboard layouts on the human side',async t=>{
   const ui=await loadUI(t,{configureRace:false});
   assert.equal(TRACK.id,'coast-london');
   assert.equal(ui.ghostClient.city,'coast-london');
@@ -1191,8 +1170,8 @@ test('fresh product defaults to London, AI sprint and the fastest-lap board, wit
   assert.doesNotMatch(ui.nodes.get('ai-control-note').textContent,/WASD|方向键|Arrow|Enter|Shift/,'AI note no longer attributes human controls to the opponent');
   ui.modeButtons.find(button=>button.dataset.mode==='local').click();assert.equal(alternative.classList.contains('hidden'),true);
   ui.modeButtons.find(button=>button.dataset.mode==='ai').click();assert.equal(alternative.classList.contains('hidden'),false);
-  ui.launch();ui.advance(3.1);assert.equal(ui.engine.laps,1);assert.equal(ui.engine.state,'racing');
-  ui.key('ArrowUp');ui.advance(.3);assert.ok(ui.engine.cars.every(car=>car.speed>50));assert.ok(ui.ai.elapsed>0);
+  await ui.launchPrepared();ui.advance(3.1);assert.equal(ui.engine.laps,1);assert.equal(ui.engine.state,'racing');
+  ui.key('ArrowUp');ui.advance(.3);assert.equal(ui.engine.cars.length,1);assert.ok(ui.engine.cars[0].speed>50);
 });
 
 test('solo mode uses one full human HUD and camera for both colors, while local mode restores two views',async t=>{
@@ -1203,12 +1182,180 @@ test('solo mode uses one full human HUD and camera for both colors, while local 
  assert.ok(context.calls.some(call=>call[0]==='translate'&&call[1]===1018&&call[2]===577));
  assert.ok(!context.calls.some(call=>call[0]==='fillText'&&call[1]==='VS'));
  assert.ok(!context.calls.some(call=>call[0]==='fillRect'&&call[1]===597));
- ui.allNodes.find(node=>node.dataset.playerColor==='orange').click();ui.launch();ui.advance(3.1);
+ ui.allNodes.find(node=>node.dataset.playerColor==='orange').click();await ui.launchPrepared();ui.advance(3.1);
  assert.equal(ui.engine.cars[0].colorIndex,1);assert.equal(ui.renderer.singlePlayer,true,'orange human remains the first camera');
  ui.key('Escape');ui.frame();ui.click('pause-menu');ui.frame();
  ui.modeButtons.find(button=>button.dataset.mode==='local').click();before=context.counts.get('scale');context.calls.length=0;ui.frame();
  assert.equal(ui.renderer.singlePlayer,false);assert.equal(ui.document.body.classList.contains('solo-mode'),false);
+ assert.equal(ui.engine.cars.length,2,'returning to local mode restores the second physical human car');
  assert.equal(context.counts.get('scale')-before,2);assert.ok(context.calls.some(call=>call[0]==='fillText'&&call[1]==='VS'));
+});
+
+function challengeFixture(laps = 1) {
+  const times = laps === 3 ? [126000, 129000, 132000] : [42000, 43000, 44000];
+  const entries = times.map((timeMs,index) => ({ id:`challenge-driver-${index}`, name:['Alice','Bob','Carol'][index],
+    timeMs, playerId:1, mode:'local', createdAt:index+1, ...(laps===3?{kind:'race',laps:3}:{}) }));
+  // The challenge must tolerate old responses containing repeat names or a
+  // legacy AI entry without occupying one of the three human places.
+  const board = [entries[0], {...entries[0], id:'challenge-repeat-alice', name:'ＡＬＩＣＥ', timeMs:times[0]+100},
+    {...entries[0], id:'challenge-legacy-ai', name:'Old AI', timeMs:times[0]+200, playerId:2, mode:'ai'}, ...entries.slice(1)];
+  const replay = entry => ({version:1,durationMs:entry.timeMs,
+    frames:Array.from({length:entry.timeMs/100+1},(_,i)=>[i*100,100+i/10,200,0,0]),
+    ...(laps===3?{kind:'race',laps:3,lapEndsMs:[entry.timeMs/3,entry.timeMs*2/3,entry.timeMs]}:{})});
+  return {entries, board, replay};
+}
+
+function challengeFetch(fixture, {beforeBoard} = {}) {
+  return async raw => {
+    const url=new URL(raw), city=url.searchParams.get('city'), version=url.searchParams.get('version');
+    if(url.pathname==='/api/laps') {
+      await beforeBoard?.(url);
+      return {ok:true,status:200,json:async()=>({city,version,entries:fixture.board})};
+    }
+    if(url.pathname.startsWith('/api/ghosts/')) {
+      const entry=fixture.board.find(entry=>url.pathname.endsWith('/'+entry.id));
+      return {ok:true,status:200,json:async()=>({city,version,entry,replay:fixture.replay(entry)})};
+    }
+    return {ok:true,status:200,json:async()=>({city,version,laps:Number(url.searchParams.get('laps'))||3,entries:[]})};
+  };
+}
+
+test('automatic solo setup waits for matching, then starts three distinct human ghosts and three pace ghosts with one physical car', async t=>{
+  let hold=false, release;
+  const fixture=challengeFixture(1), gate=new Promise(resolve=>{release=resolve;});
+  const ui=await loadUI(t,{fetchImpl:challengeFetch(fixture,{beforeBoard:()=>hold?gate:undefined})});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();
+  ui.lapButtons.find(button=>button.dataset.laps==='1').click();
+  hold=true;ui.click('start');await ui.flush();
+  assert.equal(ui.nodes.get('race-setup-dialog').open,true);
+  assert.equal(ui.nodes.get('challenge-setup').hidden,false);
+  assert.equal(ui.nodes.get('manual-ghost-setup').hidden,true);
+  assert.equal(ui.nodes.get('setup-launch').disabled,true,'cannot race a roster that is still loading');
+  ui.click('setup-launch');ui.advance(.1);assert.equal(ui.engine.state,'menu');
+  release();await ui.flush();
+  assert.equal(ui.nodes.get('setup-launch').disabled,false);
+  assert.equal(ui.nodes.get('setup-launch').textContent,'开始挑战');
+  const roster=ui.application.challengeSetup;
+  assert.equal(roster.humanCount,3);assert.equal(roster.paceCount,3);
+  assert.deepEqual(roster.ghosts.filter(ghost=>!ghost.synthetic).map(ghost=>ghost.entry.name),['Alice','Bob','Carol']);
+  assert.equal(new Set(roster.ghosts.map(ghost=>ghost.color)).size,6);
+  assert.deepEqual(roster.ghosts.map(ghost=>ghost.slotId),[0,1,2,3,4,5]);
+  for(const [index,ghost]of roster.ghosts.slice(3).entries())assert.ok(Math.abs(ghost.entry.timeMs-44000-(index+1)*1000)<100);
+  assert.equal(ui.nodes.get('challenge-roster').children.length,6);
+  assert.match(ui.nodes.get('challenge-status').textContent,/3 位人类幽灵和 3 位配速幽灵/);
+  assert.equal(ui.requests.filter(request=>request.url.includes('/api/ghosts/')).length,3,'repeat names and legacy AI never fetch a replay');
+  ui.click('setup-launch');ui.advance(3.1);
+  assert.equal(ui.engine.state,'racing');assert.equal(ui.engine.cars.length,1);
+  assert.equal(ui.application.activeGhosts.length,6);assert.equal(ui.renderer.singlePlayer,true);
+  assert.equal(ui.nodes.get('challenge-live-list').children.length,6);
+  assert.equal(ui.nodes.get('challenge-live').hidden,false);
+  assert.equal(ui.renderer.ghostPoses[0].length,0,'lap ghosts wait for the human timing-line crossing');
+  ui.key('KeyW');ui.advance(1);
+  assert.equal(ui.engine.cars[0]._started,true);
+  assert.equal(ui.renderer.ghostPoses[0].length,6);
+  const poses=structuredClone(ui.renderer.ghostPoses), time=ui.engine.time;
+  ui.key('Escape');ui.advance(.2);
+  assert.equal(ui.engine.time,time);assert.deepEqual(ui.renderer.ghostPoses,poses);
+  ui.click('resume');ui.frame();assert.ok(ui.engine.time>time);
+  assert.equal(ui.requests.filter(request=>request.method==='POST').length,0,'matching and pacing never submit records');
+});
+
+for(const laps of [1,3])test(`Ghost Challenge ${laps}-lap results use the correct clock and finish immediately with only the human save card`,async t=>{
+  const fixture=challengeFixture(laps),ui=await loadUI(t,{fetchImpl:challengeFetch(fixture)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();
+  ui.lapButtons.find(button=>Number(button.dataset.laps)===laps).click();
+  await ui.launchPrepared();ui.advance(3.1);
+  assert.equal(ui.application.activeGhosts.length,6);
+  const replayRequests=ui.requests.filter(request=>request.url.includes('/api/ghosts/'));
+  assert.equal(replayRequests.length,3);
+  for(const {url}of replayRequests)assert.equal(new URL(url).searchParams.get('version'),ghostVersionForCity('coast',laps));
+  assert.equal(ui.renderer.ghostPoses[0].length,laps===3?6:0,'full-race ghosts begin at GO; lap ghosts wait for the timing line');
+  const car=ui.engine.cars[0];
+  const finishTime=laps===1?44.5:128.5,lastLap=laps===1?42.5:41.5;
+  Object.assign(car,{finished:true,_started:true,lap:laps,finishTime,lastLap,bestLap:lastLap,speed:0});
+  ui.engine.time=finishTime;ui.frame();await ui.flush();
+  assert.equal(ui.engine.state,'finished','the only physical car ends the race even though slower ghosts still have target time remaining');
+  assert.equal(ui.nodes.get('result-driver2-row').hidden,true);
+  assert.equal(ui.nodes.get('challenge-results').hidden,false);
+  assert.equal(ui.nodes.get('challenge-results-list').children.length,7);
+  assert.equal(ui.nodes.get('winner-name').textContent,'第 2 名 · 挑战完成');
+  const own=ui.nodes.get('challenge-results-list').children.find(node=>node.className.includes('is-you'));
+  assert.equal(own.children[0].textContent,'02');assert.equal(own.children[1].textContent,'你');
+  assert.equal(own.children[2].textContent,laps===1?'00:42.50':'02:08.50');
+  assert.match(ui.nodes.get('result-subtitle').textContent,laps===1?/起终点之间/:/GO/);
+  assert.equal(ui.leaderboard.cards.length,1);
+  assert.equal(ui.leaderboard.cards[0].playerId,1);assert.equal(ui.leaderboard.cards[0].mode,'ai','compatibility mode applies only to the human submission');
+  assert.equal(ui.requests.filter(request=>request.method==='POST').length,0);
+});
+
+test('solo setup retains manual two-color ghost choice behind its in-flow switch',async t=>{
+  const fixture=challengeFixture(1),ui=await loadUI(t,{fetchImpl:challengeFetch(fixture)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();
+  ui.lapButtons.find(button=>button.dataset.laps==='1').click();
+  ui.click('start');await ui.flush();ui.click('setup-manual');await ui.flush();
+  assert.equal(ui.nodes.get('challenge-setup').hidden,true);
+  assert.equal(ui.nodes.get('manual-ghost-setup').hidden,false);
+  assert.equal(ui.nodes.get('setup-auto').hidden,false);
+  for(const [index,entry]of fixture.entries.slice(0,2).entries()){
+    const button=ui.ghostClient.pickerButtons.find(choice=>choice.entry.id===entry.id&&choice.slotId===index).button;
+    await Promise.all(button.click().pending);await ui.flush();
+  }
+  ui.click('setup-launch');ui.advance(3.1);
+  assert.equal(ui.engine.cars.length,1);
+  assert.deepEqual(ui.application.activeGhosts.map(ghost=>ghost.entry.name),['Alice','Bob']);
+  assert.deepEqual(ui.application.activeGhosts.map(ghost=>ghost.slotId),[0,1]);
+  ui.key('KeyW');ui.advance(1);assert.equal(ui.renderer.ghostPoses[0].length,2);
+  ui.key('Escape');ui.click('pause-menu');ui.frame();
+  ui.modeButtons.find(button=>button.dataset.mode==='local').click();
+  ui.launch();ui.advance(3.1);
+  assert.equal(ui.engine.cars.length,2);assert.equal(ui.renderer.singlePlayer,false);
+  ui.key('KeyW');ui.key('ArrowUp');ui.advance(.3);assert.ok(ui.engine.cars.every(car=>car.speed>50));
+});
+
+test('late automatic match cannot restart a skipped free time trial or contaminate a different map',async t=>{
+  let hold=false,release;
+  const gate=new Promise(resolve=>{release=resolve;}),fixture=challengeFixture(1);
+  const ui=await loadUI(t,{fetchImpl:challengeFetch(fixture,{beforeBoard:()=>hold?gate:undefined})});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();ui.lapButtons.find(button=>button.dataset.laps==='1').click();
+  hold=true;ui.click('start');await ui.flush();ui.click('setup-skip');ui.advance(3.1);
+  assert.equal(ui.engine.state,'racing');assert.equal(ui.application.activeGhosts.length,0);
+  ui.key('Escape');ui.click('pause-menu');ui.frame();ui.trackCards.get('coast-bay').button.click();
+  release();await ui.flush();
+  assert.equal(TRACK.id,'coast-bay');assert.equal(ui.engine.state,'menu');
+  assert.equal(ui.application.activeGhosts.length,0);assert.equal(ui.application.challengeSetup,null);
+  assert.equal(ui.nodes.get('race-setup-dialog').open,false);
+});
+
+for(const action of ['setup-manual','setup-close'])test(`a pending automatic match cannot undo ${action==='setup-manual'?'manual ghost selection':'closing preparation'}`,async t=>{
+  let hold=false,release;
+  const gate=new Promise(resolve=>{release=resolve;}),fixture=challengeFixture(1);
+  const ui=await loadUI(t,{fetchImpl:challengeFetch(fixture,{beforeBoard:()=>hold?gate:undefined})});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();ui.lapButtons.find(button=>button.dataset.laps==='1').click();
+  hold=true;ui.click('start');await ui.flush();assert.equal(ui.application.challengeSetup.loading,true);
+  ui.click(action);release();await ui.flush();
+  assert.equal(ui.engine.state,'menu');assert.equal(ui.application.activeGhosts.length,0);
+  assert.equal(ui.nodes.get('challenge-roster').children.length,0,'cancelled match never supplies an old roster');
+  if(action==='setup-manual'){
+    assert.equal(ui.nodes.get('race-setup-dialog').open,true);
+    assert.equal(ui.nodes.get('challenge-setup').hidden,true);assert.equal(ui.nodes.get('manual-ghost-setup').hidden,false);
+    assert.equal(ui.nodes.get('setup-launch').disabled,false,'manual launch is independent of the cancelled automatic request');
+  }else assert.equal(ui.nodes.get('race-setup-dialog').open,false);
+});
+
+test('empty and unavailable automatic boards permit an explicit time trial and a fresh match retry',async t=>{
+  let fail=false;
+  const fixture=challengeFixture(1);fixture.board=[];
+  const fetchFixture=challengeFetch(fixture);
+  const ui=await loadUI(t,{fetchImpl:async url=>fail&&url.includes('/api/laps')?{ok:false,status:503}:fetchFixture(url)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();ui.lapButtons.find(button=>button.dataset.laps==='1').click();
+  ui.click('start');await ui.flush();
+  assert.equal(ui.nodes.get('setup-launch').disabled,false);assert.equal(ui.nodes.get('setup-launch').textContent,'自由计时');
+  assert.match(ui.nodes.get('challenge-status').textContent,/没有可用的人类幽灵/);
+  fail=true;ui.click('challenge-retry');await ui.flush();
+  assert.match(ui.nodes.get('challenge-status').textContent,/暂时无法连接/);
+  assert.equal(ui.nodes.get('setup-launch').disabled,false);
+  fail=false;fixture.board=fixture.entries;ui.click('challenge-retry');await ui.flush();
+  assert.equal(ui.application.challengeSetup.humanCount,3);assert.equal(ui.nodes.get('setup-launch').textContent,'开始挑战');
 });
 
 for (const player of [1, 2]) test(`player ${player} sees a cancellable final-three-second off-road warning and automatic recovery`, async t => {

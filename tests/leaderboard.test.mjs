@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LEADERBOARD_VERSION, LEADERBOARD_LIMIT, LEADERBOARD_CITIES, normalizeCity, normalizeName,
-  normalizeEntries, qualifyingRank, insertRecord } from '../leaderboard.js';
+  normalizeEntries, qualifyingRank, insertRecord, leaderboardNameKey } from '../leaderboard.js';
 
 const record = (id, timeMs, options = {}) => ({ id, timeMs, name: `车手${id}`,
   laps: 3, city: 'coast', playerId: 1, mode: 'local', createdAt: 1000, ...options });
@@ -117,7 +117,7 @@ test('same-ID retries are idempotent, while independent lap boards may reuse an 
   assert.deepEqual(insertRecord(entries, record('same', 100000, { name: 'changed' })), entries);
   assert.deepEqual(normalizeEntries([...entries, record('same', 100000)]), entries);
   assert.equal(insertRecord(entries, record('same', 200000, { laps: 5 })).length, 2);
-  assert.equal(insertRecord(entries, record('other', 110000, { name: entries[0].name })).length, 2);
+  assert.deepEqual(insertRecord(entries, record('other', 110000, { name: entries[0].name })).map(entry => entry.id), ['other']);
 });
 
 test('inserting into one lap category preserves the other category exactly', () => {
@@ -147,7 +147,7 @@ test('each city and lap count gets its own top five and qualifications never com
   const entries = [];
   for (const city of LEADERBOARD_CITIES) for (const laps of [3, 5]) {
     for (let i = 0; i < 7; i++) entries.push(record(`${city}-${laps}-${i}`,
-      (city === 'coast' ? 100000 : 350000) + i * 1000 + laps * 1000, { city, laps }));
+      (city === 'coast' ? 100000 : 350000) + i * 1000 + laps * 1000, { city, laps, name: `车手${i}` }));
   }
   for (const city of LEADERBOARD_CITIES) for (const laps of [3, 5]) {
     const ranked = normalizeEntries(entries, laps, city);
@@ -185,4 +185,31 @@ test('one-lap sprint boards stay separate from three-lap and historical five-lap
 test('retired Lighthouse Grand Prix cannot enter any ranking category',()=>{
  assert.equal(normalizeCity('coast-grand'),null);
  assert.deepEqual(normalizeEntries([{id:'retired-score',name:'Driver',timeMs:42000,laps:1,city:'coast-grand',playerId:1,mode:'local',createdAt:1}],1,'coast-grand'),[]);
+});
+
+
+test('each name contributes its fastest attempt before selecting five distinct drivers', () => {
+  const entries = [record('alice-slow', 105000, { name: ' Alice ' }),
+    record('alice-best', 100000, { name: 'ＡＬＩＣＥ' }), record('alice-tie', 100000, { name: 'alice' }),
+    record('b', 110000, { name: 'Bob' }), record('c', 120000, { name: '车手丙' }),
+    record('d', 130000, { name: 'Dora' }), record('e', 140000, { name: 'Eve' }), record('f', 150000, { name: 'Fred' })];
+  const before = structuredClone(entries), board = normalizeEntries(entries, 3);
+  assert.deepEqual(board.map(entry => entry.id), ['alice-best', 'b', 'c', 'd', 'e']);
+  assert.equal(board[0].name, 'ＡＬＩＣＥ', 'show the winning attempt’s original nickname');
+  assert.equal(leaderboardNameKey(' ＡＬＩＣＥ '), leaderboardNameKey('alice'));
+  assert.deepEqual(entries, before, 'ranking projection leaves historical source attempts untouched');
+  assert.deepEqual(normalizeEntries([...entries, record('alice-five', 200000, { name: 'Alice', laps: 5 })]).map(entry => entry.id),
+    ['alice-best', 'b', 'c', 'd', 'e', 'alice-five']);
+  assert.equal(normalizeEntries([...entries, record('alice-london', 350000, { name: 'Alice', city: 'london' })], 3, 'london')[0].id, 'alice-london');
+});
+
+test('named qualification replaces a slower personal best but never awards a second place', () => {
+  const entries = five().map((entry, i) => ({ ...entry, name: ['Alice', 'Bob', 'Carol', 'Dave', 'Eve'][i] }));
+  assert.equal(qualifyingRank(entries, result(105000, { name: ' ALICE ' })), null);
+  assert.equal(qualifyingRank(entries, result(100000, { name: 'Ａｌｉｃｅ' })), null);
+  assert.equal(qualifyingRank(entries, result(99999, { name: 'alice' })), 1);
+  assert.equal(qualifyingRank(entries, result(115000, { name: 'Eve' })), 3);
+  assert.equal(qualifyingRank(entries, result(139999, { name: 'New driver' })), 5);
+  assert.equal(qualifyingRank(entries, result(140000, { name: 'New driver' })), null);
+  assert.equal(qualifyingRank(entries, result(105000)), 2, 'unnamed pre-check remains provisional');
 });

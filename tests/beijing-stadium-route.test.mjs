@@ -87,12 +87,15 @@ test('overlapping bridge branches have a real floor gap and project onto their o
 });
 
 test('driving directly between stadium doors cannot earn the omitted oval checkpoints',()=>{
- const engine=new RaceEngine({laps:1});engine.state='racing';const car=engine.cars[0],stadium=TRACK.stadium;
+ const engine=new RaceEngine({laps:1}).start(),car=engine.cars[0],stadium=TRACK.stadium;
+ // Enter the timed lap through the real standing-start controls; the later
+ // synthetic path isolates stadium checkpoints, not pre-line launch rules.
+ for(let frame=0;frame<600&&!car._started;frame++)engine.step(1/120,new Set(['KeyW']));
+ assert.equal(car._started,true);assert.equal(car.launchResetCount,0);
  const sample=(p,dt=4/330)=>{
   engine.time+=dt;Object.assign(car,{x:p.x,y:p.y,angle:p.angle,elevation:p.elevation});engine._advance(car,dt);
  };
- const from=TRACK.startDistance-30,p=trackPoint(from,car._lane);
- Object.assign(car,{x:p.x,y:p.y,_lastX:p.x,_lastY:p.y,_lastTrackS:p.s});
+ const from=TRACK.startDistance+mod(car._lastTrackS-TRACK.startDistance,TRACK.length);
  for(let s=from+4;s<stadium.loopStart;s+=4)sample(trackPoint(s));
  const a=trackPoint(stadium.loopStart),b=trackPoint(stadium.loopEnd);
  for(let i=0;i<=80;i++)sample({x:a.x+(b.x-a.x)*i/80,y:a.y+(b.y-a.y)*i/80,angle:b.angle,elevation:a.elevation+(b.elevation-a.elevation)*i/80});

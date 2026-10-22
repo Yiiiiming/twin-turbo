@@ -30,7 +30,7 @@ function fixture(initialLanguage) {
 
 test('race, AI controls, both ghost distances and independent standings have complete English text',()=>{
   const strings=[
-    ['1 圈极速竞技','1-lap sprint'],['3 圈','3 laps'],['青色闪电获胜！','Cyan Lightning wins!'],
+    ['幽灵挑战','Ghost Challenge'],['配速幽灵','Pace ghost'],['1 圈极速竞技','1-lap sprint'],['3 圈','3 laps'],['青色闪电获胜！','Cyan Lightning wins!'],
     ['领先紫色幽灵 −0.15 秒','Ahead of Purple ghost −0.15s'],
     ['第 2 圈 · 计时点 03','Lap 2 · Checkpoint 03'],
     ['你驾驶橙色赛车，与 AI 较量。WASD 或方向键均可驾驶。','Drive the Orange car against AI. Use WASD or Arrow keys.'],
@@ -40,9 +40,11 @@ test('race, AI controls, both ghost distances and independent standings have com
   for(const source of [
     '完整 3 圈前五 · 点颜色加入，再点一次取消。已选颜色可替换。',
     '还没有完整 3 圈幽灵上榜。可以直接出发，完赛后保存自己的幽灵。',
-    '最快单圈前五 · 每次成绩独立排名，同一昵称可多次上榜。',
-    '3 圈整场前五 · 每次完赛独立排名，同一昵称可多次上榜。 部分幽灵暂未读取，可重试。',
+    '最快单圈前五 · 每个昵称只展示最快成绩，其他成绩保留在历史记录中。',
+    '3 圈整场前五 · 每个昵称只展示最快成绩，其他成绩保留在历史记录中。 部分幽灵暂未读取，可重试。',
     '整场成绩已保存；最快单圈与幽灵已保存；三圈幽灵暂未确认；重试只补存这一部分，昵称不用重填。',
+    '整场成绩已保存至历史记录，本次未进入排行榜',
+    '昵称、单圈时间和驾驶轨迹会公开。榜单只展示个人最快成绩，其他记录继续保留。',
     '为 P2 的刹车 / 倒车按一个新键；Esc 取消。',
     'Enter 已用于 P1 的氮气，请换一个键。',
   ])assert.doesNotMatch(translateText(source),/[\u3400-\u9fff]/,source);
@@ -119,4 +121,39 @@ test('off-road recovery warnings translate all three countdown values and the re
  for(const seconds of [3,2,1])assert.equal(translateText(`请返回赛道，${seconds} 秒后自动复位`),`Return to the road — automatic recovery in ${seconds}s`);
  assert.equal(translateText('回到路面即可取消倒计时'),'Return to the road to cancel the countdown');
  assert.equal(translateText('离开赛道满 7 秒 · 已自动复位'),'7 seconds off-road · Automatically recovered');
+});
+
+
+test('ghost challenge setup and results translate fully without exposing AI mode internals',()=>{
+  const values = [
+    ['幽灵挑战', 'Ghost Challenge'], ['榜首挑战', 'Leaderboard challenge'], ['自选幽灵', 'Choose ghosts'],
+    ['重新匹配','Match again'],['幽灵挑战对手','Ghost challengers'],['自动匹配','Auto-match'],['正在匹配本图最快的三位车手…','Matching this circuit’s three fastest drivers…'],
+    ['配速幽灵','Pace ghost'],['人类纪录','Player record'],['自由计时','Time trial'],['开始挑战','Start challenge'],
+    ['本场挑战排名','Challenge standings'],['你','You'],['挑战完成','Challenge complete'],['自由计时完成','Time trial complete'],
+    ['目标用时','Target time'],['已匹配 3 位人类幽灵和 3 位配速幽灵。','Matched 3 player ghosts and 3 pace ghosts.'],
+    ['已匹配 1 位人类幽灵和 3 位配速幽灵。','Matched 1 player ghost and 3 pace ghosts.'],
+    ['第 4 名 · 挑战完成','P4 · Challenge complete'],
+  ];
+  for(const [source,expected] of values)assert.equal(translateText(source),expected);
+  for(const source of [
+    '以起终点之间的单圈用时比较幽灵。','以从 GO 开始的整场用时比较幽灵。',
+    '一个昵称，一次保存整场成绩、最快单圈和幽灵。榜单只展示个人最佳，其他成绩保留在历史记录里。',
+    '当前地图还没有可用的人类幽灵，可以先自由计时。',
+    '暂时无法连接幽灵榜，可以重试或自由计时。',
+    '人类幽灵不足三位，已使用当前可用纪录。',
+    '最快的三位不同车手，加上三位配速幽灵。',
+    '配速目标约比最慢的人类幽灵多 1、2、3 秒，不参与排行榜。',
+    '幽灵均不碰撞；你完赛后立即结算。','选择你喜欢的车色。',
+    '镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶，完赛后结算。',
+    '你驾驶青色赛车，与人类纪录和配速幽灵较量。WASD 或方向键均可驾驶。',
+    '你驾驶橙色赛车，与人类纪录和配速幽灵较量。WASD 或方向键均可驾驶。',
+  ])assert.doesNotMatch(translateText(source),/[\u3400-\u9fff]/,source);
+});
+
+test('a rejected launch explains how to restart in English, including a partly saved result', () => {
+  const notice = '这次单圈起步不符合规则，幽灵未保存；请从起跑位向前重新比赛';
+  assert.equal(translateText(notice + '。'), 'This lap did not follow the start rules, so its ghost was not saved. Start a new race driving forward from the grid.');
+  assert.equal(translateText('需重新比赛'), 'Start a new race');
+  assert.doesNotMatch(translateText('整场成绩已保存；' + notice + '。'), /[\u3400-\u9fff]/);
+  assert.doesNotMatch(translateText(notice + '；整场成绩暂未确认；重试只补存这一部分，昵称不用重填。'), /[\u3400-\u9fff]/);
 });

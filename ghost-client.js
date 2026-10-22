@@ -1,4 +1,4 @@
-import { normalizeName } from './leaderboard.js';
+import { normalizeName, leaderboardNameKey } from './leaderboard.js';
 import { RACE_GHOST_VERSION, ghostVersionForCity, isNewGhostCircuit, validateRaceReplay } from './ghost-replay.js';
 
 export const GHOST_VERSION = 'coast-ghost-v1';
@@ -9,7 +9,7 @@ export const GHOST_SLOTS = Object.freeze([
 const CITY = 'coast';
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 const browserFetch = (...args) => globalThis.fetch(...args);
-const nameKey = name => normalizeName(name).normalize('NFKC').toLowerCase();
+const nameKey = leaderboardNameKey;
 const category = (data, version, city) => data?.version === version && data?.city === city;
 const timeLabel = ms => {
   const cs = Math.round(ms / 10);
@@ -277,9 +277,9 @@ export class GhostClient {
   }
   renderPickerBoard(entries) {
     const list = this.node('ghost-picker-list'); if (!list) return;
-    const seen = new Set();
+    const seen = new Set(), names = new Set();
     const clean = (Array.isArray(entries) ? entries : []).filter(entry => this.matchesMode(entry)).sort((a, b) => a.timeMs - b.timeMs)
-      .filter(entry => { const key = entry.id; if (seen.has(key)) return false; seen.add(key); return true; }).slice(0, 5);
+      .filter(entry => { const key = entry.id, name = nameKey(entry.name); if (seen.has(key)) return false; seen.add(key); if (names.has(name)) return false; names.add(name); return true; }).slice(0, 5);
     list.replaceChildren(); this.pickerButtons = [];
     for (const [index, entry] of clean.entries()) {
       const row = this.el('li', 'ghost-picker-row');
@@ -338,9 +338,9 @@ export class GhostClient {
   }
   menu() { this.endRace(); }
   renderBoard(entries) {
-    const seen = new Set();
+    const seen = new Set(), names = new Set();
     const clean = (Array.isArray(entries) ? entries : []).filter(validEntry).sort((a, b) => a.timeMs - b.timeMs)
-      .filter(entry => { if (seen.has(entry.id)) return false; seen.add(entry.id); return true; }).slice(0, 5);
+      .filter(entry => { const name = nameKey(entry.name); if (seen.has(entry.id)) return false; seen.add(entry.id); if (names.has(name)) return false; names.add(name); return true; }).slice(0, 5);
     const list = this.node('lap-list'); list.replaceChildren();
     for (const [index, entry] of clean.entries()) {
       const row = this.el('li', 'leaderboard-row');
@@ -378,7 +378,7 @@ export class GhostClient {
       card.input.value = this.remembered(result.playerId); card.input.required = true; card.input.setAttribute('aria-label', `P${result.playerId} 幽灵昵称`);
       label.appendChild(card.input); form.appendChild(label);
       card.button = this.el('button', 'ghost-button', '保存单圈与幽灵'); card.button.type = 'submit'; form.appendChild(card.button);
-      card.message = this.el('p', 'ghost-help', '昵称、单圈时间和驾驶轨迹会公开。每个昵称只保留最快的一圈。');
+      card.message = this.el('p', 'ghost-help', '昵称、单圈时间和驾驶轨迹会公开。榜单只展示个人最快成绩，其他记录继续保留。');
       card.message.setAttribute('role', 'status'); form.appendChild(card.message);
       card.input.addEventListener('compositionstart', () => { card.composing = true; });
       card.input.addEventListener('compositionend', () => { card.composing = false; card.input.value = normalizeName(card.input.value); });

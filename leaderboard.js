@@ -20,6 +20,9 @@ export function normalizeName(value) {
   return Array.from(value.replace(CONTROL_CHARACTERS, '').trim()).slice(0, 16).join('').trim();
 }
 
+/** Match the score service and ghost search without changing the displayed nickname. */
+export const leaderboardNameKey = value => normalizeName(value).normalize('NFKC').toLocaleLowerCase('en-US');
+
 function humanCompetitor(value) {
   return (value.playerId === 1 || value.playerId === 2)
     && (value.mode === 'local' || value.mode === 'ai')
@@ -48,7 +51,8 @@ function normalizeRecord(value) {
 /**
  * Copy, validate and order records for exactly one city (legacy default: coast).
  * Without laps, return its boards in increasing lap-count order. Equal times retain their
- * existing order. IDs are deduplicated within each city/lap category.
+ * existing order. Each city/lap board shows one fastest result per normalized nickname;
+ * this is a display projection, not deletion of stored attempts.
  */
 export function normalizeEntries(entries, laps, city = 'coast') {
   if (!Array.isArray(entries) || normalizeCity(city) === null
@@ -62,8 +66,11 @@ export function normalizeEntries(entries, laps, city = 'coast') {
     seen.add(identity); records.push(record);
   }
   records.sort((a, b) => a.laps - b.laps || a.timeMs - b.timeMs);
-  const count = new Map();
+  const count = new Map(), names = new Set();
   return records.filter(record => {
+    const name = `${record.laps}:${leaderboardNameKey(record.name)}`;
+    if (names.has(name)) return false;
+    names.add(name);
     const rank = (count.get(record.laps) || 0) + 1;
     count.set(record.laps, rank);
     return rank <= LEADERBOARD_LIMIT;
@@ -73,15 +80,21 @@ export function normalizeEntries(entries, laps, city = 'coast') {
 /** Return a one-based rank only for a finished human result that makes top 5. */
 export function qualifyingRank(entries, result) {
   if (!validScore(result) || result.finished !== true) return null;
-  const board = normalizeEntries(entries, result.laps, normalizeCity(result.city));
+  let board = normalizeEntries(entries, result.laps, normalizeCity(result.city));
+  const name = leaderboardNameKey(result.name);
+  if (name) {
+    const previous = board.find(entry => leaderboardNameKey(entry.name) === name);
+    if (previous && previous.timeMs <= result.timeMs) return null;
+    board = board.filter(entry => leaderboardNameKey(entry.name) !== name);
+  }
   // A new tie follows every existing tie; matching fifth place is not enough.
   const rank = board.filter(entry => entry.timeMs <= result.timeMs).length + 1;
   return rank <= LEADERBOARD_LIMIT ? rank : null;
 }
 
 /**
- * Insert an already verified finished score as a canonical stored record.
- * The service must verify the finish and qualification inside its transaction;
+ * Project an already verified finished score into personal-best leaderboard rows.
+ * The service retains attempt history separately and verifies each submission;
  * this data function cannot establish whether a submitted game really finished.
  * Existing same-ID records win, so retrying one submission never duplicates it.
  */

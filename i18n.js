@@ -1,6 +1,11 @@
 // Chinese remains the authoring language; a DOM adapter also translates dynamic
 // status messages. Player-entered nicknames are kept verbatim.
 const PHRASES = [
+['发车前请向前行驶，已回到起跑位。','Drive forward. Back on the grid.'],
+['这次单圈起步不符合规则，幽灵未保存；请从起跑位向前重新比赛。','This lap did not follow the start rules, so its ghost was not saved. Start a new race driving forward from the grid.'],
+['这次单圈起步不符合规则，幽灵未保存；请从起跑位向前重新比赛','This lap did not follow the start rules, so its ghost was not saved. Start a new race driving forward from the grid'],
+['需重新比赛','Start a new race'],
+['单圈须向前发车，倒退或绕行蓄速会回到起跑位。','One-lap races start forward from the grid. Reversing or circling for a run-up resets your car.'],
 ['单人赛道，镜头跟随你的赛车','Single-player circuit, camera following your car'],['单人完整视野斜后方赛车。自定义按键见下方操作说明。','Full-view single-player chase-camera racing. See the controls below for your custom key bindings.'],
 ['更改地图/模式','Change track / mode'],['泰晤士河岸','Thames Riverside'],['伦敦河岸','London Riverside'],
 ['北京古都','Imperial Beijing'],['奥斯汀河谷','Austin River Valley'],['里约海岸','Rio Coast'],['巴黎塞纳河','Paris Seine'],['上海云环','Shanghai Skyline Spiral'],['上海天际线','Shanghai Skyline'],
@@ -12,6 +17,7 @@ const PHRASES = [
 ['无法启用 3D 画面。请开启浏览器硬件加速，再刷新页面。','3D graphics are unavailable. Enable hardware acceleration in your browser, then refresh.'],['请使用支持 WebGL 的桌面浏览器。','Please use a desktop browser with WebGL support.'],
 ['稍作停留。','Take a breather.'],['准备好后，继续你们的对决。','Ready when you are.'],['成绩已保留，等待对手完赛','Your result is kept while the other driver finishes.'],
 ['直道加速，弯道松油','Accelerate on straights. Ease off in corners.'],['斜后方跟车 · 弯前注意减速','Chase camera · Brake before the turn'],['连接键盘或使用电脑，即可开始双人对战。','Use a computer or connect a keyboard to race.'],
+['幽灵挑战','Ghost Challenge'],['单人幽灵挑战','Solo Ghost Challenge'],['配速幽灵','Pace ghost'],
 ['一个昵称，一次保存整场成绩、最快单圈和幽灵。开赛时可选择两个幽灵，也能从榜上发起挑战。','One nickname, one save for your race, best lap and ghosts. Choose up to two opponents before the start.'],
 ['留下这场较量','Keep this race'],['每位车手只需保存一次。','One save per driver.'],['本地对战 · 在线全站榜 · 无需账号','Local racing · Shared leaderboards · No account needed'],
 ['发车前，选好对手。','Choose your challengers.'],['可以直接出发，也可以带上两位幽灵一起跑。','Race on your own or bring two ghosts along.'],['这次想挑战哪两位？','Which two will you challenge?'],['点榜单上的颜色加入，最多两个，不会碰撞。','Choose a color on the leaderboard. Up to two ghosts, with no collisions.'],['打开后读取可挑战的记录。','Available challengers load here.'],
@@ -28,7 +34,7 @@ const PHRASES = [
 ['连接超时，请重试。','Connection timed out. Please retry.'],['这份幽灵已不存在，请重新查找。','This ghost is no longer available. Search again.'],['暂时无法连接记录服务，请稍后重试。','Records are temporarily unavailable. Please retry.'],['记录版本已变化，请刷新游戏后重试。','The record version changed. Please refresh the game.'],['暂时无法连接记录服务，请联网后重试。','Could not connect to records. Check your connection and retry.'],['暂时无法连接记录服务。','Could not connect to records.'],['先输入昵称，最多 16 个字符。','Enter a nickname, up to 16 characters.'],['请输入昵称，最多 16 个字符。','Enter a nickname, up to 16 characters.'],['请先查找并选择一份幽灵。','Search for and choose a ghost first.'],['这份幽灵数据不完整，请重新查找。','This ghost is incomplete. Please search again.'],
 ['本场只显示完整 3 圈幽灵，计时从发车到完赛。','Only full three-lap ghosts appear here, timed from GO to the finish.'],['本场只显示单圈幽灵，挑战一圈极限。','Only single-lap ghosts appear here. Make every corner count.'],['可以按昵称查找，或直接出发。','Search a nickname or start without ghosts.'],['本场未载入幽灵。回到发车准备后可以选择。','No ghosts loaded. Choose them in race setup.'],['选择一个颜色，查找想挑战的幽灵；也可以直接发车。','Choose a color and find a ghost, or start without one.'],['游戏仍可正常进行。','You can still race.'],
 ['幽灵记录版本不匹配。','Ghost record version mismatch.'],['榜单版本或类别不匹配。','Leaderboard version or category mismatch.'],['还没有成绩，完成比赛或有效单圈后保存，留下第一条记录。','No records yet. Finish a race or a valid lap, then save your time.'],['按最快单圈排名；整场成绩可切换 1 圈或 3 圈查看。','Fastest individual laps. Switch to 1 or 3 laps for race standings.'],
-['一个昵称，一次保存。符合条件的总成绩、最快单圈与幽灵将一起记录。','One nickname, one save. Your eligible race time, best lap and ghosts are saved together.'],['未确认总成绩。','Race result was not confirmed.'],['未确认单圈成绩。','Lap result was not confirmed.'],['正在保存成绩与幽灵…','Saving your results and ghosts…'],['整场成绩已保存','Race result saved'],['整场成绩未进前五','Race result is outside the top five'],['最快单圈与幽灵已保存','Lap result and ghost saved'],['三圈整场幽灵已保存','Full three-lap ghost saved'],['暂未确认；重试只补存这一部分，昵称不用重填',' not confirmed. Retry only saves the missing part; no need to re-enter your name'],
+['一个昵称，一次保存。符合条件的总成绩、最快单圈与幽灵将一起记录。','One nickname, one save. Your eligible race time, best lap and ghosts are saved together.'],['未确认总成绩。','Race result was not confirmed.'],['未确认单圈成绩。','Lap result was not confirmed.'],['正在保存成绩与幽灵…','Saving your results and ghosts…'],['整场成绩已保存','Race result saved'],['整场成绩已保存至历史记录，本次未进入排行榜','Race result saved to history; this attempt is outside the leaderboard'],['整场成绩未进前五','Race result is outside the top five'],['最快单圈与幽灵已保存','Lap result and ghost saved'],['三圈整场幽灵已保存','Full three-lap ghost saved'],['暂未确认；重试只补存这一部分，昵称不用重填',' not confirmed. Retry only saves the missing part; no need to re-enter your name'],
 ['整场用时榜','Race leaderboard'],['最快单圈榜','Fastest lap leaderboard'],['整场成绩榜','Race leaderboard'],['成绩时间','Time'],['全站最快五名','Global top five'],['全站速度榜','Global leaderboard'],['个人最快单圈','Personal best lap'],['最快有效单圈','Best valid lap'],['幽灵未进入当前地图与圈数的个人前 20，成绩保存不受影响','Ghost outside your best 20 for this circuit and distance; score saving is unaffected'],['新地图 · 完整 3 圈幽灵榜','New circuit · Three-lap ghosts'],['新地图 · 最快单圈幽灵榜','New circuit · Single-lap ghosts'],['完整 3 圈幽灵榜','Three-lap ghost leaderboard'],['最快单圈幽灵榜','Single-lap ghost leaderboard'],['完整 3 圈幽灵','Full three-lap ghost'],['三圈幽灵','Three-lap ghost'],['单圈幽灵','Single-lap ghost'],['最快单圈','Fastest lap'],['整场用时','Race time'],['完赛用时','Finish time'],['成绩与幽灵','Results & ghosts'],['保存成绩与幽灵','Save results & ghosts'],['保存我的成绩','Save my results'],['重试未保存部分','Retry unsaved results'],['搜索自己的幽灵','Search your ghost'],['输入自己或对手的完整昵称','Enter your or an opponent’s full nickname'],['选择幽灵记录','Choose a ghost record'],
 ['海岸技术环线','Harbor Technical'],['海岸港湾','Sunset Harbor'],['松林山谷','Pine Valley'],['霓虹城区','Neon District'],['青色闪电','Cyan Lightning'],['橙色风暴','Orange Storm'],['青色车手','Cyan driver'],['橙色车手','Orange driver'],['双人分屏','Split-screen'],['分屏竞速','SPLIT-SCREEN RACING'],['一决高下','Settle it on the track'],['本地双人','Local two-player'],['单人挑战 AI','Solo vs AI'],['标准大奖赛','Grand Prix'],['极速竞技','Sprint'],['我的赛车','My car'],['开始比赛','Start race'],['成绩榜','Leaderboards'],['自定义按键','Key bindings'],['调整键位','Key bindings'],['退出全屏','Exit fullscreen'],['返回发车区','Back to the grid'],['返回菜单','Back to menu'],['返回主菜单','Back to main menu'],['继续比赛','Resume race'],['再来一局','Race again'],['确认发车','Start the race'],['不带幽灵，直接出发','Start without ghosts'],['带幽灵出发','Race with ghosts'],['重试榜单','Retry leaderboard'],['重新连接','Reconnect'],['准备好了','Ready'],['玩家一','Player one'],['玩家二','Player two'],['恢复默认按键','Restore defaults'],['等待发车','On the grid'],['准备出发','Get ready'],['比赛进行中','Racing'],['比赛已暂停','Paused'],['比赛结束','Race finished'],['等待另一位完赛','Waiting for the other driver'],['返回赛道 · 罚停中','Recovering · penalty'],['返回赛道 · 罚停 2 秒','Recovered · 2-second penalty'],['碰撞 · 减速','Impact · slowing down'],['草地减速','Off-road slowdown'],['全油门出发','FULL THROTTLE'],['逆向行驶','Wrong way'],['直道 · 氮气时机','Straight · use nitro'],['前方右弯 · 松油减速','Right turn · ease off'],['前方左弯 · 松油减速','Left turn · ease off'],['窄拱门 · 居中减速通过','Narrow passage · slow down'],
 ['关闭声音','Mute sound'],['开启声音','Enable sound'],['声音关','Sound off'],['声音开','Sound on'],['全屏','Fullscreen'],['怎么玩','How to play'],['暂停','Pause'],['继续','Resume'],['重开','Restart'],['加速','Accelerate'],['刹车 / 倒车','Brake / reverse'],['向左转','Turn left'],['向右转','Turn right'],['向左','Left'],['向右','Right'],['回到赛道','Recover'],['返回赛道','Recover'],['转向','Steer'],['氮气','Nitro'],['复位','Recover'],['驾驶','Drive'],['左 Shift','Left Shift'],['右 Shift','Right Shift'],['小键盘','Numpad'],['方向键','Arrow keys'],['斜杠','Slash'],
@@ -42,7 +48,7 @@ PHRASES.push(
 ['输入完整昵称，也能查找榜外车手','Enter a full nickname, including drivers outside the top five'],
 ['本场只显示当前赛道完整 3 圈幽灵，计时从发车到完赛。','Full three-lap ghosts for this circuit, timed from GO to the finish.'],
 ['本场只显示当前赛道的单圈幽灵，挑战一圈极限。','Single-lap ghosts for this circuit. Set your fastest lap.'],
-['最快单圈前五 · 每次成绩独立排名，同一昵称可多次上榜。','The five fastest laps. Each saved attempt ranks separately; one driver can hold several places.'],
+['最快单圈前五 · 每个昵称只展示最快成绩，其他成绩保留在历史记录中。','The five fastest personal-best laps. Only the fastest result per nickname appears; other attempts stay in history.'],
 ['部分幽灵暂未读取，可重试。','Some ghosts could not be loaded. Please retry.'],
 ['暂时无法读取全站速度榜，游戏可照常进行。','The leaderboard is unavailable. You can still race.'],
 ['未确认幽灵成绩。','The ghost result was not confirmed.'],['未确认保存结果。','The save was not confirmed.'],
@@ -51,7 +57,7 @@ PHRASES.push(
 ['已保存','Saved'],['已保留更快纪录','Faster record kept'],['重试保存','Retry save'],['保存单圈与幽灵','Save lap & ghost'],
 ['单圈榜还空着，完成一圈并保存，就能留下第一条记录。','No lap records yet. Complete and save a lap to set the first time.'],
 ['本局最快有效单圈 · 保存后可按昵称找到幽灵','Your best valid lap this race · Save it to find the ghost by nickname'],
-['昵称、单圈时间和驾驶轨迹会公开。每个昵称只保留最快的一圈。','Your nickname, lap time and replay will be public. Only your fastest lap is kept.'],
+['昵称、单圈时间和驾驶轨迹会公开。榜单只展示个人最快成绩，其他记录继续保留。','Your nickname, lap time and replay will be public. The leaderboard shows personal bests; other records stay saved.'],
 ['海港 · 全站最快单圈前五，每个昵称保留最好成绩。','Harbor · The five fastest personal bests.'],
 ['全屏游戏','Fullscreen game'],['Twin Turbo 首页','Twin Turbo home'],['本局单圈时间','Current race lap times'],
 ['比赛状态','Race status'],['已完成圈数','Completed laps'],['暂停比赛','Pause race'],['重新开始比赛','Restart race'],
@@ -72,6 +78,34 @@ PHRASES.push(
 ['单圈用时','Lap time'],['全站前五名','Global top five'],
 ['对战 AI',' vs AI'],
 );
+PHRASES.push(
+["完赛成绩", "Race results"],
+["重新匹配", "Match again"],
+["幽灵挑战对手", "Ghost challengers"],
+["以起终点之间的单圈用时比较幽灵。", "Compare ghosts using your lap time between timing-line crossings."],
+["以从 GO 开始的整场用时比较幽灵。", "Compare ghosts using your full race time from GO."],
+["一个昵称，一次保存整场成绩、最快单圈和幽灵。榜单只展示个人最佳，其他成绩保留在历史记录里。", "One nickname saves your race result, fastest lap and ghosts together. Leaderboards show personal bests; other results stay in history."],
+["榜首挑战", "Leaderboard challenge"],
+["自选幽灵", "Choose ghosts"],
+["自动匹配", "Auto-match"],
+["正在匹配本图最快的三位车手…", "Matching this circuit’s three fastest drivers…"],
+["人类纪录", "Player record"],
+["当前地图还没有可用的人类幽灵，可以先自由计时。", "This circuit has no player ghosts yet. You can start a time trial."],
+["暂时无法连接幽灵榜，可以重试或自由计时。", "The ghost leaderboard is unavailable. Retry or start a time trial."],
+["人类幽灵不足三位，已使用当前可用纪录。", "Fewer than three player ghosts are available. Using the available records."],
+["最快的三位不同车手，加上三位配速幽灵。", "The three fastest distinct drivers, plus three pace ghosts."],
+["配速目标约比最慢的人类幽灵多 1、2、3 秒，不参与排行榜。", "Pace targets are about 1, 2 and 3 seconds slower than the slowest player ghost. They do not enter leaderboards."],
+["自由计时", "Time trial"],
+["开始挑战", "Start challenge"],
+["本场挑战排名", "Challenge standings"],
+["你", "You"],
+["挑战完成", "Challenge complete"],
+["自由计时完成", "Time trial complete"],
+["目标用时", "Target time"],
+["幽灵均不碰撞；你完赛后立即结算。", "Ghosts have no collisions. Results appear as soon as you finish."],
+["选择你喜欢的车色。", "Choose your favorite car color."],
+["镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶，完赛后结算。", "The full view follows your car as you challenge this circuit’s fastest player ghosts and three pace ghosts. Use either keyboard layout; results appear when you finish."]
+);
 PHRASES.push(['回到路面即可取消倒计时','Return to the road to cancel the countdown'],['离开赛道满 7 秒 · 已自动复位','7 seconds off-road · Automatically recovered']);
 const exact = new Map(PHRASES);
 const pieces = [...exact].sort((a,b)=>b[0].length-a[0].length);
@@ -83,6 +117,9 @@ export function translateText(value, language='en') {
   // Quoted button labels are UI, while every other quoted value is a nickname.
   let out=text.replace(/点击「((?:加入|替换)(?:紫色|金色)幽灵)」确认/g,(_,action)=>`Click “${exact.get(action)}” to confirm`);
   out=out.replace(/「([^」]+)」/g,(_,name)=>`\uE000${names.push(name)-1}\uE001`);
+  out=out.replace(/已匹配 (\d+) 位人类幽灵和 (\d+) 位配速幽灵。/g,(_,humans,paces)=>`Matched ${humans} player ghost${humans==='1'?'':'s'} and ${paces} pace ghost${paces==='1'?'':'s'}.`)
+    .replace(/第 (\d+) 名 · 挑战完成/g,'P$1 · Challenge complete')
+    .replace(/你驾驶(青色|橙色)赛车，与人类纪录和配速幽灵较量。WASD 或方向键均可驾驶。/g,(_,color)=>`Drive the ${color==='青色'?'Cyan':'Orange'} car against player records and pace ghosts. Use WASD or Arrow keys.`);
   out=out.replace(/第 (\d+) 圈完成/g,'Lap $1 complete').replace(/第 (\d+) 圈/g,'Lap $1').replace(/第 (\d+) 名 · 已完赛/g,'P$1 · Finished')
     .replace(/两位车手均已完成 (\d+) 圈/g,'Both drivers completed $1 laps').replace(/(.+)获胜！/g,'$1 wins!')
     .replace(/(领先|落后)(.+?) ([+−][\d.]+) 秒/g,(_,direction,target,gap)=>`${direction==='领先'?'Ahead of':'Behind'} ${target} ${gap}s`)
@@ -118,7 +155,7 @@ export function translateText(value, language='en') {
     .replace(/已保留更快的单圈与幽灵 ([\d:.]+)/g,'Faster lap and ghost retained: $1')
     .replace(/已保留更快的三圈幽灵 ([\d:.]+)/g,'Faster three-lap ghost retained: $1')
     .replace(/(\d+) 圈 · 按整场完赛时间排名；单圈为该昵称的个人最好成绩。/g,'$1 laps · Ranked by total race time. ')
-    .replace(/(\d+) 圈整场前五 · 每次完赛独立排名，同一昵称可多次上榜。/g,(_,laps)=>`The five fastest ${laps}-lap races. Each finish ranks separately; one driver can hold several places.`)
+    .replace(/(\d+) 圈整场前五 · 每个昵称只展示最快成绩，其他成绩保留在历史记录中。/g,(_,laps)=>`The five fastest ${laps}-lap personal bests. Only the fastest result per nickname appears; other attempts stay in history.`)
     .replace(/海港 (\d+) 圈整场前五/g,'Harbor’s five fastest $1-lap races')
     .replace(/(.+)的单圈与幽灵已保存，下次开赛前搜索这个昵称即可。/g,'$1’s lap and ghost are saved. Search this nickname before your next race.')
     .replace(/(.+)已有更快纪录 ([\d:.]+)，继续保留原来的幽灵。/g,'$1 already has a faster time of $2. The existing ghost is kept.')
