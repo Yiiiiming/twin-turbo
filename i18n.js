@@ -96,6 +96,8 @@ PHRASES.push(
 ["最快的三位不同车手，加上三位配速幽灵。", "The three fastest distinct drivers, plus three pace ghosts."],
 ["配速目标约比最慢的人类幽灵多 1、2、3 秒，不参与排行榜。", "Pace targets are about 1, 2 and 3 seconds slower than the slowest player ghost. They do not enter leaderboards."],
 ["自由计时", "Time trial"],
+["不带幽灵", "No ghosts"],
+["实时名次", "POSITION"],
 ["开始挑战", "Start challenge"],
 ["本场挑战排名", "Challenge standings"],
 ["你", "You"],

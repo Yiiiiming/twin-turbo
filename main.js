@@ -6,13 +6,14 @@ import { GhostRecorder, sampleReplay } from './ghost-replay.js';
 import { RaceEngine, TRACK, TRACKS, trackPoint, projectTrack, mod, OFFROAD_GRACE_SECONDS } from './engine.js';
 import { RaceRenderer, sceneWeights } from './renderer.js';
 import { loadGhostChallenge } from './ghost-challenge.js';
+import { ghostProgressTimeline, liveGhostPosition, carNitroAnchor } from './race-hud.js';
 import { UnifiedRecordsClient } from './unified-records.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
 const hud = $('hud');
 const ctx = hud.getContext('2d');
-const engine = new RaceEngine();
+const engine = new RaceEngine({laps:1});
 let renderer;
 const keys = new Set();
 let controlStorage; try { controlStorage = window.localStorage; } catch {}
@@ -23,11 +24,11 @@ let bindingCapture = null;
 const leaderboard = new UnifiedRecordsClient({ document, onSaved: () => {
   if (engine.state === 'finished') returnToMenu();
 }, onChallenge: async entry => {
-  if (ghostClient.locked) return;
+  if (ghostClient.locked || entry.kind === 'race' || entry.laps === 3) return;
   if (engine.state === 'finished') returnToMenu();
   if (!['menu','finished'].includes(engine.state)) return;
   if (entry.city && entry.city !== TRACK.id) selectCircuit(entry.city);
-  selectLaps(entry.kind === 'race' ? 3 : 1);
+  selectLaps();
   openRaceSetup();
   chooseManualGhosts();
   await ghostClient.challenge(entry);
@@ -42,6 +43,7 @@ const splitTiming = new SplitTiming();
 let activeGhosts = [];
 let challengeSetup = null, challengeRequest = 0, challengeAbort = null, manualGhosts = false;
 let challengeRows = [];
+let ghostTimelines = [];
 function cancelChallengeLoad() {
   challengeRequest++; challengeAbort?.abort(); challengeAbort = null;
 }
@@ -59,14 +61,13 @@ function renderChallengeRoster() {
 }
 function updateSetupMode() {
   const auto = selectedMode === 'ai' && !manualGhosts;
-  $('setup-start-rule').hidden = selectedLaps !== 1;
   $('challenge-setup').hidden = !auto;
   $('manual-ghost-setup').hidden = auto;
   $('setup-auto').hidden = selectedMode !== 'ai' || auto;
   $('setup-manual').hidden = !auto;
   $('setup-launch').disabled = auto && Boolean(challengeSetup?.loading);
-  $('setup-launch').textContent = i18n.t(auto && challengeSetup?.ghosts?.length ? '开始挑战' : auto ? '自由计时' : '确认发车');
-  $('setup-skip').textContent = i18n.t(selectedMode === 'ai' ? '自由计时' : '不带幽灵，直接出发');
+  $('setup-launch').textContent = i18n.t(auto && challengeSetup?.ghosts?.length ? '开始挑战' : '确认发车');
+  $('setup-skip').textContent = i18n.t('不带幽灵');
 }
 async function matchChallenge() {
   cancelChallengeLoad(); const request = challengeRequest, city = TRACK.id, laps = selectedLaps;
@@ -107,7 +108,7 @@ function renderChallengeResults(car) {
   const timeMs = Math.round((engine.laps===3 ? car.finishTime : car.lastLap)*1000);
   const rows = activeGhosts.map((ghost,index)=>({name:challengeLabel(ghost),timeMs:ghost.entry.timeMs,color:ghost.color,order:index,human:false}));
   rows.push({name:i18n.t('你'),timeMs,color:colors[0],order:rows.length,human:true});
-  rows.sort((a,b)=>a.timeMs-b.timeMs||a.order-b.order);
+  rows.sort((a,b)=>a.timeMs-b.timeMs||Number(b.human)-Number(a.human)||a.order-b.order);
   const place = rows.findIndex(row=>row.human)+1;
   $('winner-name').textContent = i18n.t(activeGhosts.length ? `第 ${place} 名 · 挑战完成` : '自由计时完成');
   $('winner-name').style.color=colors[0];
@@ -124,7 +125,8 @@ void ghostClient.init();
 
 const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
-let selectedLaps = 1, selectedMode = 'ai', raceMode = 'local', lastRescueCounts = [0, 0];
+const selectedLaps = 1;
+let selectedMode = 'ai', raceMode = 'local', lastRescueCounts = [0, 0];
 let selectedColor = 'cyan';
 let lastTime = performance.now(), lastState = '', lastCount = 0;
 let goUntil = 0, soundEnabled = false, audio = null, audioNodes = [];
@@ -164,7 +166,7 @@ function drawMiniMap(c, x, y, playerId) {
     if(ghost.replay.kind!=='race'&&!player._started)continue;
     const elapsed=(ghost.replay.kind==='race'?engine.time:player.lapTime)*1000;
     if(raceMode==='ai'&&elapsed>ghost.replay.durationMs)continue;
-    const pose=sampleReplay(ghost.replay,elapsed);if(!Number.isFinite(pose.x))continue;
+    const pose=sampleReplay(ghost.replay,elapsed);if(!Number.isFinite(pose?.x))continue;
     c.beginPath();c.arc(pose.x,pose.y,25*cityScale,0,tau);c.fillStyle=ghost.color;c.fill();
   }
   for (const car of engine.cars) {
@@ -181,6 +183,24 @@ function drawHUD(now) {
   for (const [i, car] of engine.cars.slice(0,solo?1:2).entries()) {
     const x = i * 600, center=x+viewWidth/2;
     drawMiniMap(ctx, x + viewWidth - 182, 577, car.id);
+    if (['countdown','racing','paused'].includes(engine.state) && !car.finished) {
+      // Use the actual smoothed camera and its physical aspect ratio, then map
+      // the resulting screen point into this HUD's virtual coordinates.
+      const pixelsWide=solo?canvas.width:i?canvas.width-Math.floor(canvas.width/2):Math.floor(canvas.width/2), pixelsHigh=canvas.height;
+      const anchor=carNitroAnchor(renderer.cameras?.[i],car,pixelsWide,pixelsHigh);
+      if(anchor){
+        const nx=x+anchor.x/pixelsWide*viewWidth, ny=anchor.y/pixelsHigh*700;
+        ctx.save();ctx.translate(nx,ny);
+        const meterScale=Math.min(1.5,Math.max(1,1200/canvas.clientWidth));ctx.scale(meterScale,meterScale);
+        rounded(ctx,-51,-18,102,30,9,'#0b1926df');
+        ctx.font='bold 9px sans-serif';ctx.textAlign='left';ctx.fillStyle=car.boosting?'#c6f56b':'#d4e2e8';
+        ctx.fillText(car.boosting?'NITRO ↑':'NITRO',-42,-6);
+        ctx.textAlign='right';ctx.fillText(`${Math.round(car.boost)}%`,42,-6);
+        rounded(ctx,-42,0,84,4,2,'#ffffff26');
+        if(car.boost>0)rounded(ctx,-42,0,84*Math.max(0,Math.min(car.boost,100))/100,4,2,car.boosting?'#c6f56b':colors[i]);
+        ctx.restore();
+      }
+    }
     if (notices[i] && toastTime < noticeUntil[i] && engine.state === 'racing') {
       rounded(ctx, center - 137, 120, 274, 38, 7, '#10222ddd');
       ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = colors[i];
@@ -342,7 +362,8 @@ function updateSplitUI(car) {
 }
 function updateUI(now) {
   $('timer').textContent=fmt(engine.time);
-  $('challenge-live').hidden = raceMode !== 'ai' || !activeGhosts.length || !['racing','paused'].includes(engine.state);
+  $('challenge-live').hidden = raceMode !== 'ai' || !activeGhosts.length || !['racing','paused'].includes(engine.state) || engine.time>=3;
+  $('challenge-live').classList.toggle('roster-fading',engine.time>=2.5);
   if(raceMode==='ai' && engine.cars[0])challengeRows.forEach((row,index)=>row.classList.toggle('ghost-finished',challengeElapsed(engine.cars[0])>=activeGhosts[index].entry.timeMs));
   const statuses={menu:'等待发车',countdown:'准备出发',racing:'比赛进行中',paused:'比赛已暂停',finished:'比赛结束'};
   const finishers = engine.cars.filter(car => car.finished).sort((a, b) => a.finishTime - b.finishTime
@@ -356,6 +377,19 @@ function updateUI(now) {
     $('personal-best'+car.id).textContent = car.bestLap === null ? '—' : fmt(car.bestLap);
     $('boost'+car.id).style.width=car.boost+'%';$('boost-label'+car.id).textContent=Math.round(car.boost)+'%';
     $('speed'+car.id).textContent=Math.round(Math.abs(car.speed)*(TRACK.unitsPerMeter ? 3.6/TRACK.unitsPerMeter : .66));
+    const speed=Math.abs(car.speed)*(TRACK.unitsPerMeter ? 3.6/TRACK.unitsPerMeter : .66);
+    const gaugeFraction=Math.max(0,Math.min(speed/420,1));
+    $('speed-fill'+car.id).style.strokeDashoffset=String(100-gaugeFraction*100);
+    $('speed-needle'+car.id).style.transform=`rotate(${-130+gaugeFraction*260}deg)`;
+    $('speed-gauge'+car.id).classList.toggle('is-boosting',car.boosting);
+    $('speed-mode'+car.id).textContent=car.boosting?'BOOST':car.speed<-.5?'REVERSE':'KM/H';
+    const position=raceMode==='ai'?liveGhostPosition(car,ghostTimelines):{
+      place:1+engine.cars.filter(other=>other!==car&&(other.finished?(!car.finished||other.finishTime<car.finishTime):!car.finished&&other.progress>car.progress+.00001)).length,
+      total:engine.cars.length
+    };
+    $('race-position'+car.id).hidden=!['countdown','racing','paused'].includes(engine.state);
+    $('position-place'+car.id).textContent=position.place;
+    $('position-total'+car.id).textContent=`/ ${position.total}`;
     const warning=engine.state==='racing'&&!car.finished&&car.offroad&&car.offroadTime>=OFFROAD_GRACE_SECONDS-3-1e-8;
     const seconds=Math.max(1,Math.ceil(OFFROAD_GRACE_SECONDS-car.offroadTime-1e-8));
     const warningText=`请返回赛道，${seconds} 秒后自动复位`;
@@ -421,10 +455,11 @@ function begin(skipGhosts = false) {
   leaderboard.newRace(); leaderboard.setRaceActive(true);
   const manualSelections = ghostClient.startRace();
   activeGhosts = skipGhosts ? [] : opponents || manualSelections;
+  ghostTimelines=activeGhosts.map(ghost=>ghostProgressTimeline(ghost.replay));
   ghostRecorder.reset(); splitTiming.reset(activeGhosts);
-  $('ghost-race-label').textContent = selectedMode==='ai' ? i18n.t(activeGhosts.length?'幽灵挑战':'自由计时')
+  $('ghost-race-label').textContent = selectedMode==='ai' ? i18n.t(activeGhosts.length?'幽灵挑战':'不带幽灵')
     : activeGhosts.map(ghost=>`${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」 · ${fmt(ghost.entry.timeMs/1000)}`).join('  /  ');
-  raceMode=selectedMode; if(engine.cars.length!==(raceMode==='ai'?1:2))engine.setPlayerCount(raceMode==='ai'?1:2); renderer.setSinglePlayer(raceMode==='ai'); engine.start(selectedLaps); applyPlayerColors(); lastRescueCounts=[0,0];
+  raceMode=selectedMode; if(engine.cars.length!==(raceMode==='ai'?1:2))engine.setPlayerCount(raceMode==='ai'?1:2); renderer.setSinglePlayer(raceMode==='ai'); engine.start(1); applyPlayerColors(); lastRescueCounts=[0,0];
   buildChallengeRacePanel();
   keys.clear(); lastLaps=[0,0]; lastLaunchResetCounts=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine); goUntil=0;
   canvas.focus({preventScroll:true}); if(soundEnabled){initAudio();audio?.resume();}
@@ -493,8 +528,7 @@ $('setup-menu').addEventListener('click',()=>{
 });
 $('back-menu').addEventListener('click',returnToMenu);
 $('pause-menu').addEventListener('click',returnToMenu);
-function selectLaps(laps) {
-  selectedLaps = laps === 1 ? 1 : 3;
+function selectLaps() {
   ghostClient.setLaps(selectedLaps);
   document.querySelectorAll('[data-laps]').forEach(button=>{const active=Number(button.dataset.laps)===selectedLaps;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   document.querySelectorAll('.total-laps').forEach(el=>el.textContent=selectedLaps);
@@ -512,6 +546,7 @@ function applyPlayerColors() {
     $('player'+id+'-name').textContent=names[id-1]; $('control-player'+id+'-name').textContent=names[id-1];
     $('help-player'+id+'-name').textContent=`0${id} ${names[id-1]}`;
     $('finisher'+id).style.setProperty('--accent',colors[id-1]);
+    $('race-position'+id).style.setProperty('--accent',colors[id-1]);
   }
   document.querySelectorAll('[data-help-player]').forEach(node=>node.style.setProperty('--accent',colors[Number(node.dataset.helpPlayer)-1]));
   document.querySelectorAll('.speed-readout').forEach((node,i)=>node.style.setProperty('--accent',colors[i]));

@@ -157,3 +157,55 @@ test('every circuit places and restores both cars abreast in their original lane
     }
   } finally { setTrack('coast'); }
 });
+
+test('solo starts at the road center on every map for either color without moving the timing line or local grid', () => {
+  try {
+    for (const track of Object.values(TRACKS)) {
+      setTrack(track.id);
+      const originalGrid = structuredClone(track.startGrid);
+      const starts=[];
+      for (const colorIndex of [0,1]) {
+        const engine=new RaceEngine({laps:1,playerCount:1}).start(1),car=engine.cars[0];
+        car.colorIndex=colorIndex;
+        const expected=trackPoint(track.startDistance+(track.startGrid[0]?.offset??-30),0);
+        assert.equal(car._lane,0);assert.equal(car._started,false);assert.equal(car.lap,0);
+        near(car._gridS,track.startDistance-30);near(car.x,expected.x);near(car.y,expected.y);
+        near(car.angle,expected.angle);near(car.elevation,expected.elevation);
+        engine.step(.1,new Set(['KeyW','ShiftLeft']));
+        near(car.x,expected.x);near(car.y,expected.y);near(car.speed,0);near(engine.time,0);
+        for(let tick=0;tick<29;tick++)engine.step(.1);
+        for(let tick=0;tick<240&&!car._started;tick++)engine.step(1/120,new Set(['KeyW','ShiftLeft']));
+        assert.equal(car._started,true,track.id);assert.equal(car.launchResetCount,0);
+        starts.push({x:car.x,y:car.y,speed:car.speed,boost:car.boost,time:car._lapStartTime});
+        near(car.lapTime,engine.time-car._lapStartTime);
+      }
+      assert.deepEqual(starts[0],starts[1],`${track.id}: cosmetic car color cannot alter the launch`);
+      assert.deepEqual(track.startGrid,originalGrid,'centering must never mutate route metadata');
+      const local=new RaceEngine({playerCount:2});
+      assert.deepEqual(local.cars.map(car=>car._lane),[-18,22]);
+      assert.deepEqual(local.cars.map(car=>car._gridS),[track.startDistance-30,track.startDistance-30]);
+    }
+  } finally {setTrack('coast');}
+});
+
+test('solo launch resets, pre-line rescue and map/mode changes keep the centered position and elapsed GO clock', () => {
+  try {
+    for(const track of Object.values(TRACKS)) {
+      setTrack(track.id);
+      const engine=new RaceEngine({laps:1,playerCount:1}).start(1);
+      for(let tick=0;tick<30;tick++)engine.step(.1);
+      const car=engine.cars[0],grid=trackPoint(car._gridS,0);
+      for(let tick=0;tick<240&&!car.launchResetCount;tick++)engine.step(1/120,new Set(['KeyS']));
+      assert.equal(car.launchResetCount,1);assert.equal(car._started,false);assert.equal(car._lane,0);
+      near(car.x,grid.x);near(car.y,grid.y);near(car.speed,0);
+      const elapsed=engine.time;assert.ok(elapsed>0);
+      car.x+=300;car.y+=300;engine.rescue(car.id);
+      near(car.x,grid.x);near(car.y,grid.y);near(engine.time,elapsed);
+      assert.equal(car.rescueCooldown,2);assert.equal(car._lane,0);
+      engine.reset();engine.setPlayerCount(2);assert.deepEqual(engine.cars.map(value=>value._lane),[-18,22]);
+      engine.setPlayerCount(1);assert.equal(engine.cars[0]._lane,0);
+      engine.selectTrack(track.id);assert.equal(engine.cars[0]._lane,0);
+      near(engine.cars[0].x,grid.x);near(engine.cars[0].y,grid.y);
+    }
+  } finally {setTrack('coast');}
+});

@@ -164,9 +164,11 @@ export function projectTrack(x, y, referenceS = null, referenceElevation = null)
     offset: -(x - p.x) * Math.sin(p.angle) + (y - p.y) * Math.cos(p.angle) };
 }
 
-function createCar(id) {
+function createCar(id, solo = false) {
   const grid = TRACK.startGrid?.[id - 1];
-  const lane = grid?.lane ?? (id === 1 ? -18 : 22);
+  // Solo colors share one centered starting position. Keep the existing grid
+  // distance and both local-player lanes so timing and paired starts stay put.
+  const lane = solo ? 0 : grid?.lane ?? (id === 1 ? -18 : 22);
   const gridS = TRACK.startDistance + (grid?.offset ?? -30);
   const p = trackPoint(gridS, lane);
   return {
@@ -219,7 +221,7 @@ export class RaceEngine {
   }
 
   reset() {
-    this.cars = Array.from({ length: this.playerCount }, (_, index) => createCar(index + 1));
+    this.cars = Array.from({ length: this.playerCount }, (_, index) => createCar(index + 1, this.playerCount === 1));
     this.state = 'menu';
     this.countdown = 3;
     this.time = 0;

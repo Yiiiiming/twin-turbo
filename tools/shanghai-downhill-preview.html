@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>上海下坡 · 地标巡览</title>
+<style>body{margin:0;background:#14252c;color:#e8eee6;font:14px system-ui}header{display:flex;flex-wrap:wrap;gap:10px;padding:13px 16px;align-items:center}select,button,input{font:inherit;padding:8px;background:#253e49;color:#e8eee6;border:1px solid #647c80;border-radius:6px}button[aria-pressed=true]{background:#c6f56b;color:#14252c;border-color:#c6f56b}#status{padding:0 16px 12px;color:#b7d4bb;line-height:1.5;min-height:21px}canvas{display:block;width:100%;height:calc(100vh - 126px)}label{display:flex;align-items:center;gap:7px}input{width:95px}#play{min-width:93px}</style>
+<header><strong>上海下坡 · 地标巡览</strong><select id="landmark" aria-label="选择名胜地标"></select><button id="detail" aria-pressed="false">建筑细节</button><button id="drive" aria-pressed="true">实际驾驶视角</button><button id="next">下一座</button><label>赛道位置<input id="station" type="number" value="9200" step="100"></label><button id="position">定位</button><button id="play" aria-pressed="false">播放下坡</button></header>
+<div id="status" role="status" aria-live="polite">正在准备上海地标…</div><canvas id="view" aria-label="上海下坡建筑预览"></canvas>
+<script type="module">
+import {RaceEngine,TRACK,setTrack,trackPoint} from '../engine.js';
+import {RaceRenderer} from '../renderer.js';
+import {shanghaiDownhillPlacements,addShanghaiDownhillLandmark} from '../shanghai-downhill.js';
+import {previewMesh} from './landmark-preview-mesh.js';
+setTrack('coast-shanghai');
+const $=id=>document.getElementById(id),canvas=$('view'),plots=shanghaiDownhillPlacements();
+const engine=new RaceEngine({laps:1,playerCount:1}),renderer=new RaceRenderer(canvas,{sceneUrls:{coast:'../assets/coast.png',alpine:'../assets/alpine.png',city:'../assets/city.png',clouds:'../assets/cloud-sky.jpg'}});
+renderer.setSinglePlayer(true);let mode='drive',playing=false,s=9200,previous=performance.now();
+const carMeshes=[...renderer.meshes.cars,renderer.meshes.shadow],counts=carMeshes.map(mesh=>mesh.count);
+const worldProps=renderer.meshes.props,roadCount=renderer.meshes.road.count;let isolated;
+for(const [index,item]of plots.entries()){const option=document.createElement('option');option.value=item.kind;option.textContent=`${String(index+1).padStart(2,'0')} · ${item.nameZh||item.zh||item.label}`;$('landmark').append(option);}
+function selected(){return plots.find(item=>item.kind===$('landmark').value)||plots[0];}
+function setup(){
+  const item=selected(),car=engine.cars[0];engine.state='menu';
+  carMeshes.forEach((mesh,i)=>mesh.count=mode==='drive'?counts[i]:0);
+  if(isolated){renderer.gl.deleteBuffer(isolated.buffer);isolated=null;}
+  renderer.meshes.props=mode==='detail'?(isolated=previewMesh(renderer.gl,mesh=>addShanghaiDownhillLandmark(mesh,item))):worldProps;
+  renderer.meshes.road.count=mode==='detail'?0:roadCount;
+  Object.assign(car,trackPoint(s,-18),{speed:363,height:25});renderer.resetCameras(engine);
+  if(mode==='detail'){
+    const c=Math.cos(item.angle),sn=Math.sin(item.angle),p=(x,y,z)=>[item.x+c*x-sn*z,y,item.z+sn*x+c*z];
+    const targetY=item.height*.46,ahead=72+363/517*22;
+    Object.assign(car,{x:item.x-c*ahead,y:item.z-sn*ahead,angle:item.angle,elevation:targetY-13,slope:0});
+    renderer.cameras[0]={carX:car.x,carY:car.y,angle:item.angle,eye:p(-item.radius*1.25,targetY+item.height*.25,-Math.max(item.radius*3,item.height*1.33)),target:p(0,targetY,0),fov:52*Math.PI/180};
+  }
+  $('detail').setAttribute('aria-pressed',String(mode==='detail'));$('drive').setAttribute('aria-pressed',String(mode==='drive'));
+  $('play').setAttribute('aria-pressed',String(playing));$('play').textContent=playing?'暂停巡览':'播放下坡';
+  $('status').textContent=renderer.available?`${plots.length} 处新增真实地标 · ${item.nameZh||item.zh||item.label} / ${item.label} · ${(item.features||[]).join(' · ')} · ${mode==='detail'?'建筑细节':'原赛道驾驶视角，路线与高低起伏保持原样'}`:renderer.error;
+}
+$('landmark').onchange=()=>{playing=false;s=selected().s-290;$('station').value=Math.round(s);setup();};
+$('detail').onclick=()=>{playing=false;mode='detail';setup();};$('drive').onclick=()=>{mode='drive';s=selected().s-290;$('station').value=Math.round(s);setup();};
+$('position').onclick=()=>{playing=false;mode='drive';s=Number($('station').value);setup();};
+$('next').onclick=()=>{$('landmark').selectedIndex=($('landmark').selectedIndex+1)%plots.length;$('landmark').onchange();};
+$('play').onclick=()=>{playing=!playing;mode='drive';if(playing&&(s<6800||s>13400))s=6800;setup();};
+setup();
+function draw(now){
+  const elapsed=Math.min((now-previous)/1000,.05);previous=now;
+  if(playing){s+=elapsed*300;if(s>13400)s=6800;$('station').value=Math.round(s);Object.assign(engine.cars[0],trackPoint(s,-18),{speed:363});}
+  const ratio=Math.min(devicePixelRatio||1,1.5),w=Math.round(canvas.clientWidth*ratio),h=Math.round(canvas.clientHeight*ratio);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+  renderer.render(engine,playing?elapsed:0,now/1000);requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script></html>

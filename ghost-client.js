@@ -1,5 +1,5 @@
 import { normalizeName, leaderboardNameKey } from './leaderboard.js';
-import { RACE_GHOST_VERSION, ghostVersionForCity, isNewGhostCircuit, validateRaceReplay } from './ghost-replay.js';
+import { ghostVersionForCity, isNewGhostCircuit } from './ghost-replay.js';
 
 export const GHOST_VERSION = 'coast-ghost-v1';
 export const GHOST_SLOTS = Object.freeze([
@@ -66,10 +66,9 @@ export class GhostClient {
   get matches() { return this.slotStates[this.activeSlot].matches; }
   get searching() { return this.slotStates[this.activeSlot].searching; }
   get loading() { return this.slotStates[this.activeSlot].loading; }
-  get version() { return ghostVersionForCity(this.city, this.laps); }
+  get version() { return ghostVersionForCity(this.city, 1); }
   matchesMode(entry) {
-    return validEntry(entry) && (this.laps === 3 ? entry.kind === 'race' && entry.laps === 3
-      : (entry.kind === undefined || entry.kind === 'lap') && (entry.laps === undefined || entry.laps === 1));
+    return validEntry(entry) && (entry.kind === undefined || entry.kind === 'lap') && (entry.laps === undefined || entry.laps === 1);
   }
   selections() { return this.slots.filter(Boolean); }
   status(message, slotId = this.activeSlot) {
@@ -77,6 +76,7 @@ export class GhostClient {
     if (slotId === this.activeSlot) this.node('ghost-status').textContent = message;
   }
   select(value, slotId = this.activeSlot) {
+    if (value && (!this.matchesMode(value.entry) || !validGhostReplay(value.replay))) return;
     this.slots[slotId] = value ? { ...GHOST_SLOTS[slotId], ...value } : null;
     this.onSelection(this.selections()); this.controls();
   }
@@ -143,7 +143,7 @@ export class GhostClient {
       if (this.locked) return;
       for (const state of this.slotStates) { state.request++; state.searching = false; state.loading = false; }
       this.status(this.node('ghost-enabled').checked ? '选择紫色或金色，再查找想挑战的昵称。' : '本场不带幽灵，已选记录会保留供下次使用。');
-      this.onSelection(this.node('ghost-enabled').checked ? this.selections() : []); this.controls();
+      this.onSelection(this.node('ghost-enabled').checked ? this.selections().filter(ghost => this.matchesMode(ghost.entry) && validGhostReplay(ghost.replay)) : []); this.controls();
     });
     this.node('ghost-name').addEventListener('input', () => {
       if (!this.locked) { this.pendingChallenge = null; this.slotStates[this.activeSlot].name = normalizeName(this.node('ghost-name').value); this.clearSelection('昵称已修改，请重新查找；已加入的幽灵会保留。', true); }
@@ -204,7 +204,7 @@ export class GhostClient {
         .filter(entry => nameKey(entry.name) === nameKey(name)).slice(0, 20).map(copyEntry);
       state.choice = state.matches[0]?.id || '';
       this.status(state.matches.length ? `已找到记录。点击「${this.slots[slotId] ? '替换' : '加入'}${GHOST_SLOTS[slotId].colorLabel}幽灵」确认。`
-        : `还没有「${name}」的${this.laps === 3 ? '完整 3 圈' : '单圈'}幽灵。完成对应比赛后，可以在成绩区保存。`, slotId);
+        : `还没有「${name}」的单圈幽灵。完成对应比赛后，可以在成绩区保存。`, slotId);
       if (slotId === this.activeSlot) this.renderChoices();
     } catch (error) { if (request === state.request && !this.locked) this.status(error.message, slotId); }
     finally { if (request === state.request) { state.searching = false; this.controls(); } }
@@ -221,7 +221,7 @@ export class GhostClient {
       const data = await this.request(`/api/ghosts/${encodeURIComponent(id)}?${this.query()}`);
       if (request !== state.request || this.locked) return;
       if (!this.matchesMode(data.entry) || data.entry.id !== id || nameKey(data.entry.name) !== nameKey(match.name)
-        || !(this.laps === 3 ? validateRaceReplay(data.replay) : validGhostReplay(data.replay)) || data.entry.timeMs !== data.replay.durationMs) {
+        || !validGhostReplay(data.replay) || data.entry.timeMs !== data.replay.durationMs) {
         throw new Error('这份幽灵数据不完整，请重新查找。');
       }
       this.select({ entry: copyEntry(data.entry), replay: copyReplay(data.replay) }, slotId);
@@ -242,8 +242,8 @@ export class GhostClient {
     return copyEntry(entry);
   }
   setLaps(laps) {
-    if (this.locked || ![1, 3].includes(Number(laps))) return;
-    const next = Number(laps);
+    if (this.locked) return;
+    const next = 1;
     if (next === this.laps) return;
     this.laps = next; this.resetPickerCategory();
   }
@@ -257,12 +257,12 @@ export class GhostClient {
     this.slots = [null, null]; this.pickerButtons = [];
     for (const state of this.slotStates) {
       state.request++; state.searching = false; state.loading = false; state.matches = []; state.choice = '';
-      state.message = this.laps === 3 ? '本场只显示当前赛道完整 3 圈幽灵，计时从发车到完赛。' : '本场只显示当前赛道的单圈幽灵，挑战一圈极限。';
+      state.message = '本场只显示当前赛道的单圈幽灵，挑战一圈极限。';
     }
     this.node('ghost-picker-list')?.replaceChildren();
     this.renderChoices(); this.onSelection([]);
   }
-  openPicker(laps = 3) {
+  openPicker(laps = 1) {
     if (this.locked) return Promise.resolve();
     this.setLaps(laps);
     this.controls();
@@ -297,16 +297,16 @@ export class GhostClient {
       row.appendChild(actions); list.appendChild(row);
     }
     this.node('ghost-picker-status').textContent = clean.length
-      ? `${this.laps === 3 ? '完整 3 圈' : '最快单圈'}前五 · 点颜色加入，再点一次取消。已选颜色可替换。`
-      : `还没有${this.laps === 3 ? '完整 3 圈' : '单圈'}幽灵上榜。可以直接出发，完赛后保存自己的幽灵。`;
+      ? `最快单圈前五 · 点颜色加入，再点一次取消。已选颜色可替换。`
+      : `还没有单圈幽灵上榜。可以直接出发，完赛后保存自己的幽灵。`;
     this.node('ghost-picker-retry').hidden = true;
     this.controls();
   }
   async loadPickerBoard() {
     if (this.locked || !this.node('ghost-picker-list')) return;
     const request = ++this.pickerRequest;
-    const title = this.node('ghost-picker-title'); if (title) title.textContent = (isNewGhostCircuit(this.city) ? '新地图 · ' : '') + (this.laps === 3 ? '完整 3 圈幽灵榜' : '最快单圈幽灵榜');
-    this.node('ghost-picker-status').textContent = `正在读取可挑战的${this.laps === 3 ? '完整 3 圈' : '单圈'}记录…`;
+    const title = this.node('ghost-picker-title'); if (title) title.textContent = (isNewGhostCircuit(this.city) ? '新地图 · ' : '') + '最快单圈幽灵榜';
+    this.node('ghost-picker-status').textContent = `正在读取可挑战的单圈记录…`;
     this.node('ghost-picker-retry').hidden = true;
     try {
       const data = await this.request(`/api/laps?${this.query()}`);
@@ -318,7 +318,7 @@ export class GhostClient {
     }
   }
   startRace() {
-    const chosen = this.node('ghost-enabled').checked ? this.selections() : [];
+    const chosen = this.node('ghost-enabled').checked ? this.selections().filter(ghost => this.matchesMode(ghost.entry) && validGhostReplay(ghost.replay)) : [];
     this.locked = true; this.pendingChallenge = null; this.pickerRequest++;
     for (const state of this.slotStates) { state.request++; state.searching = false; state.loading = false; }
     this.resultsToken++; this.cards = [];
@@ -339,7 +339,7 @@ export class GhostClient {
   menu() { this.endRace(); }
   renderBoard(entries) {
     const seen = new Set(), names = new Set();
-    const clean = (Array.isArray(entries) ? entries : []).filter(validEntry).sort((a, b) => a.timeMs - b.timeMs)
+    const clean = (Array.isArray(entries) ? entries : []).filter(entry => this.matchesMode(entry)).sort((a, b) => a.timeMs - b.timeMs)
       .filter(entry => { const name = nameKey(entry.name); if (seen.has(entry.id)) return false; seen.add(entry.id); if (names.has(name)) return false; names.add(name); return true; }).slice(0, 5);
     const list = this.node('lap-list'); list.replaceChildren();
     for (const [index, entry] of clean.entries()) {

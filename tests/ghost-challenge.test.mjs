@@ -92,9 +92,12 @@ test('loader rejects category mismatch and supports canceling an in-flight prepa
   controller.abort(); await assert.rejects(promise, /cancelled/);
 });
 
-test('solo uses one physical car, preserves the starting grid, and local mode restores both racers', () => {
+test('solo uses one centered physical car at the same grid distance and local mode restores both racers', () => {
   setTrack('coast'); const engine = new RaceEngine(), start = structuredClone(engine.cars[0]);
-  engine.setPlayerCount(1); assert.equal(engine.cars.length, 1); assert.deepEqual(engine.cars[0], start);
+  engine.setPlayerCount(1); assert.equal(engine.cars.length, 1);
+  const center=trackPoint(start._gridS,0),solo=engine.cars[0];
+  assert.equal(solo._gridS,start._gridS);assert.equal(solo._lane,0);
+  assert.equal(solo.x,center.x);assert.equal(solo.y,center.y);
   engine.start(1); for (let i = 0; i < 30; i++) engine.step(.1);
   assert.doesNotThrow(() => engine.step(.1, new Set(['KeyW']))); assert.equal(engine.cars.length, 1);
   assert.throws(() => engine.setPlayerCount(2), /before starting/);

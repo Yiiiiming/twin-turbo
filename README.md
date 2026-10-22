@@ -2,7 +2,7 @@
 
 A compact arcade racer with twelve circuits. Choose Chinese or English, enter Ghost Challenge in one full-width view, or race a friend in split screen. Ghost Challenge matches up to three distinct human record holders and three slower pace ghosts; custom two-ghost selection remains available.
 
-The opening selection is London Riverside, one lap, in Ghost Challenge. Human opponents use the current circuit and matching lap/race replay category. Pace ghosts finish about 1, 2 and 3 seconds after the slowest selected human and never submit scores. The live AI opponent has been removed; ai.js remains only as a deterministic route-validation driver for development tests.
+The opening selection is London Riverside, one lap, in Ghost Challenge. All public race modes are now one-lap sprints. Human opponents use the current circuit’s one-lap replay category; historical three-lap data stays in storage. Pace ghosts finish about 1, 2 and 3 seconds after the slowest selected human and never submit scores. The live AI opponent has been removed; ai.js remains only as a deterministic route-validation driver for development tests.
 
 At the finish, each human driver enters one nickname directly in the results panel to save the race, fastest lap and ghosts together. Failed saves can be retried there without leaving fullscreen.
 
@@ -20,9 +20,17 @@ Architectural references: [Royal Opera House history](https://www.rbo.org.uk/abo
 
 Additional references: [Buckingham Palace's East Wing](https://www.rct.uk/visit/buckingham-palace/history-of-the-east-wing-of-buckingham-palace), [Westminster Abbey architecture](https://www.westminster-abbey.org/history/explore-our-history/architecture), [British Museum architecture](https://www.britishmuseum.org/about-us/british-museum-story/architecture), [St Paul's Cathedral](https://www.stpauls.co.uk/explore-our-map), and [Globe Theatre](https://www.shakespearesglobe.com/discover/about-us/globe-theatre/).
 
-Every circuit supports one-lap sprints and three-lap races, Ghost Challenge/local play, checkpoint gaps, and independent top-five total and lap records. Each public board shows only the fastest result per normalized nickname; other attempts remain in storage and personal ghost search retains its best-20 view. Solo races accept either keyboard layout; custom bindings, language and nicknames are stored in this browser. Flat-road cruising is 240 km/h, with uphill slowing and downhill gains.
+Every circuit supports one-lap sprints, Ghost Challenge/local play, checkpoint gaps, and independent top-five total and lap records. Each public board shows only the fastest result per normalized nickname; other attempts remain in storage and personal ghost search retains its best-20 view. Solo races accept either keyboard layout; custom bindings, language and nicknames are stored in this browser. Flat-road cruising is 240 km/h, with uphill slowing and downhill gains.
 
-One-lap races require a forward launch from the standing grid. Reversing behind the grid or circling before the first timing-line crossing resets the car to the same starting position at zero speed. The GO clock and remaining nitro are preserved; normal launches and three-lap flying laps are unchanged. No circuit geometry or record namespace changes in this update.
+One-lap races require a forward launch from the standing grid. Reversing behind the grid or circling before the first timing-line crossing resets the car to the same starting position at zero speed. The GO clock and remaining nitro are preserved; normal launches are unchanged, and historical flying-lap data remains readable internally. No circuit geometry or record namespace changes in this update.
+
+Solo starts from the road center in either color; local two-player grid slots retain their positions. The opponent roster fades after three racing seconds, with live position at the top. A projected nitro meter follows the car, and the speed dial reflects actual speed and boost. “No ghosts” starts without opponents.
+
+## Shanghai downhill landmarks — October 22
+
+The existing descent now has 65 additional named landmarks: 35 historic monuments and heritage buildings, 15 cultural/scenic venues and 15 skyline anchors. They include Longhua Pagoda, Jing’an Temple, Guangfulin, Moller Villa, Sihang Warehouse, 1933 Old Millfun, the China Art Museum and the Shanghai Astronomy Museum. Each has its own roofline or silhouette and facade details. The buildings remain grounded, face the road on both sides, and clear all driving lanes and chase-camera sweeps. The road, grades, finish line and checkpoints retain their locked geometry.
+
+These are compact architectural interpretations, not a geographic recreation. The heritage catalog includes official reference links. Use `tools/shanghai-downhill-preview.html` for the complete named catalog, isolated detail views and the real driving perspective.
 
 ## Local development
 
@@ -52,7 +60,7 @@ The London landmarks / Paris leaderboard update passed 93 focused frontend check
 
 The four city skies use an original generated cloud-only image; other circuits retain their existing scenery. Landmark design references include [UT Austin's Tower history](https://news.utexas.edu/2018/10/04/whats-the-story-behind-the-tower/), [Beijing's Temple of Heaven architecture](https://english.visitbeijing.com.cn/article/47ONy6AX0b3), [Austin's downtown guide](https://www.austintexas.org/explore/entertainment-districts/downtown/), and [Visit Brasil's Rio guide](https://www.visitbrasil.com/en/location/rio-de-janeiro-en/).
 
-Shanghai is circuit **1**: twelve distinct landmarks, a 720° ascending spiral around the Oriental Pearl, a descending skyline run, Huangpu crossing and flowing Bund bends. It retains the same 240 km/h cruising scale and all existing one/three-lap, AI, local two-player, dual-ghost and independent leaderboard modes. The route is a compact architectural interpretation, not a geographic recreation.
+Shanghai is circuit **3**: twelve distinct landmarks, a 720° ascending spiral around the Oriental Pearl, a descending skyline run, Huangpu crossing and flowing Bund bends. It retains the same 240 km/h cruising scale, single-lap Ghost Challenge, local two-player, custom dual-ghost and independent leaderboard modes. The route is a compact architectural interpretation, not a geographic recreation.
 
 London now adds eight further theatres: His Majesty’s, Theatre Royal Drury Lane, Lyceum, Sondheim, Apollo Victoria, Victoria Palace, Savoy and Prince Edward. Their individually designed show advertisements feature Phantom, Frozen, The Lion King, Les Misérables, Wicked, Hamilton, The Book of Mormon and The Play That Goes Wrong. The game programme is illustrative and does not assert current real-world theatre residencies.
 

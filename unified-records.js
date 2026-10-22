@@ -51,7 +51,7 @@ export class UnifiedRecordsClient {
   }
   remember(playerId, name) { try { this.storage?.setItem(`twin-turbo-ghost-name-${playerId}`, name); } catch { /* Storage is optional. */ } }
   init(city = this.city) {
-    for (const category of [1, 3, 'lap']) this.node(`records-tab-${category}`).addEventListener('click', () => this.load(category));
+    for (const category of [1, 'lap']) this.node(`records-tab-${category}`).addEventListener('click', () => this.load(category));
     this.node('records-retry').addEventListener('click', () => this.load());
     this.node('records-results').hidden = true;
     return city === this.city ? this.load() : this.setTrack(city);
@@ -98,8 +98,9 @@ export class UnifiedRecordsClient {
     requests.set(key, pending); return pending;
   }
   tabs(category) {
+    if (![1, 'lap'].includes(category)) return;
     this.category = category;
-    for (const value of [1, 3, 'lap']) {
+    for (const value of [1, 'lap']) {
       const selected = value === category;
       this.node(`records-tab-${value}`).classList.toggle('selected', selected);
       this.node(`records-tab-${value}`).setAttribute('aria-selected', String(selected));
@@ -119,18 +120,18 @@ export class UnifiedRecordsClient {
       identity.appendChild(this.el('small', '', entry.mode === 'ai' ? '单人' : '本地双人')); row.appendChild(identity);
       row.appendChild(this.el('td', 'record-time record-total-time', timeLabel(entry.timeMs)));
       const challenge = this.el('td', 'record-ghost-cell');
-      if (ghost) {
-        const ghostLabel = this.category === 3 ? '三圈幽灵' : '单圈幽灵';
+      if (ghost && validLapEntry(ghost)) {
+        const ghostLabel = '单圈幽灵';
         const button = this.el('button', 'record-challenge', `挑战${ghostLabel}`); button.type = 'button'; button.disabled = this.locked;
         button.setAttribute('aria-label', `挑战「${normalizeName(ghost.name)}」的${ghostLabel}`);
-        button.addEventListener('click', () => { if (!this.locked) return this.onChallenge({ ...ghost, city: this.city }); });
+        button.addEventListener('click', () => { if (!this.locked && validLapEntry(ghost)) return this.onChallenge({ ...ghost, city: this.city }); });
         this.challengeButtons.push(button); challenge.appendChild(button);
       } else challenge.appendChild(this.el('span', 'record-no-ghost', ghostCache.has(entry.id) ? '未录制' : '待查询'));
       row.appendChild(challenge); list.appendChild(row);
     }
   }
   async load(category = this.category) {
-    if (![1, 3, 'lap'].includes(category)) return;
+    if (![1, 'lap'].includes(category)) return;
     const request = ++this.boardRequest, city = this.city;
     // Records can be improved in another tab. Deduplicate lookups only within
     // this refresh; old in-flight lookups lose ownership of the new cache.

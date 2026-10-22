@@ -279,40 +279,43 @@ test('ranked board failure can retry to an empty board without preventing a race
   assert.deepEqual(h.client.startRace(), []);
 });
 
-test('three-lap picker only lists full races and preserves frozen race metadata through loading', async () => {
+test('picker always uses single-lap records and rejects retired three-lap challenges', async () => {
   const h = setup(); h.client.recordsManaged = true; await h.client.init();
-  h.queue.push(raceResponse({ entries: [entry(), raceEntry()] })); await h.client.openPicker(3);
-  assert.match(h.requests[0].url, /coast-race-ghost-v1/); assert.match(h.get('ghost-picker-title').textContent, /完整 3 圈/);
-  assert.equal(h.client.pickerButtons.length, 2); assert.equal(h.client.challenge(entry()), null);
-  h.queue.push(raceResponse({ entry: raceEntry(), replay: raceReplay() }));
+  h.client.setLaps(3); assert.equal(h.client.laps, 1);
+  h.queue.push(response({ entries: [entry(), raceEntry()] })); await h.client.openPicker(3);
+  assert.match(h.requests[0].url, /version=coast-ghost-v1/);
+  assert.doesNotMatch(h.requests[0].url, /race-ghost/);
+  assert.match(h.get('ghost-picker-title').textContent, /最快单圈/);
+  assert.equal(h.client.pickerButtons.length, 2); assert.equal(h.client.challenge(raceEntry()), null);
+  h.client.select({ entry: raceEntry(), replay: raceReplay() }); assert.equal(h.client.selections().length, 0);
+  h.queue.push(response({ entry: entry(), replay: replay() }));
   await h.client.pickerButtons[1].button.dispatch('click');
-  const [ghost] = h.client.startRace(); assert.equal(ghost.entry.kind, 'race'); assert.equal(ghost.entry.laps, 3);
-  assert.equal(ghost.replay.kind, 'race'); assert.deepEqual(ghost.replay.lapEndsMs, [42000, 84000, 126000]);
-  assert.throws(() => { ghost.replay.lapEndsMs[0] = 1; }, TypeError);
-  assert.equal(h.client.pickerButtons[1].button.disabled, true);
-  h.client.setLaps(1); assert.equal(h.client.laps, 3, 'running race is locked to its category');
+  const [ghost] = h.client.startRace(); assert.equal(ghost.replay.kind, undefined); assert.equal(ghost.replay.lapEndsMs, undefined);
+  assert.equal(h.client.laps, 1);
 });
 
-test('changing race length clears incompatible ghosts and invalidates late search and board responses', async () => {
+test('changing map clears incompatible ghosts and invalidates late search and board responses', async () => {
   const h = setup(); h.client.recordsManaged = true; await h.client.init(); await addSlot(h, 0, '单圈', 'lap');
   const slowSearch = deferred(), slowBoard = deferred(); h.get('ghost-name').value = '旧查询';
   h.queue.push(() => slowSearch.promise, () => slowBoard.promise);
   const searchPromise = h.client.search(), boardPromise = h.client.openPicker(1); await flush();
-  h.queue.push(raceResponse({ entries: [raceEntry()] })); await h.client.openPicker(3);
+  h.client.setTrack('coast-ridge');
+  h.queue.push(response({ city:'coast-ridge', entries:[entry('山道','ridge-record')] })); await h.client.openPicker();
   assert.equal(h.client.selections().length, 0); assert.equal(h.client.matches.length, 0);
   slowSearch.resolve(response({ entries: [entry('旧查询')] })); slowBoard.resolve(response({ entries: [entry('旧榜')] }));
   await Promise.all([searchPromise, boardPromise]);
   assert.equal(h.client.matches.length, 0); assert.equal(h.client.pickerButtons.length, 2);
-  assert.equal(h.client.pickerButtons[0].entry.kind, 'race'); assert.doesNotMatch(h.get('ghost-picker-list').textContent, /旧榜/);
+  assert.equal(h.client.pickerButtons[0].entry.id, 'ridge-record'); assert.doesNotMatch(h.get('ghost-picker-list').textContent, /旧榜/);
 });
 
-test('late lap replay cannot fill a race slot after a mode change; opposite replay shapes are rejected', async () => {
+test('late replay cannot fill a slot on a changed map and race-shaped telemetry is rejected', async () => {
   const h = setup(); h.client.recordsManaged = true; await h.client.init(); await search(h);
   const pending = deferred(); h.queue.push(() => pending.promise); const oldLoad = h.client.loadSelected(); await flush();
-  h.client.setLaps(3); pending.resolve(response({ entry: entry(), replay: replay() })); await oldLoad;
+  h.client.setTrack('coast-ridge'); pending.resolve(response({ entry: entry(), replay: replay() })); await oldLoad;
   assert.equal(h.client.selections().length, 0);
-  h.client.challenge(raceEntry()); h.queue.push(raceResponse({ entry: raceEntry(), replay: { ...replay(126000) } }));
-  await h.client.loadSelected(); assert.equal(h.client.selections().length, 0); assert.match(h.get('ghost-status').textContent, /不完整/);
+  h.client.setTrack('coast'); h.client.challenge(entry());
+  h.queue.push(response({ entry: entry(), replay: raceReplay() })); await h.client.loadSelected();
+  assert.equal(h.client.selections().length, 0); assert.match(h.get('ghost-status').textContent, /不完整/);
   assert.equal(validGhostReplay(raceReplay()), false);
   assert.equal(validGhostReplay({ ...replay(), lapEndsMs: [14000, 28000, 42000] }), false);
 });
@@ -337,9 +340,9 @@ test('changing track clears prior ghosts and rejects late search and ranked-boar
   h.client.startRace(); h.client.setTrack('coast'); assert.equal(h.client.city, 'coast-ridge');
 });
 
-test('Beijing, Austin, Rio, Paris and Shanghai each load only their own single-lap and three-lap challengers', async () => {
+test('Beijing, Austin, Rio, Paris and Shanghai each load only their own single-lap challengers', async () => {
   const h = setup(); h.client.recordsManaged = true; await h.client.init();
-  for(const city of ['coast-beijing','coast-austin','coast-rio','coast-paris','coast-shanghai'])for(const laps of [1,3]) {
+  for(const city of ['coast-beijing','coast-austin','coast-rio','coast-paris','coast-shanghai'])for(const laps of [1]) {
     h.client.setTrack(city);assert.equal(h.client.city,city);
     const version=city==='coast-shanghai'?(laps===3?'coast-race-ghost-v3':'coast-ghost-v3'):['coast-austin','coast-beijing'].includes(city)?(laps===3?'coast-race-ghost-v2':'coast-ghost-v2'):(laps===3?RACE_GHOST_VERSION:GHOST_VERSION);
     const value=laps===1?entry('城市车手',`${city}-lap`):raceEntry('城市车手',`${city}-race`);
@@ -362,7 +365,7 @@ test('only revised Austin, Shanghai and Beijing use new lap/race versions',()=>{
   }
 });
 
-for(const city of ['coast-austin','coast-shanghai','coast-beijing'])for(const laps of [1,3])test(`${city} ${laps}-lap picker rejects old paths and lets a normalized nickname select all twenty retained ghosts`,async()=>{
+for(const city of ['coast-austin','coast-shanghai','coast-beijing'])for(const laps of [1])test(`${city} ${laps}-lap picker rejects old paths and lets a normalized nickname select all twenty retained ghosts`,async()=>{
   const h=setup();h.client.recordsManaged=true;await h.client.init();h.client.setTrack(city);h.client.setLaps(laps);
   const v=city==='coast-shanghai'?3:2,version=laps===3?`coast-race-ghost-v${v}`:`coast-ghost-v${v}`,oldVersion=laps===3?RACE_GHOST_VERSION:GHOST_VERSION;
   const values=Array.from({length:21},(_,i)=>laps===3?raceEntry('Alice',`retained-${i}`,126000+i*1000):entry('Alice',`retained-${i}`,42000+i*1000));
@@ -382,8 +385,8 @@ for(const city of ['coast-austin','coast-shanghai','coast-beijing'])for(const la
 });
 
 
-test('lap and three-lap ghost leaderboards fill five unique normalized names without reducing personal search', async () => {
-  for (const laps of [1, 3]) {
+test('single-lap ghost leaderboards fill five unique normalized names without reducing personal search', async () => {
+  for (const laps of [1]) {
     const h = setup(); h.client.recordsManaged = true; await h.client.init();
     const make = laps === 3 ? raceEntry : entry, baseTime = laps === 3 ? 126000 : 42000;
     const values = ['ＡＬＩＣＥ', 'Alice', 'Bob', 'Carol', 'Dora', 'Eve', 'Fred'].map((name, index) => make(name, `public-${index}`, baseTime + index * 1000));

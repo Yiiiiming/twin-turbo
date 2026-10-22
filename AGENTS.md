@@ -46,3 +46,7 @@ removals require the corresponding explicit user request as well.
 ## Beijing stadium authorization implemented, 2026-10-20
 
 The user explicitly requested “给北京能不能加一个项目 就是能开进鸟巢里面 绕着里面的跑道跑一圈再出来继续” and confirmed “必经路段：进场绕一圈再出来”. Only Beijing's local stadium bend was replaced with a mandatory drive-through oval, raised entrance and separate ground exit. Its new route baseline is now frozen; this permission does not authorize further route edits. All eleven other courses retain their previous exact hashes. The pre-stadium Beijing base remains the reference for existing city plots. New Beijing total-record and ghost namespaces keep the longer course separate from old records.
+
+## Single-player grid authorization implemented, 2026-10-22
+
+The user explicitly requested “单人比赛在中间起步就可以了”. A one-car race now starts at lateral lane 0 for both colors, and its pre-line recovery returns there. The longitudinal grid station, local two-player slots, driving surface, finish line and checkpoints remain unchanged. This narrow exception does not authorize any other route or grid changes.

@@ -20,18 +20,18 @@ class Node {
   async dispatch(name, values = {}) { await Promise.all((this.listeners.get(name) || []).map(handler => handler({ preventDefault() {}, ...values }))); }
   focus() { this.document.activeElement = this; }
 }
-const ids = ['records-tab-3', 'records-tab-1', 'records-tab-lap', 'records-list', 'records-status', 'records-retry', 'records-results', 'records-result-list', 'records-time-heading'];
+const ids = ['records-tab-1', 'records-tab-lap', 'records-list', 'records-status', 'records-retry', 'records-results', 'records-result-list', 'records-time-heading'];
 const lap = (name = '月亮', id = 'lap-one', timeMs = 42000) => ({ id, name, timeMs, playerId: 1, mode: 'local', createdAt: 1 });
-const total = (name = '月亮', id = 'total-one', laps = 3) => ({ ...lap(name, id, 140000), city: 'coast', laps });
+const total = (name = '月亮', id = 'total-one', laps = 1) => ({ ...lap(name, id, 140000), city: 'coast', laps });
 const replay = (durationMs = 42000) => ({ version: 1, durationMs, frames: [[0, 1, 2, 0, 3], [durationMs, 1, 2, 0, 3]] });
-const result = extra => ({ playerId: 1, mode: 'local', laps: 3, timeMs: 140000, finished: true, replay: replay(), ...extra });
+const result = extra => ({ playerId: 1, mode: 'local', laps: 1, timeMs: 140000, finished: true, replay: replay(), ...extra });
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
 const lp = extra => ({ city: 'coast', version: GHOST_VERSION, entries: [], ...extra });
 const rp = extra => ({ city: 'coast', version: RACE_GHOST_VERSION, entries: [], ...extra });
 const raceEntry = (name = '月亮', id = 'race-one', timeMs = 140000) => ({ ...lap(name, id, timeMs), kind: 'race', laps: 3 });
 const fullRace = (durationMs = 140000) => ({ version: 1, kind: 'race', laps: 3, durationMs, lapEndsMs: [45000, 90000, durationMs],
   frames: Array.from({ length: durationMs / 100 + 1 }, (_, i) => [i * 100, 1, 2, 0, 3]) });
-const tp = (extra, laps = 3) => ({ city: 'coast', version: LEADERBOARD_VERSION, laps, entries: [], ...extra });
+const tp = (extra, laps = 1) => ({ city: 'coast', version: LEADERBOARD_VERSION, laps, entries: [], ...extra });
 const deferred = () => { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; };
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function setup() {
@@ -51,26 +51,24 @@ function setup() {
 const posted = h => h.requests.filter(request => request.method === 'POST');
 const savedLap = body => response(lp({ saved: true, entry: { ...lap(body.name, body.id, body.timeMs), playerId: body.playerId, mode: body.mode, totalRecordId: body.totalRecordId } }));
 
-test('one table switches sprint, three-lap and fastest lap rankings with exactly matching ghosts', async () => {
+test('one table switches single-lap total and fastest lap, while retired three-lap requests have no public entry point', async () => {
   const h = setup();
   h.handler = req => {
-    const laps = Number(req.url.searchParams.get('laps'));
-    if (req.url.pathname === '/api/leaderboard') return response(tp({ entries: [total('月亮', `total-${laps}`, laps)] }, laps));
-    if (req.url.pathname === '/api/laps') return response(lp({ entries: [lap()] }));
-    const isRace = req.url.searchParams.get('version') === RACE_GHOST_VERSION;
-    const id = isRace ? 'total-3' : 'total-1';
-    return response((isRace ? rp : lp)({ entry: { ...(isRace ? raceEntry('月亮', id) : lap('月亮', id)), totalRecordId: id } }));
+    if (req.url.pathname === '/api/leaderboard') return response(tp({ entries:[total('月亮','total-1')] }));
+    if (req.url.pathname === '/api/laps') return response(lp({ entries:[lap()] }));
+    return response(lp({ entry:{...lap('月亮','total-1'),totalRecordId:'total-1'} }));
   };
-  await h.client.init(); await h.client.load(3);
-  assert.equal(h.get('records-list').children.length, 1); assert.equal(h.get('records-list').children[0].children.length, 4);
-  assert.match(h.get('records-list').textContent, /02:20.00/); assert.doesNotMatch(h.get('records-list').textContent, /00:42.00/);
-  await h.client.challengeButtons[0].dispatch('click'); assert.equal(h.challenges[0].id, 'total-3');
-  assert.equal(h.challenges[0].kind, 'race'); assert.equal(h.challenges[0].laps, 3);
-  await h.client.load(1); await h.client.challengeButtons[0].dispatch('click');
-  assert.equal(h.challenges[1].id, 'total-1'); assert.equal(h.challenges[1].laps, 1);
-  await h.client.load('lap'); assert.equal(h.get('records-list').children[0].children[2].textContent, '00:42.00');
-  assert.match(h.get('records-status').textContent, /最快单圈/);
-  await h.client.load(5); assert.equal(h.client.category, 'lap');
+  await h.client.init(); await h.client.load(1);
+  assert.equal(h.get('records-list').children.length,1);assert.equal(h.get('records-list').children[0].children.length,4);
+  assert.match(h.get('records-list').textContent,/02:20.00/);assert.doesNotMatch(h.get('records-list').textContent,/00:42.00/);
+  await h.client.challengeButtons[0].dispatch('click');assert.equal(h.challenges[0].id,'total-1');assert.equal(h.challenges[0].laps,1);
+  const before=h.requests.length;await h.client.load(3);
+  assert.equal(h.requests.length,before);assert.equal(h.client.category,1);assert.equal(h.document.getElementById('records-tab-3'),undefined);
+  await h.client.load('lap');assert.equal(h.get('records-list').children[0].children[2].textContent,'00:42.00');
+  assert.match(h.get('records-status').textContent,/最快单圈/);
+  await h.client.load(5);assert.equal(h.client.category,'lap');
+  h.client.entries=[{...raceEntry(),kind:'race',laps:3}];h.client.render();
+  assert.equal(h.client.challengeButtons.length,0,'a stale race-kind entry cannot offer a three-lap challenge');
 });
 
 test('fastest lap ranks one normalized nickname and challenges its fastest replay', async () => {
@@ -96,7 +94,7 @@ test('all categories select five distinct personal bests after duplicate names a
     if (req.url.pathname === '/api/laps') return response(lp({ entries: names.map((name, index) => lap(name, `lap-${index}`, 50000 + index * 1000)) }));
     return response({ error: 'not_found' }, 404);
   };
-  for (const category of [3, 'lap', 1]) {
+  for (const category of ['lap', 1]) {
     await h.client.load(category);
     assert.equal(h.client.entries.length, 5);
     assert.equal(h.get('records-list').children.length, 5);
@@ -109,24 +107,24 @@ test('all categories select five distinct personal bests after duplicate names a
 
 test('historical total records without telemetry show no ghost and cannot be challenged', async () => {
   const h = setup(); h.handler = req => req.url.pathname === '/api/leaderboard' ? response(tp({ entries: [total()] })) : response(req.url.searchParams.get('version') === RACE_GHOST_VERSION ? rp({}) : lp({}));
-  await h.client.init(); await h.client.load(3); assert.match(h.get('records-list').textContent, /未录制/); assert.equal(h.client.challengeButtons.length, 0);
+  await h.client.init(); await h.client.load(1); assert.match(h.get('records-list').textContent, /未录制/); assert.equal(h.client.challengeButtons.length, 0);
 });
 
 test('late board and personal-best responses cannot overwrite another selected category', async () => {
   const h = setup(), oldBoard = deferred(), oldLap = deferred();
   h.handler = req => req.url.pathname === '/api/leaderboard' ? oldBoard.promise : req.url.pathname.startsWith('/api/ghosts/') ? oldLap.promise : response(lp({ entries: [lap('单圈新榜')] }));
-  const first = h.client.load(3); await tick(); await h.client.load('lap');
+  const first = h.client.load(1); await tick(); await h.client.load('lap');
   oldBoard.resolve(response(tp({ entries: [total('过时总榜')] }))); await first;
   assert.equal(h.client.category, 'lap'); assert.match(h.get('records-list').textContent, /单圈新榜/);
   h.handler = req => req.url.pathname === '/api/leaderboard' ? response(tp({ entries: [total('过时补录')] })) : req.url.pathname.startsWith('/api/ghosts/') ? oldLap.promise : response(lp({ entries: [lap('单圈新榜')] }));
-  const lookup = h.client.load(3); await tick(); await h.client.load('lap');
+  const lookup = h.client.load(1); await tick(); await h.client.load('lap');
   oldLap.resolve(response(lp({ entries: [lap('过时补录')] }))); await lookup;
   assert.match(h.get('records-list').textContent, /单圈新榜/); assert.doesNotMatch(h.get('records-list').textContent, /过时/);
 });
 
 test('mismatched categories are rejected and never merged into the table', async () => {
   const h = setup(); h.handler = () => response(tp({ entries: [total('错误类别', 'five', 5)] }, 5));
-  await h.client.load(3); assert.equal(h.client.entries.length, 0); assert.match(h.get('records-status').textContent, /类别/);
+  await h.client.load(1); assert.equal(h.client.entries.length, 0); assert.match(h.get('records-status').textContent, /类别/);
   h.handler = () => response(lp({ city: 'london', entries: [lap('错误城市')] }));
   await h.client.load('lap'); assert.equal(h.client.entries.length, 0); assert.equal(h.get('records-retry').hidden, false);
 });
@@ -338,12 +336,12 @@ test('one nickname saves total, fastest lap and three-lap replay, retrying only 
   const h = setup(); await h.client.init(); let raceAttempts = 0;
   h.handler = req => {
     if (req.method !== 'POST') return;
-    if (req.url.pathname === '/api/records') return response(tp({ saved: true }));
+    if (req.url.pathname === '/api/records') return response(tp({ saved: true }, 3));
     if (req.body.version === GHOST_VERSION) return savedLap(req.body);
     if (++raceAttempts === 1) throw new Error('race response lost');
     return response(rp({ saved: true, entry: { ...raceEntry(req.body.name, req.body.id, req.body.timeMs), totalRecordId: req.body.totalRecordId } }));
   };
-  const source = fullRace(); h.client.showResults([result({ raceReplay: source })]);
+  const source = fullRace(); h.client.showResults([result({ laps:3, raceReplay: source })]);
   const card = h.client.cards[0]; card.input.value = '同一车手'; await h.client.save(card);
   assert.deepEqual(posted(h).map(req => req.body.name), ['同一车手', '同一车手', '同一车手']);
   assert.equal(card.total.state, 'saved'); assert.equal(card.lap.state, 'saved'); assert.equal(card.race.state, 'error');
@@ -370,12 +368,12 @@ test('single-lap sprint saves its total and lap, never a mismatched race replay'
 test('partial or mismatched three-lap replays do not masquerade as completed three-lap ghosts', async () => {
   const h = setup(); await h.client.init();
   for (const changes of [{ finished: false }, { timeMs: 140001 }, { raceReplay: { ...fullRace(), lapEndsMs: [45000, 90000] } }]) {
-    h.client.showResults([result({ raceReplay: fullRace(), ...changes })]);
+    h.client.showResults([result({ laps:3, raceReplay: fullRace(), ...changes })]);
     assert.equal(h.client.cards[0].race.state, 'none');
   }
   h.handler = req => req.url.pathname === '/api/leaderboard' ? response(tp({ entries: [total()] }))
     : req.url.searchParams.get('version') === RACE_GHOST_VERSION ? response(rp({ entries: [lap()] })) : response(lp({ entries: [lap()] }));
-  await h.client.load(3); assert.equal(h.client.challengeButtons.length, 0);
+  await h.client.load(1); assert.equal(h.client.challengeButtons.length, 0);
   assert.doesNotMatch(h.get('records-list').textContent, /00:42.00/); assert.match(h.get('records-list').textContent, /未录制/);
 });
 
@@ -384,7 +382,7 @@ test('switching harbor courses separates board queries, saves and late responses
   h.handler = req => req.url.pathname === '/api/leaderboard' && req.url.searchParams.get('city') === 'coast' ? waiting.promise
     : req.url.pathname === '/api/leaderboard' ? response(tp({ city: 'coast-neon', entries: [{ ...total('霓虹车手'), city: 'coast-neon' }] }))
       : response(req.url.searchParams.get('version') === RACE_GHOST_VERSION ? rp({ city: 'coast-neon' }) : lp({ city: 'coast-neon' }));
-  const old = h.client.load(3); await tick();
+  const old = h.client.load(1); await tick();
   await h.client.setTrack('coast-neon'); waiting.resolve(response(tp({ entries: [total('旧海港车手')] }))); await old;
   assert.match(h.get('records-list').textContent, /霓虹车手/); assert.doesNotMatch(h.get('records-list').textContent, /旧海港/);
   h.client.showResults([result({ city: 'coast' }), result({ playerId: 2, city: 'coast-neon', replay: null })]);
@@ -461,7 +459,7 @@ test('old saves cannot notify after a new race clears all result cards', async (
   assert.equal(h.client.cards.length, 0); assert.equal(h.savedCalls, 0);
 });
 
-for (const trackId of ['coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'coast-paris', 'coast-shanghai']) for (const laps of [1, 3]) test(`${trackId} ${laps}-lap result preserves its own map while another board is viewed, then returns an exact ghost challenge`, async () => {
+for (const trackId of ['coast-london', 'coast-beijing', 'coast-austin', 'coast-rio', 'coast-paris', 'coast-shanghai']) for (const laps of [1]) test(`${trackId} ${laps}-lap result preserves its own map while another board is viewed, then returns an exact ghost challenge`, async () => {
   const h = setup(), saved = [];
   h.handler = req => {
     const city = req.body?.city || req.url.searchParams.get('city');
@@ -524,14 +522,14 @@ for(const city of ['coast-austin','coast-shanghai'])test(`${city} completes tota
     return response({city:categoryCity,version,entries:[]});
   };
   await h.client.init();await h.client.setTrack(city);
-  h.client.showResults([result({city,raceReplay:fullRace()})]);const card=h.client.cards[0];card.input.value='Twenty Racer';
+  h.client.showResults([result({city,laps:3,raceReplay:fullRace()})]);const card=h.client.cards[0];card.input.value='Twenty Racer';
   await h.client.save(card);
   assert.equal(card.total.state,'saved');assert.equal(card.lap.state,'archived');assert.equal(card.race.state,'archived');
   assert.equal(card.done,true);assert.equal(h.savedCalls,1);assert.equal(card.button.textContent,'已完成');assert.match(card.message.textContent,/个人前 20/);
   assert.deepEqual(posted(h).map(req=>req.body.version),[LEADERBOARD_VERSION,city==='coast-shanghai'?'coast-ghost-v3':'coast-ghost-v2',city==='coast-shanghai'?'coast-race-ghost-v3':'coast-race-ghost-v2']);
   assert.ok(!h.client.lapCache.get(card.lap.id));assert.ok(!h.client.raceCache.get(card.race.id));
-  await h.client.load(3);assert.equal(h.client.entries.length,1,'total score remains ranked even though ghost is archived');
-  assert.equal(h.client.raceCache.get(card.race.id),null);assert.equal(h.client.challengeButtons.length,0);
+  await h.client.load(3);assert.equal(h.client.entries.length,0,'legacy three-lap history is no longer exposed as a public board');
+  assert.equal(storedTotal.laps,3,'retired history remains stored');assert.equal(h.client.challengeButtons.length,0);
   await h.client.save(card);assert.equal(posted(h).length,3,'archive is terminal, not an endless retry');assert.equal(h.savedCalls,1);
 });
 
@@ -547,7 +545,7 @@ for(const city of ['coast-austin','coast-shanghai'])test(`${city} unified board 
   };
   await h.client.init();await h.client.setTrack(city);
   assert.equal(h.client.entries.length,0);assert.match(h.get('records-status').textContent,/版本/);
-  h.client.showResults([result({city,raceReplay:fullRace()})]);const card=h.client.cards[0];card.input.value='Old Racer';await h.client.save(card);
+  h.client.showResults([result({city,laps:3,raceReplay:fullRace()})]);const card=h.client.cards[0];card.input.value='Old Racer';await h.client.save(card);
   assert.equal(card.total.state,'saved');assert.equal(card.lap.state,'error');assert.equal(card.race.state,'error');assert.equal(card.done,false);assert.equal(h.savedCalls,0);
   assert.equal(h.client.lapCache.size,0);assert.equal(h.client.raceCache.size,0);
 });

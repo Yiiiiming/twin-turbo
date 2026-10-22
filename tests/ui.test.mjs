@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { TRACK, TRACKS, setTrack, trackPoint, projectTrack, mod } from '../engine.js';
 import { RaceAI } from '../ai.js';
 import { GHOST_VERSION } from '../ghost-client.js';
-import { validateReplay, validateRaceReplay, RACE_GHOST_VERSION, ghostVersionForCity } from '../ghost-replay.js';
+import { validateReplay, RACE_GHOST_VERSION, ghostVersionForCity } from '../ghost-replay.js';
 import { LEADERBOARD_VERSION } from '../leaderboard.js';
 
 const sourceURL = new URL('../main.js', import.meta.url);
@@ -218,6 +218,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
   const rendererURL = `data:text/javascript;base64,${Buffer.from(rendererModule).toString('base64')}`;
   const source = (await readFile(sourceURL, 'utf8'))
     .replace("from './i18n.js'", `from '${new URL('../i18n.js', import.meta.url).href}'`)
+    .replace("from './race-hud.js'", `from '${new URL('../race-hud.js', import.meta.url).href}'`)
     .replace("from './controls.js'", `from '${new URL('../controls.js', import.meta.url).href}'`)
     .replace("from './split-timing.js'", `from '${new URL('../split-timing.js', import.meta.url).href}'`)
     .replace("from './ghost-challenge.js'", `from '${new URL('../ghost-challenge.js', import.meta.url).href}'`)
@@ -258,8 +259,8 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     application.renderer.rebuildCalls.length = 0;
     application.renderer.resetCalls.splice(0, application.renderer.resetCalls.length - 1);
     modeButtons.find(button=>button.dataset.mode==='local').click();
-    lapButtons.find(button=>button.dataset.laps==='3').click();
-    nodes.get('records-tab-3').click();
+    lapButtons.find(button=>button.dataset.laps==='1').click();
+    nodes.get('records-tab-1').click();
   }
   ui.frame();
   await ui.flush();
@@ -363,7 +364,7 @@ test('start and Space open preparation before countdown, with an explicit no-gho
   ui.click('start');
   assert.equal(ui.nodes.get('race-setup-dialog').open, true);
   assert.equal(ui.engine.state, 'menu');
-  assert.match(ui.nodes.get('race-setup-summary').textContent, /3 圈/);
+  assert.match(ui.nodes.get('race-setup-summary').textContent, /1 圈/);
   ui.key('KeyW'); ui.advance(.2);
   assert.equal(ui.engine.time, 0); assert.equal(ui.keys.size, 0);
   ui.click('setup-close');
@@ -456,7 +457,7 @@ test('single-player orange retains both control layouts with one real car and no
   assert.equal(ui.engine.cars.length, 1);
   await ui.launchPrepared(); ui.advance(3.1);
   assert.equal(ui.engine.cars[0].id, 1); assert.equal(ui.engine.cars[0].colorIndex, 1);
-  assert.equal(ui.engine.cars[0]._lane, -18);
+  assert.equal(ui.engine.cars[0]._lane, 0);
   ui.key('KeyW'); ui.advance(.4);
   assert.ok(ui.engine.cars[0].speed > 70, 'P1 driving controls still drive the human orange car');
   ui.keyup('KeyW'); ui.key('KeyK'); ui.advance(.2);
@@ -575,7 +576,7 @@ test('finish overlay directly offers the sole nickname form without leaving full
   ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
   await ui.launchPrepared(); ui.advance(3.1);
   const winner = ui.engine.cars[0];
-  Object.assign(winner, { finished: true, lap: 3, finishTime: 120.125, bestLap: 39.8 });
+  Object.assign(winner, { finished: true, lap: 1, finishTime: 120.125, bestLap: 39.8 });
   ui.engine.winner = winner; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
   assert.equal(ui.leaderboard.cards.length, 1);
   assert.equal(ui.nodes.get('records-results').hidden, false);
@@ -611,8 +612,8 @@ test('finish overlay directly offers the sole nickname form without leaving full
 test('both human finishers get independent name cards in finish order even when player 2 wins', async t => {
   const ui = await loadUI(t);
   ui.launch(); ui.advance(3.1);
-  Object.assign(ui.engine.cars[0], { finished: true, lap: 3, finishTime: 120.2, bestLap: 40 });
-  Object.assign(ui.engine.cars[1], { finished: true, lap: 3, finishTime: 120.1, bestLap: 39.9 });
+  Object.assign(ui.engine.cars[0], { finished: true, lap: 1, finishTime: 120.2, bestLap: 40 });
+  Object.assign(ui.engine.cars[1], { finished: true, lap: 1, finishTime: 120.1, bestLap: 39.9 });
   ui.engine.winner = ui.engine.cars[1]; ui.engine.state = 'finished'; ui.frame(); await ui.flush();
   assert.deepEqual(ui.leaderboard.cards.map(card => card.playerId), [2, 1]);
   const [firstCard, secondCard] = ui.leaderboard.cards;
@@ -641,7 +642,7 @@ test('the first finisher waits without interrupting the other player or showing 
   const ui = await loadUI(t);
   ui.launch(); ui.advance(3.1);
   const first = ui.engine.cars[0];
-  Object.assign(first, { finished: true, lap: 3, finishTime: 120.125, bestLap: 39.8, speed: 0 });
+  Object.assign(first, { finished: true, lap: 1, finishTime: 120.125, bestLap: 39.8, speed: 0 });
   ui.engine.winner = first; ui.engine.time = 120.125;
   ui.key('ArrowUp'); ui.key('Enter'); ui.advance(.3); await ui.flush();
   assert.equal(ui.engine.state, 'racing');
@@ -707,7 +708,7 @@ test('rescue shortcuts update real car penalty and player HUD', async t => {
   }
 });
 
-test('both player scoreboards count consecutive full laps despite brief shoulder excursions at a gate', async t => {
+test('both player scoreboards finish the single lap despite brief shoulder excursions at a gate', async t => {
   const ui = await loadUI(t);
   ui.launch(); ui.advance(3.1);
   const gate = TRACK.startDistance + TRACK.length / TRACK.checkpoints;
@@ -715,10 +716,10 @@ test('both player scoreboards count consecutive full laps despite brief shoulder
   const grassFrames = [0, 0];
   // Smooth, continuous position samples exercise the actual engine and HUD.
   // The old logic lost an entire lap after only 1–2 frames beyond the asphalt.
-  for (let s = TRACK.startDistance - 25; s < TRACK.startDistance + TRACK.length * 2 + 10; s += 5) {
+  for (let s = TRACK.startDistance - 25; s < TRACK.startDistance + TRACK.length + 10 && ui.engine.state !== 'finished'; s += 5) {
     const circuitDistance = TRACK.startDistance + mod(s - TRACK.startDistance, TRACK.length);
     for (const [index, car] of ui.engine.cars.entries()) {
-      const lane = index === 0 ? 22 : -18;
+      const lane = car._lane;
       const bump = Math.max(0, 1 - Math.abs(circuitDistance - gate) / 100) * (62 - Math.abs(lane));
       const p = trackPoint(s, lane + Math.sign(lane) * bump);
       car.x = p.x; car.y = p.y; car.angle = p.angle; car.speed = 0;
@@ -736,19 +737,19 @@ test('both player scoreboards count consecutive full laps despite brief shoulder
       verifiedLaps = expected;
     }
   }
-  assert.equal(verifiedLaps, 2);
+  assert.equal(verifiedLaps, 1);
   assert.ok(grassFrames.every(count => count > 0), 'both cars genuinely leave the asphalt briefly');
-  assert.equal(ui.engine.state, 'racing');
+  assert.equal(ui.engine.state, 'finished');
 });
 
-test('a real-control race saves one nickname for total, lap and complete three-lap ghost, retries only the failed part, and resets cleanly', async t => {
+test('a real-control one-lap race saves one nickname for total and lap ghost, retries only the failed part, and resets cleanly', async t => {
   let failedLapOnce = false;
   const savedTotals = [], savedLaps = [], savedRaces = [];
   const ui = await loadUI(t, { fetchImpl: async (url, options = {}) => {
     const lap = url.includes('/api/laps') || url.includes('/api/ghosts'), body = options.body ? JSON.parse(options.body) : null;
     const isRace = (body?.version || new URL(url).searchParams.get('version')) === RACE_GHOST_VERSION;
     const category = lap ? { version: isRace ? RACE_GHOST_VERSION : GHOST_VERSION, city: 'coast' }
-      : { version: LEADERBOARD_VERSION, city: 'coast', laps: body?.laps || Number(new URL(url).searchParams.get('laps')) || 3 };
+      : { version: LEADERBOARD_VERSION, city: 'coast', laps: body?.laps || Number(new URL(url).searchParams.get('laps')) || 1 };
     if (body) {
       if (lap && !isRace && !failedLapOnce) {
         failedLapOnce = true;
@@ -789,7 +790,7 @@ test('a real-control race saves one nickname for total, lap and complete three-l
     ui.frame();
   }
   assert.equal(ui.engine.state, 'finished');
-  assert.equal(ui.engine.winner.id, 1); assert.equal(ui.engine.winner.lap, 3);
+  assert.equal(ui.engine.winner.id, 1); assert.equal(ui.engine.winner.lap, 1);
   assert.ok(ui.engine.cars.every(car => car.finished));
   assert.deepEqual([...steering].sort(), ['left', 'right']);
   assert.equal(ui.nodes.get('result').classList.contains('hidden'), false);
@@ -809,11 +810,7 @@ test('a real-control race saves one nickname for total, lap and complete three-l
     const replay = ui.ghostRecorder.bestReplay(car.id);
     assert.ok(validateReplay(replay), 'actual harbor race creates a complete valid replay');
     assert.equal(replay.durationMs, Math.round(car.bestLap * 1000));
-    const fullRace = ui.ghostRecorder.fullRaceReplay(car.id);
-    assert.ok(validateRaceReplay(fullRace), 'actual controls record every lap of the race from GO');
-    assert.equal(fullRace.durationMs, Math.round(car.finishTime * 1000));
-    assert.equal(fullRace.lapEndsMs.length, 3);
-    assert.equal(fullRace.frames[0][0], 0);
+    assert.equal(ui.ghostRecorder.fullRaceReplay(car.id), null, 'single-lap races never create a retired three-lap replay');
     assert.equal(ui.nodes.get('personal-best'+car.id).textContent, ui.nodes.get(car.id===1?'best-lap':'best-lap2').textContent);
   }
   const cards = ui.leaderboard.cards;
@@ -828,10 +825,8 @@ test('a real-control race saves one nickname for total, lap and complete three-l
   const racePosts = () => posts().filter(request => request.url.includes('/api/laps') && JSON.parse(request.body).version === RACE_GHOST_VERSION);
   assert.equal(totalPosts().length, 1);
   assert.equal(lapPosts().length, 1);
-  assert.equal(savedTotals.length, 1); assert.equal(savedLaps.length, 0); assert.equal(savedRaces.length, 1);
-  assert.equal(racePosts().length, 1);
-  const raceSubmission = JSON.parse(racePosts()[0].body);
-  assert.equal(raceSubmission.name, 'Harbor Champion'); assert.ok(validateRaceReplay(raceSubmission.replay));
+  assert.equal(savedTotals.length, 1); assert.equal(savedLaps.length, 0); assert.equal(savedRaces.length, 0);
+  assert.equal(racePosts().length, 0, 'single-lap results do not post a three-lap ghost');
   const totalSubmission = JSON.parse(totalPosts()[0].body), lapSubmission = JSON.parse(lapPosts()[0].body);
   assert.equal(totalSubmission.name, 'Harbor Champion');
   assert.equal(lapSubmission.name, totalSubmission.name, 'one nickname is shared by both records');
@@ -845,8 +840,8 @@ test('a real-control race saves one nickname for total, lap and complete three-l
   assert.equal(totalPosts().length, 1, 'confirmed race record is not submitted again');
   assert.equal(lapPosts().length, 2);
   assert.deepEqual(JSON.parse(lapPosts()[1].body), lapSubmission, 'retry retains the same replay, nickname, and submission ID');
-  assert.equal(savedTotals.length, 1); assert.equal(savedLaps.length, 1); assert.equal(savedRaces.length, 1);
-  assert.equal(racePosts().length, 1, 'a confirmed complete race ghost is not resubmitted');
+  assert.equal(savedTotals.length, 1); assert.equal(savedLaps.length, 1); assert.equal(savedRaces.length, 0);
+  assert.equal(racePosts().length, 0, 'retry cannot create a retired three-lap ghost');
   assert.equal(winnerCard.button.disabled, true);
   const runnerUpCard = cards.find(card => card.playerId === 2);
   assert.equal(runnerUpCard.input.disabled, false, 'the other human still has an independent unsaved result');
@@ -875,7 +870,7 @@ for (const search of ['', '?city=london']) {
     assert.equal(ui.renderer.canvas, ui.nodes.get('game'));
     assert.equal(ui.nodes.has('city-game'), false);
     assert.equal(ui.nodes.has('board-city'), false);
-    assert.doesNotMatch(ui.html, /data-city=|london-guide|白金汉宫|伦敦/);
+    assert.doesNotMatch(ui.html, /data-city=|london-guide|city-game\.js/);
     assert.ok(ui.requests.length > 0);
     for (const request of ui.requests) {
       assert.equal(new URL(request.url).searchParams.get('city'), 'coast-london');
@@ -898,7 +893,7 @@ test('two nickname ghosts lock at start, replay independently in both viewports,
     return url.includes('/api/ghosts/') ? {version:GHOST_VERSION,city:'coast',entry:second?secondRecord:record,replay:second?secondReplay:recorded} :
       url.includes('/api/ghosts?') ? {version:GHOST_VERSION,city:'coast',entries:[second?secondRecord:record]} :
       url.includes('/api/laps') ? {version:GHOST_VERSION,city:'coast',entries:[record,secondRecord]} :
-      {version:LEADERBOARD_VERSION,city:'coast',laps:3,entries:[]};
+      {version:LEADERBOARD_VERSION,city:'coast',laps:1,entries:[]};
   }})});
   ui.lapButtons.find(button => button.dataset.laps === '1').click();
   assert.equal(ui.nodes.get('ghost-enabled').checked,false);
@@ -992,41 +987,36 @@ test('Ghost Challenge accepts either steering layout for the selected human colo
   ui.key('Enter'); ui.frame(); assert.ok(ui.engine.cars[0].boost < 100, 'the arrow layout also offers the human boost');
 });
 
-test('start preparation lists complete three-lap ghosts with two color choices and runs them from the shared GO clock', async t => {
-  const makeReplay = offset => ({ version: 1, kind: 'race', laps: 3, durationMs: 90000, lapEndsMs: [30000, 60000, 90000],
-    frames: Array.from({ length: 901 }, (_, index) => [index * 100, offset + index / 10, 100, 0, 0]) });
-  const ghosts = [{ id: 'three-purple', name: '完整三圈甲', playerId: 1, mode: 'local', createdAt: 1, timeMs: 90000, kind: 'race', laps: 3 },
-    { id: 'three-gold', name: '完整三圈乙', playerId: 2, mode: 'local', createdAt: 2, timeMs: 90000, kind: 'race', laps: 3 }];
+test('public setup and leaderboard exclude retired three-lap ghosts even in stale mixed responses', async t => {
+  const lap = { id: 'current-lap', name: '单圈车手', playerId: 1, mode: 'local', createdAt: 2, timeMs: 42000 };
+  const retired = { id: 'retired-race', name: '历史三圈', playerId: 1, mode: 'local', createdAt: 1, timeMs: 90000, kind: 'race', laps: 3 };
+  const replay = { version: 1, durationMs: 42000, frames: Array.from({ length: 421 }, (_, i) => [i * 100, 100 + i / 10, 200, 0, 0]) };
   const ui = await loadUI(t, { fetchImpl: async raw => {
-    const url = new URL(raw), kind = url.searchParams.get('version');
-    if (url.pathname.startsWith('/api/ghosts/')) {
-      const index = ghosts.findIndex(entry => url.pathname.endsWith(entry.id));
-      return { ok: true, json: async () => ({ city: 'coast', version: kind, entry: ghosts[index], replay: makeReplay(100 + index * 200) }) };
-    }
-    if (url.pathname === '/api/laps') return { ok: true, json: async () => ({ city: 'coast', version: kind, entries: kind === RACE_GHOST_VERSION ? ghosts : [] }) };
-    return { ok: true, json: async () => ({ city: 'coast', version: LEADERBOARD_VERSION, laps: 3, entries: [] }) };
+    const url = new URL(raw), city = url.searchParams.get('city'), version = url.searchParams.get('version');
+    if (url.pathname.startsWith('/api/ghosts/')) return { ok: true, json: async () => ({ city, version, entry: lap, replay }) };
+    if (url.pathname === '/api/laps') return { ok: true, json: async () => ({ city, version, entries: [retired, lap] }) };
+    return { ok: true, json: async () => ({ city, version, laps: 1, entries: [] }) };
   } });
+  assert.deepEqual(ui.lapButtons.map(button => button.dataset.laps), ['1']);
+  assert.equal(ui.nodes.has('records-tab-3'), false);
+  ui.click('records-tab-lap'); await ui.flush();
+  assert.deepEqual(ui.leaderboard.entries.map(entry => entry.id), [lap.id]);
+  assert.equal(ui.leaderboard.challengeButtons.length, 1);
   ui.click('start'); await ui.flush();
-  assert.equal(ui.nodes.get('race-setup-dialog').open, true); assert.equal(ui.engine.state, 'menu');
-  assert.match(ui.nodes.get('ghost-picker-title').textContent, /3 圈/);
-  assert.ok(ui.html.indexOf('id="ghost-search-form"') < ui.html.indexOf('id="ghost-picker-list"'), 'personal search sits above the choice leaderboard');
-  assert.equal(ui.ghostClient.pickerButtons.length, 4, 'every row offers purple and gold buttons');
-  const choose = (id, slotId) => ui.ghostClient.pickerButtons.find(item => item.entry.id === id && item.slotId === slotId).button.click();
-  await Promise.all(choose('three-purple', 0).pending); await ui.flush();
-  await Promise.all(choose('three-gold', 1).pending); await ui.flush();
-  assert.deepEqual(ui.ghostClient.selections().map(ghost => ghost.entry.id), ['three-purple', 'three-gold']);
-  ui.click('setup-launch'); ui.advance(3.2);
-  assert.equal(ui.engine.state, 'racing');
-  assert.ok(ui.engine.cars.every(car => !car._started), 'comparison begins before either car reaches the timing line');
-  for (const poses of ui.renderer.ghostPoses) {
-    assert.equal(poses.length, 2); assert.ok(Math.abs(poses[0].x - (100 + ui.engine.time)) < .001);
-    assert.ok(Math.abs(poses[1].x - (300 + ui.engine.time)) < .001);
+  assert.equal(ui.nodes.get('race-setup-dialog').open, true);
+  assert.match(ui.nodes.get('ghost-picker-title').textContent, /单圈/);
+  assert.deepEqual([...new Set(ui.ghostClient.pickerButtons.map(item => item.entry.id))], [lap.id]);
+  assert.equal(ui.ghostClient.pickerButtons.length, 2, 'the valid single-lap row still offers both ghost colors');
+  ui.ghostClient.setLaps(3); assert.equal(ui.ghostClient.laps, 1);
+  ui.click('setup-close');
+  await ui.leaderboard.onChallenge({ ...retired, city: 'coast' }); await ui.flush();
+  assert.equal(ui.nodes.get('race-setup-dialog').open, false, 'a stale three-lap challenge cannot reopen setup');
+  assert.equal(ui.engine.laps, 1);
+  for (const request of ui.requests) {
+    const url = new URL(request.url);
+    assert.notEqual(url.searchParams.get('laps'), '3');
+    assert.doesNotMatch(url.searchParams.get('version') || '', /race-ghost/);
   }
-  ui.key('Escape'); ui.frame(); const paused = structuredClone(ui.renderer.ghostPoses); ui.advance(.4);
-  assert.deepEqual(ui.renderer.ghostPoses, paused);
-  ui.click('pause-menu'); ui.frame();
-  ui.lapButtons.find(button => button.dataset.laps === '1').click();
-  assert.equal(ui.ghostClient.selections().length, 0, 'switching to sprint cannot carry three-lap ghosts into the wrong mode');
 });
 
 test('language choice is required before starting, persists the choice, and switching mid-race pauses safely', async t => {
@@ -1038,7 +1028,7 @@ test('language choice is required before starting, persists the choice, and swit
   ui.click('language-en');assert.equal(dialog.open,false);assert.equal(ui.i18n.language,'en');
   assert.equal(ui.document.documentElement.lang,'en');assert.equal(ui.window.localStorage.getItem('twin-turbo-language'),'en');
   assert.equal(ui.nodes.get('track-title').textContent,'Coastline Grand Prix');
-  ui.click('start');assert.match(ui.nodes.get('race-setup-summary').textContent,/3 laps/);
+  ui.click('start');assert.match(ui.nodes.get('race-setup-summary').textContent,/1 lap/);
   ui.click('setup-skip');ui.advance(3.2);ui.key('KeyW');ui.advance(.2);
   ui.click('language-toggle');assert.equal(dialog.open,true);assert.equal(ui.engine.state,'paused');
   const time=ui.engine.time;ui.advance(.2);assert.equal(ui.engine.time,time);
@@ -1081,7 +1071,7 @@ test('changing a harbor circuit resets its opponents, recording, splits and lead
   ui.ghostClient.select({entry:{id:'prior-lap',name:'旧赛道记录',timeMs:42000,playerId:1,mode:'local'},
     replay:{version:1,durationMs:42000,frames:[[0,100,100,0,0],[42000,100,100,0,0]]}});
   ui.ghostRecorder.racers.set(1,{best:{durationMs:42000}});ui.splitTiming.racers.set(1,{});
-  ui.leaderboard.showResults([{playerId:1,mode:'local',city:'coast',laps:3,finished:true,timeMs:140000}]);
+  ui.leaderboard.showResults([{playerId:1,mode:'local',city:'coast',laps:1,finished:true,timeMs:140000}]);
   assert.equal(ui.leaderboard.cards.length,1);
   ui.trackCards.get('coast-bay').button.click();await ui.flush();ui.frame();
   assert.equal(TRACK.id,'coast-bay');assert.equal(ui.ghostClient.city,'coast-bay');assert.equal(ui.leaderboard.city,'coast-bay');
@@ -1100,11 +1090,11 @@ test('changing a harbor circuit resets its opponents, recording, splits and lead
   assert.equal(ui.renderer.rebuildCalls.length,2);
 });
 
-test('every harbor map starts local and Ghost Challenge races in both one-lap sprint and three-lap modes',async t=>{
+test('every harbor map offers only one-lap local and Ghost Challenge races',async t=>{
   const ui=await loadUI(t);
-  assert.deepEqual(ui.lapButtons.map(button=>Number(button.dataset.laps)).sort(),[1,3]);
-  assert.doesNotMatch(ui.html,/data-laps="5"|id="records-tab-5"/);
-  for(const [id,track]of Object.entries(TRACKS))for(const mode of ['local','ai'])for(const laps of [1,3]){
+  assert.deepEqual(ui.lapButtons.map(button=>Number(button.dataset.laps)).sort(),[1]);
+  assert.doesNotMatch(ui.html,/data-laps="[35]"|id="records-tab-[35]"/);
+  for(const [id,track]of Object.entries(TRACKS))for(const mode of ['local','ai'])for(const laps of [1]){
     ui.trackCards.get(id).button.click();
     ui.modeButtons.find(button=>button.dataset.mode===mode).click();
     ui.lapButtons.find(button=>Number(button.dataset.laps)===laps).click();
@@ -1126,7 +1116,7 @@ test('every harbor map starts local and Ghost Challenge races in both one-lap sp
 test('leaderboard map browsing is independent of the current race and keeps unsaved results tied to their source map',async t=>{
   const ui=await loadUI(t),board=ui.nodes.get('records-track-choice');
   assert.deepEqual(board.children.map(option=>option.value),Object.keys(TRACKS));
-  ui.leaderboard.showResults([{playerId:1,mode:'local',city:'coast',laps:3,finished:true,timeMs:140000}]);
+  ui.leaderboard.showResults([{playerId:1,mode:'local',city:'coast',laps:1,finished:true,timeMs:140000}]);
   const initial=ui.leaderboard.cards[0];initial.input.value='保留中的昵称';
   board.value='coast-ridge';board.dispatch('change');await ui.flush();
   assert.equal(TRACK.id,'coast');assert.equal(ui.ghostClient.city,'coast');assert.equal(ui.leaderboard.city,'coast-ridge');
@@ -1137,8 +1127,8 @@ test('leaderboard map browsing is independent of the current race and keeps unsa
   board.value='coast-bay';board.dispatch('change');await ui.flush();
   assert.equal(TRACK.id,'coast');assert.equal(ui.engine.state,'racing');assert.equal(ui.leaderboard.locked,true);
   assert.equal(ui.ghostClient.locked,true);assert.equal(ui.leaderboard.city,'coast-bay');
-  Object.assign(ui.engine.cars[0],{finished:true,lap:3,finishTime:140,bestLap:46});
-  Object.assign(ui.engine.cars[1],{finished:true,lap:3,finishTime:141,bestLap:46.2});
+  Object.assign(ui.engine.cars[0],{finished:true,lap:1,finishTime:140,bestLap:46});
+  Object.assign(ui.engine.cars[1],{finished:true,lap:1,finishTime:141,bestLap:46.2});
   ui.engine.winner=ui.engine.cars[0];ui.engine.state='finished';ui.frame();await ui.flush();
   assert.equal(ui.leaderboard.cards.length,2,'finishing the current race still creates cards while another map board is selected');
   assert.ok(ui.leaderboard.cards.every(card=>card.city==='coast'));assert.equal(TRACK.id,'coast');
@@ -1216,7 +1206,7 @@ function challengeFetch(fixture, {beforeBoard} = {}) {
       const entry=fixture.board.find(entry=>url.pathname.endsWith('/'+entry.id));
       return {ok:true,status:200,json:async()=>({city,version,entry,replay:fixture.replay(entry)})};
     }
-    return {ok:true,status:200,json:async()=>({city,version,laps:Number(url.searchParams.get('laps'))||3,entries:[]})};
+    return {ok:true,status:200,json:async()=>({city,version,laps:Number(url.searchParams.get('laps'))||1,entries:[]})};
   };
 }
 
@@ -1257,10 +1247,18 @@ test('automatic solo setup waits for matching, then starts three distinct human 
   ui.key('Escape');ui.advance(.2);
   assert.equal(ui.engine.time,time);assert.deepEqual(ui.renderer.ghostPoses,poses);
   ui.click('resume');ui.frame();assert.ok(ui.engine.time>time);
+  ui.advance(2.1);
+  assert.equal(ui.nodes.get('challenge-live').hidden,true,'the grid list leaves the left edge after three racing seconds');
+  assert.equal(ui.nodes.get('race-position1').hidden,false,'current position remains at the top');
+  assert.equal(ui.nodes.get('position-total1').textContent,'/ 7');
+  assert.ok(Number(ui.nodes.get('position-place1').textContent)>=1);
+  assert.equal(ui.nodes.get('speed-mode1').textContent,'KM/H');
+  assert.ok(Number(ui.nodes.get('speed-fill1').style.strokeDashoffset)<100,'actual movement fills the speed dial');
+  assert.equal(ui.nodes.has('setup-start-rule'),false,'the removed rule is not in the setup');
   assert.equal(ui.requests.filter(request=>request.method==='POST').length,0,'matching and pacing never submit records');
 });
 
-for(const laps of [1,3])test(`Ghost Challenge ${laps}-lap results use the correct clock and finish immediately with only the human save card`,async t=>{
+for(const laps of [1])test(`Ghost Challenge ${laps}-lap results use the correct clock and finish immediately with only the human save card`,async t=>{
   const fixture=challengeFixture(laps),ui=await loadUI(t,{fetchImpl:challengeFetch(fixture)});
   ui.modeButtons.find(button=>button.dataset.mode==='ai').click();
   ui.lapButtons.find(button=>Number(button.dataset.laps)===laps).click();
@@ -1349,7 +1347,7 @@ test('empty and unavailable automatic boards permit an explicit time trial and a
   const ui=await loadUI(t,{fetchImpl:async url=>fail&&url.includes('/api/laps')?{ok:false,status:503}:fetchFixture(url)});
   ui.modeButtons.find(button=>button.dataset.mode==='ai').click();ui.lapButtons.find(button=>button.dataset.laps==='1').click();
   ui.click('start');await ui.flush();
-  assert.equal(ui.nodes.get('setup-launch').disabled,false);assert.equal(ui.nodes.get('setup-launch').textContent,'自由计时');
+  assert.equal(ui.nodes.get('setup-launch').disabled,false);assert.equal(ui.nodes.get('setup-launch').textContent,'确认发车');
   assert.match(ui.nodes.get('challenge-status').textContent,/没有可用的人类幽灵/);
   fail=true;ui.click('challenge-retry');await ui.flush();
   assert.match(ui.nodes.get('challenge-status').textContent,/暂时无法连接/);
@@ -1361,7 +1359,12 @@ test('empty and unavailable automatic boards permit an explicit time trial and a
 for (const player of [1, 2]) test(`player ${player} sees a cancellable final-three-second off-road warning and automatic recovery`, async t => {
   const ui = await loadUI(t);
   ui.launch(); ui.advance(3.1);
-  const car=ui.engine.cars[player-1],sign=Math.sign(car._lane),station=car._gridS;
+  const car=ui.engine.cars[player-1],sign=Math.sign(car._lane);
+  const accelerate = player === 1 ? 'KeyW' : 'ArrowUp';
+  ui.key(accelerate); ui.advance(1); ui.keyup(accelerate);
+  assert.equal(car._started, true, 'off-road recovery is exercised after a valid forward start');
+  car.speed = 0;
+  const station=projectTrack(car.x,car.y).s;
   const moveToLane=lane=>{
     const from=projectTrack(car.x,car.y).offset,steps=Math.ceil(Math.abs(lane-from)/5);
     for(let i=1;i<=steps;i++){
@@ -1392,4 +1395,16 @@ for (const player of [1, 2]) test(`player ${player} sees a cancellable final-thr
   assert.equal(ui.renderer.resetCalls.length,resets+1);
   assert.equal(ui.renderer.resetCalls.at(-1).playerId,player,'only the recovered player camera snaps back');
   assert.equal(ui.nodes.get('offroad'+player).textContent,'返回赛道 · 罚停中');
+});
+
+test('a millisecond tie keeps the player in the same place in the live HUD and final results',async t=>{
+  const fixture=challengeFixture(1),ui=await loadUI(t,{fetchImpl:challengeFetch(fixture)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();
+  await ui.launchPrepared();ui.advance(3.1);
+  const car=ui.engine.cars[0];
+  Object.assign(car,{finished:true,_started:true,lap:1,finishTime:42.6,lastLap:42,bestLap:42,speed:0,progress:1});
+  ui.engine.time=42.6;ui.frame();await ui.flush();
+  assert.equal(ui.nodes.get('position-place1').textContent,1);
+  assert.equal(ui.nodes.get('winner-name').textContent,'第 1 名 · 挑战完成');
+  assert.ok(ui.nodes.get('challenge-results-list').children[0].className.includes('is-you'));
 });
