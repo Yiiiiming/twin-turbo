@@ -9,6 +9,8 @@ import { SHANGHAI_ADDITIONAL_LANDMARKS, shanghaiCityLandmarkPlacements } from '.
 import { addShanghaiDownhillLandmark } from './shanghai-downhill.js';
 import { PARIS_LANDMARKS, addParisLandmark } from './paris-landmarks.js';
 import { parisLandmarkPlacements, parisBlocksFrontage } from './paris-layout.js';
+import { RIO_LANDMARKS, addRioLandmark } from './rio-landmarks.js';
+import { rioLandmarkPlacements, rioBlocksFrontage, rioShoreBoundary } from './rio-layout.js';
 import { addAustinCampus } from './austin-campus.js';
 import { addAustinFootball } from './austin-football.js';
 import { AUSTIN_LANDMARKS, austinLandmarkPlacements, addAustinLandmark } from './austin-landmarks.js';
@@ -55,17 +57,19 @@ export function cityLandmarkPlacements() {
  }
  if(TRACK.theme==='austin'){result.push(...sixthStreetPlacements());result.push(...austinLandmarkPlacements(result));}
  if(TRACK.theme==='paris')result.push(...parisLandmarkPlacements(result));
+ if(TRACK.theme==='rio')result.push(...rioLandmarkPlacements(result));
  const frozen=Object.freeze(result);placementCache.set(TRACK,frozen);return frozen;
 }
 export function citySceneryPlacements() {
  if(!isCityTheme())return [];
  if(sceneryCache.has(TRACK))return sceneryCache.get(TRACK);
  if(TRACK.theme==='beijing'){const items=beijingNeighborhoodPlacements(cityLandmarkPlacements());sceneryCache.set(TRACK,items);return items;}
- const random=seedRandom({beijing:20751,austin:49178,rio:61937,paris:33871,shanghai:52789}[TRACK.theme]),items=[],landmarks=cityLandmarkPlacements();
+ const random=seedRandom({beijing:20751,austin:49178,rio:61937,paris:33871,shanghai:52789}[TRACK.theme]),items=[],landmarks=cityLandmarkPlacements(),rioShore=TRACK.theme==='rio'?rioShoreBoundary():Infinity;
  for(let s=110,index=0;s<TRACK.length;s+=110,index++)for(const side of [-1,1]){
   const tree=index%5===0,kind=tree?(TRACK.theme==='rio'?'rio-palm':'city-tree'):{beijing:'hutong',austin:'music-street',paris:'haussmann',shanghai:'shikumen'}[TRACK.theme]||'rio-house';
   const width=tree?24:58+random()*30,depth=tree?24:46+random()*20,radius=tree?36:Math.hypot(width+16,depth+16)/2;
   const p=trackPoint(s,side*(TRACK.roadWidth/2+radius+35+random()*20));
+  if(TRACK.theme==='rio'&&(p.y+radius>rioShore-22||landmarks.some(item=>rioBlocksFrontage({x:p.x,z:p.y,radius},item))))continue;
   if(p.elevation>5||!clearOfRiver(p.x,p.y,radius)||projectTrack(p.x,p.y).distance<TRACK.roadWidth/2+radius+18)continue;
   if(TRACK.theme==='beijing'&&!beijingWallClearance(p.x,p.y,radius))continue;
   if(TRACK.theme==='shanghai'&&!shanghaiRiverClearance(p.x,p.y,radius))continue;
@@ -411,6 +415,7 @@ export function addCityLandmark(mesh,item){
  else if(SHANGHAI_LANDMARKS.some(landmark=>landmark.kind===item.kind))addShanghaiLandmark(mesh,item);
  else if(SHANGHAI_ADDITIONAL_LANDMARKS.some(landmark=>landmark.kind===item.kind))addShanghaiDownhillLandmark(mesh,item);
  else if(PARIS_LANDMARKS.some(landmark=>landmark.kind===item.kind))addParisLandmark(mesh,item);
+ else if(RIO_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRioLandmark(mesh,item);
  else draw[item.kind]?.(mesh,item);
 }
 export function addCityLandmarks(mesh){
