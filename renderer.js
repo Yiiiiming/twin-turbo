@@ -1,6 +1,6 @@
 import { austinScoreboardSurface, paintAustinScoreboard } from './austin-football.js';
 import { addShanghaiRiverfront } from './shanghai-riverfront.js';
-import { addShanghaiDownhillLandmarks, addShanghaiDownhillCourts } from './shanghai-downhill.js';
+import { addShanghaiDownhillCourts } from './shanghai-downhill.js';
 import { isCityTheme, citySceneryPlacements, cityLandmarkPlacements, addCityLandmarks, addCityStreetScenery, addCityPavements } from './city-scenery.js';
 import { WEST_END_LANDMARKS, addWestEndLandmark, details as architecturalDetails } from './london-west-end.js';
 import { londonDetailMesh } from './london-detail-mesh.js';
@@ -907,7 +907,7 @@ function buildWorld() {
   if(london)londonPavements(terrain);
   if(themedCity)addCityPavements(terrain);
   if(TRACK.theme==='shanghai')addShanghaiRiverfront(terrain,water,props);
-  if(TRACK.theme==='shanghai'){addShanghaiDownhillCourts(terrain);addShanghaiDownhillLandmarks(props);}
+  if(TRACK.theme==='shanghai')addShanghaiDownhillCourts(terrain);
   const waterStart=river?river.centerZ-river.halfWidth:shoreZ,waterEnd=river?river.centerZ+river.halfWidth:h+2600;
   if(!inland)water.quad([-1800,.12,waterStart],[w+2400,.12,waterStart],[w+2400,.12,waterEnd],[-1800,.12,waterEnd],london||TRACK.theme==='paris'?'#577f88':'#318caa',.2,[0,1,0]);
   for(let i=0;i<(inland?0:85);i++) {

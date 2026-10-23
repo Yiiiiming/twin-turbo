@@ -4,7 +4,11 @@ import { TRACK, trackPoint, projectTrack } from './engine.js';
 import { beijingNeighborhoodPlacements, addBeijingNeighborhood } from './beijing-neighborhoods.js';
 import { addBeijingGreatWall, beijingWallClearance } from './beijing-great-wall.js';
 import { BEIJING_LANDMARKS, BEIJING_REFINEMENTS, beijingLandmarkPlacements, addBeijingCityLandmark } from './beijing-city-landmarks.js';
-import { SHANGHAI_LANDMARKS, shanghaiLandmarkPlacements, addShanghaiLandmark } from './shanghai-landmarks.js';
+import { SHANGHAI_LANDMARKS, addShanghaiLandmark } from './shanghai-landmarks.js';
+import { SHANGHAI_ADDITIONAL_LANDMARKS, shanghaiCityLandmarkPlacements } from './shanghai-layout.js';
+import { addShanghaiDownhillLandmark } from './shanghai-downhill.js';
+import { PARIS_LANDMARKS, addParisLandmark } from './paris-landmarks.js';
+import { parisLandmarkPlacements, parisBlocksFrontage } from './paris-layout.js';
 import { addAustinCampus } from './austin-campus.js';
 import { addAustinFootball } from './austin-football.js';
 import { AUSTIN_LANDMARKS, austinLandmarkPlacements, addAustinLandmark } from './austin-landmarks.js';
@@ -25,7 +29,7 @@ const placementCache=new WeakMap(),sceneryCache=new WeakMap();
 
 export function cityLandmarkPlacements() {
  if(!isCityTheme())return [];
- if(TRACK.theme==='shanghai')return shanghaiLandmarkPlacements();
+ if(TRACK.theme==='shanghai')return shanghaiCityLandmarkPlacements();
  if(placementCache.has(TRACK))return placementCache.get(TRACK);
  if(TRACK.theme==='beijing'){const plots=beijingLandmarkPlacements();placementCache.set(TRACK,plots);return plots;}
  const result=[];
@@ -50,6 +54,7 @@ export function cityLandmarkPlacements() {
   }
  }
  if(TRACK.theme==='austin'){result.push(...sixthStreetPlacements());result.push(...austinLandmarkPlacements(result));}
+ if(TRACK.theme==='paris')result.push(...parisLandmarkPlacements(result));
  const frozen=Object.freeze(result);placementCache.set(TRACK,frozen);return frozen;
 }
 export function citySceneryPlacements() {
@@ -66,6 +71,15 @@ export function citySceneryPlacements() {
   if(TRACK.theme==='shanghai'&&!shanghaiRiverClearance(p.x,p.y,radius))continue;
   if(TRACK.theme==='shanghai'&&side===1&&s>=TRACK.bund.start-300&&s<=TRACK.bund.end+500)continue;
   if(landmarks.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+25)||items.some(item=>Math.hypot(item.x-p.x,item.z-p.y)<item.radius+radius+7))continue;
+  if(TRACK.theme==='paris'&&landmarks.some(item=>parisBlocksFrontage({x:p.x,z:p.y,radius},item)))continue;
+  // Keep the approach to a set-back Shanghai landmark open. An ordinary house
+  // can clear its footprint while still hiding the entrance from the road.
+  if(TRACK.theme==='shanghai'&&landmarks.some(item=>{
+   const road=trackPoint(item.s),dx=item.x-road.x,dz=item.z-road.y,len=Math.hypot(dx,dz);
+   if(len<1)return false;
+   const along=((p.x-road.x)*dx+(p.y-road.y)*dz)/len;
+   return along>0&&along<len&&Math.abs((p.x-road.x)*dz-(p.y-road.y)*dx)/len<radius+Math.min(48,(item.width||80)*.24);
+  }))continue;
   // Haussmann blocks keep the even cornice line Paris streets are known for.
   const height=TRACK.theme==='beijing'?38+random()*22:TRACK.theme==='paris'?64+random()*14:58+random()*45;
   items.push(Object.freeze({kind,x:p.x,z:p.y,angle:p.angle,side,radius,width,depth,height,variant:index%6}));
@@ -395,6 +409,8 @@ export function addCityLandmark(mesh,item){
  else if(AUSTIN_LANDMARKS.some(landmark=>landmark.kind===item.kind))addAustinLandmark(mesh,item);
  else if(SIXTH_STREET_VENUES.some(venue=>venue.kind===item.kind))addSixthStreetVenue(mesh,item);
  else if(SHANGHAI_LANDMARKS.some(landmark=>landmark.kind===item.kind))addShanghaiLandmark(mesh,item);
+ else if(SHANGHAI_ADDITIONAL_LANDMARKS.some(landmark=>landmark.kind===item.kind))addShanghaiDownhillLandmark(mesh,item);
+ else if(PARIS_LANDMARKS.some(landmark=>landmark.kind===item.kind))addParisLandmark(mesh,item);
  else draw[item.kind]?.(mesh,item);
 }
 export function addCityLandmarks(mesh){
