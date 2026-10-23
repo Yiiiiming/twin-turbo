@@ -19,7 +19,9 @@ kbd{display:inline-block;min-width:19px;padding:2px 4px;font-family:var(--font);
 /* Rounded race instruments requested during the visual review. */
 .race-card{border-radius:22px;padding:10px 20px}#pause{border-radius:18px}.race-position{border-radius:18px}.split-readout{border-radius:20px;padding:15px 17px;border-left:0;border:1px solid #b7a4e52b}.split-readout>strong{font-size:19px;line-height:1.45;font-weight:400;overflow-wrap:anywhere}.split-readout>span{line-height:1.7}.challenge-live{border-radius:18px}.offroad-warning{border-radius:20px}.finisher-notice{border-radius:24px}.player-color-select{display:flex;gap:12px;margin:12px 0 24px}.player-color-select button{display:flex;align-items:center;gap:9px;flex:1;padding:13px 16px;background:transparent;border:1px solid #ffffff20;border-radius:14px;font-size:12px;color:#c9bddb}.player-color-select button i{height:8px;width:8px;border-radius:50%;background:var(--cyan)}.player-color-select button[data-player-color=orange] i{background:var(--orange)}.player-color-select button.selected{border-color:#b6a0e5;background:#a38cc916;color:#fff}.pointer-orbits{position:fixed;inset:0;z-index:9999;pointer-events:none!important;opacity:0;transition:opacity .3s;overflow:hidden;contain:strict}.pointer-orbits.visible{opacity:1}.pointer-orbits i{display:block;position:absolute;top:0;left:0;border:1px solid #d4c5ff88;border-radius:50%;width:19px;height:19px;will-change:transform;pointer-events:none}.pointer-orbits i:nth-child(2){width:46px;height:46px;border-color:#b89bff4d}.pointer-orbits i:nth-child(3){width:85px;height:85px;border-color:#b89bff29}.language-dialog .language-options{margin-top:0!important}
 @media(max-width:700px){.split-readout>strong{font-size:15px}.race-card{padding:8px 13px;border-radius:18px}.player-color-select{gap:8px}.player-color-select button{padding:11px;font-size:11px}}
-@media(prefers-reduced-motion:reduce),(pointer:coarse){.pointer-orbits{display:none!important}}
+@media(hover:none),(pointer:coarse){.pointer-orbits{display:none!important}}
+/* Remaining nitro occupies the open lower edge of each existing speed dial. */
+.dial-nitro-track,.dial-nitro-fill{fill:none;stroke-width:4;stroke-linecap:round}.dial-nitro-track{stroke:#dbd1ef26}.dial-nitro-fill{stroke:var(--accent);stroke-dasharray:100;stroke-dashoffset:0}.speed-readout.is-boosting .dial-nitro-fill{filter:drop-shadow(0 0 2px var(--accent))}
 /* Race deltas: one driver per line; the stopwatch is the only top timing readout. */
 .pause-race-details .lap-timing{position:static;display:flex;gap:7px;font-size:10px;text-shadow:none;color:#ad9fc6;margin:0 0 12px}.split-readout>span{display:grid;gap:7px;margin-top:10px}.split-readout>span>span{display:flex;justify-content:space-between;gap:12px;font-size:10px;line-height:1.5;overflow-wrap:anywhere}.split-readout>strong{font-size:17px;line-height:1.4}.split-readout>strong>span,.split-readout>span>span>span{min-width:0;overflow-wrap:anywhere}.split-readout>strong>b,.split-readout>span>span>b{font-weight:400;white-space:nowrap;font-variant-numeric:tabular-nums}.split-readout>strong:has(>span){display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px}.split-readout>strong>b{font-size:21px}.split-readout>span>span>b{color:inherit}
 
@@ -33,7 +35,11 @@ kbd{display:inline-block;min-width:19px;padding:2px 4px;font-family:var(--font);
 @media(max-width:360px){.scoreboard .race-actions #pause{font-size:0;gap:0}.scoreboard .race-actions #pause kbd{font-size:10px}}
 
 /* The lobby landmark replaces the old orbit; the pointer rings stay independent. */
-body.orbit-cursor, body.orbit-cursor * { cursor: none !important; }
+/* Cover the root and top-layer/pseudo-element surfaces too. An explicit blank
+   cursor keeps one stable native cursor image while the DOM rings follow it. */
+html.orbit-cursor,html.orbit-cursor *,html.orbit-cursor *::before,html.orbit-cursor *::after,html.orbit-cursor ::backdrop {
+  cursor:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=") 0 0,none!important;
+}
 #menu { justify-content: safe center; }
 #menu .lobby-identity:has(.landmark-hologram) { flex-direction: column; gap: 0; max-width: 100%; }
 .landmark-hologram {

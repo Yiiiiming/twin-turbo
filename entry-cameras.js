@@ -118,31 +118,61 @@ function clearShot(shot,obstacles,subject,lamps=[],boundary=null){
   }
   return true;
 }
-function landmarkShot(item,obstacles,index,lamps,boundary){
+function landmarkShot(item,obstacles,index,lamps,boundary,aspect){
   const h=HEIGHTS[item.kind]||item.height||180,r=item.radius||110,base=item.elevation||0;
   const target=[item.x,base+h*.48,item.z];
-  // The wheel's plane is local +Z; the other facades face local -Z. Beijing's
-  // refined Tiananmen model applies its road-side rotation during dispatch,
-  // after placement. Match that actual facade, which faces inside the wall.
-  const modelAngle=(item.angle||0)+(item.kind==='palace-gate'&&item.side<0?Math.PI:0);
-  const front=modelAngle+(item.kind==='london-eye'?Math.PI:-Math.PI/2);
+  // Match the actual model's entrances/lettering, including dispatch rotations.
+  // Occlusion avoidance may move along a facade but never behind it. Symmetric
+  // subjects explicitly list equivalent faces; they are not accidental fallbacks.
+  const modelAngle=(item.angle||0)+(['palace-gate','temple-of-heaven'].includes(item.kind)&&item.side<0?Math.PI:0);
+  const radial=['sugarloaf','lighthouse','spiral-core'].includes(item.kind);
+  const faces=item.kind==='london-eye'?[Math.PI,0]:item.kind==='big-ben'?[0,Math.PI/2,Math.PI,-Math.PI/2]
+    :['texas-capitol','arc-de-triomphe','temple-of-heaven'].includes(item.kind)?[-Math.PI/2,Math.PI/2]
+    :item.kind==='eiffel-tower'?[-Math.PI/2,0,Math.PI/2,Math.PI]
+    :['sailing-club','forest-lodge'].includes(item.kind)?[Math.PI/2]
+    :radial?[-Math.PI/2,0,Math.PI/2,Math.PI]:[-Math.PI/2];
   const distance=index?Math.max(430,h*1.85,r*3.5):Math.max(780,h*2.8,r*5.7),subject={...item,radius:r,viewHeight:h};
   const nearby=obstacles.filter(o=>Math.hypot(o.x-item.x,o.y-item.z)<distance+(o.radius||Math.hypot(o.halfWidth,o.halfDepth))+30);
-  const lifts=index?[0,24,50,90,140,220,340]:[0,120,260,440,680];
-  const offsets=index?[-.30,0,.45,-.70,.85,-1.05,1.3,-1.5,1.8,-2.0,2.35,-2.65,Math.PI]:[.18,0,.48,-.48,.86,-.86,Math.PI];
-  let last;
-  for(const lift of lifts)for(const offset of offsets)for(const sweep of index?[.56,-.56]:[0]){
-    const a=front+offset,b=a+sweep,ratio=index?.73:.56;
-    const fromHeight=index?clamp(h*.17+28,48,105):h*1.25+150;
-    const toHeight=index?clamp(h*.13+22,42,82):h*.82+90;
-    const from=camera([item.x+Math.cos(a)*distance,base+fromHeight+lift,item.z+Math.sin(a)*distance],target,(index?54:60)*Math.PI/180);
-    const to=camera([item.x+Math.cos(b)*distance*ratio,base+toHeight+lift,item.z+Math.sin(b)*distance*ratio],target,(index?50:48)*Math.PI/180);
-    const shot={kind:item.kind,movement:index?'orbit':'push',subject,from,to,
-      ...(index?{orbit:{center:[item.x,item.z],angle:a,sweep,fromRadius:distance,toRadius:distance*ratio}}:{})};last=shot;
+  // The Bund facade sits just behind two street lamps. A nearer wide-angle
+  // arc passes between their sightlines while keeping the entrance and dome.
+  if(index&&item.kind==='bund-hsbc'){
+    // A portrait window uses the earlier part of this same checked arc. Moving
+    // closer would crop the wings even at 105 degrees, so do not stretch further.
+    const fraction=aspect<.78?.2:1,angle=modelAngle-Math.PI/2-.35,sweep=.46*fraction,fromRadius=300,toRadius=mix(300,219,fraction);
+    const narrowFov=Math.min(105*Math.PI/180,2*Math.atan(1/Math.max(.3,aspect)));
+    const from=camera([item.x+Math.cos(angle)*fromRadius,base+63.19,item.z+Math.sin(angle)*fromRadius],target,aspect<1.5?narrowFov:72*Math.PI/180);
+    const to=camera([item.x+Math.cos(angle+sweep)*toRadius,base+mix(63.19,48.91,fraction),item.z+Math.sin(angle+sweep)*toRadius],target,aspect<1.5?narrowFov:68*Math.PI/180);
+    const shot={kind:item.kind,movement:'orbit',subject,from,to,framedAspect:aspect,orbit:{center:[item.x,item.z],angle,sweep,fromRadius,toRadius}};
     if(clearShot(shot,nearby,subject,lamps,boundary))return shot;
   }
-  // The tall final candidate is preferable to placing a camera inside scenery.
-  return last;
+  // Curated moves reviewed against the actual foliage and building triangles.
+  // Their collision/lamps guard remains the same as for searched candidates.
+  const directed=item.kind==='forest-lodge'?(index?{face:Math.PI/2,offset:-.50,sweep:-.28,scale:.68,lift:0}:{face:Math.PI/2,offset:-.65,sweep:0,scale:1,lift:-80})
+    :index&&item.kind==='neon-plaza'?{face:-Math.PI/2,offset:.28,sweep:.56,scale:.68,lift:180}
+    :index&&item.kind==='lighthouse'?{face:Math.PI/2,offset:0,sweep:.56,scale:1,lift:0}:null;
+  if(directed){
+    const {face,offset,sweep,scale,lift}=directed,angle=modelAngle+face+offset,range=distance*scale,ratio=index?.73:.56;
+    const fromHeight=index?clamp(h*.17+28,48,105):h*1.25+150,toHeight=index?clamp(h*.13+22,42,82):h*.82+90;
+    const from=camera([item.x+Math.cos(angle)*range,base+fromHeight+lift,item.z+Math.sin(angle)*range],target,(index?54:60)*Math.PI/180);
+    const to=camera([item.x+Math.cos(angle+sweep)*range*ratio,base+toHeight+lift,item.z+Math.sin(angle+sweep)*range*ratio],target,(index?50:48)*Math.PI/180);
+    const shot={kind:item.kind,movement:index?'orbit':'push',subject,from,to,...(index?{orbit:{center:[item.x,item.z],angle,sweep,fromRadius:range,toRadius:range*ratio}}:{})};
+    if(clearShot(shot,nearby,subject,lamps,boundary))return shot;
+  }
+  const lifts=index?[0,24,50,90,140,220,340]:[0,120,260,440,680];
+  const offsets=index?[-.30,0,.30,-.56,.56,-.80,.80]:[.18,0,.48,-.48,.86,-.86];
+  for(const lift of lifts)for(const face of faces)for(const scale of [1,.82,1.18,.68,1.42])for(const offset of offsets)for(const sweep of index?[.56,-.56]:[0]){
+    if(Math.abs(offset)>Math.PI/3||Math.abs(offset+sweep)>Math.PI/3)continue;
+    const front=modelAngle+face,a=front+offset,b=a+sweep,ratio=index?.73:.56,range=distance*scale;
+    const fromHeight=index?clamp(h*.17+28,48,105):h*1.25+150;
+    const toHeight=index?clamp(h*.13+22,42,82):h*.82+90;
+    const from=camera([item.x+Math.cos(a)*range,base+fromHeight+lift,item.z+Math.sin(a)*range],target,(index?54:60)*Math.PI/180);
+    const to=camera([item.x+Math.cos(b)*range*ratio,base+toHeight+lift,item.z+Math.sin(b)*range*ratio],target,(index?50:48)*Math.PI/180);
+    const shot={kind:item.kind,movement:index?'orbit':'push',subject,from,to,
+      ...(index?{orbit:{center:[item.x,item.z],angle:a,sweep,fromRadius:range,toRadius:range*ratio}}:{})};
+    if(clearShot(shot,nearby,subject,lamps,boundary))return shot;
+  }
+  // Never accept an obstructed final candidate just because the search ended.
+  return null;
 }
 function roadShot(track,station,obstacles,low=false){
   const fromRoad=pointOnTrack(track,station-440),toRoad=pointOnTrack(track,station-160),ahead=pointOnTrack(track,station+320);
@@ -173,13 +203,13 @@ export function createEntryCameraPlan(track,car,{landmarks=[],obstacles=[],lamps
   // A spiral's subject includes the real road wrapped around its core. Its
   // helix is part of the intended silhouette, rather than a foreground wall.
   const subject=item=>item?.kind==='spiral-core'?{...item,radius:Math.max(item.radius,(track.spirals?.[item.index]?.radius||275)+track.roadWidth/2+20)}:item;
-  const first=primary?landmarkShot(subject(primary),obstacles,0,lampBodies,boundary):roadShot(track,track.startDistance+track.length*.18,obstacles);
+  const first=(primary&&landmarkShot(subject(primary),obstacles,0,lampBodies,boundary,aspect))||roadShot(track,track.startDistance+track.length*.18,obstacles);
   const orbitSubject=secondary||landmarks.find(item=>item!==primary&&item.kind===primary?.kind)||primary;
-  const second=orbitSubject?landmarkShot(subject(orbitSubject),obstacles,1,lampBodies,boundary):roadShot(track,track.startDistance+track.length*.38,obstacles,true);
+  const second=(orbitSubject&&landmarkShot(subject(orbitSubject),obstacles,1,lampBodies,boundary,aspect))||roadShot(track,track.startDistance+track.length*.38,obstacles,true);
   // Keep wide facades readable in portrait without moving a checked camera
   // through additional city blocks. The racing chase FOV remains untouched.
   const framing=Math.max(1,.95/Math.max(.3,aspect));
-  for(const shot of [first,second])for(const end of [shot.from,shot.to])end.fov=Math.min(105*Math.PI/180,2*Math.atan(Math.tan(end.fov/2)*framing));
+  for(const shot of [first,second])if(shot.framedAspect!==aspect)for(const end of [shot.from,shot.to])end.fov=Math.min(105*Math.PI/180,2*Math.atan(Math.tan(end.fov/2)*framing));
   // A brief rear approach over the actual starting straight. Keep the final
   // segment on the same line of sight as normal chase, not a sideways orbit.
   const forward=[Math.cos(car.angle),Math.sin(car.angle)],height=car.elevation||0;

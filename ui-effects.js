@@ -20,27 +20,31 @@ if (stage && typeof window.matchMedia === 'function') {
   const points = rings.map(() => ({ x: 0, y: 0 }));
   let x = 0, y = 0, frame = 0, previous = 0, lastMove = 0, started = false;
   function hide() { trail.classList.remove('visible'); started = false; if (frame) cancelAnimationFrame(frame); frame = 0; }
+  function position(ring,point){ring.style.transform=`translate3d(${point.x}px,${point.y}px,0) translate(-50%,-50%)`;}
   function draw(now) {
     frame = 0;
-    if (reduced.matches || document.hidden) { hide(); return; }
+    if (!finePointer.matches || document.hidden) { hide(); return; }
     const driving = ['racing', 'countdown'].includes(document.body.dataset.raceState);
     if (driving && now - lastMove > 1500) { hide(); return; }
     const elapsed = Math.min(40, now - previous || 16.7); previous = now;
     let distance = 0;
     points.forEach((point, i) => {
-      const amount = 1 - Math.pow(1 - [.28, .17, .095][i], elapsed / 16.7);
+      const amount = i===0||reduced.matches?1:1-Math.pow(1-[.28,.17,.095][i],elapsed/16.7);
       point.x += (x - point.x) * amount; point.y += (y - point.y) * amount;
-      rings[i].style.transform = `translate3d(${point.x}px,${point.y}px,0) translate(-50%,-50%)`;
+      position(rings[i],point);
       distance += Math.abs(point.x - x) + Math.abs(point.y - y);
     });
-    if (distance > .2 || driving) frame = requestAnimationFrame(draw);
+    if (!reduced.matches && (distance > .2 || driving)) frame = requestAnimationFrame(draw);
   }
   document.addEventListener('pointermove', event => {
-    if (event.pointerType === 'touch' || !finePointer.matches || reduced.matches) { hide(); return; }
+    if (event.pointerType === 'touch' || !finePointer.matches) { hide(); return; }
     const host = event.target.closest?.('dialog[open]') || stage;
     if (trail.parentNode !== host) host.appendChild(trail);
     x = event.clientX; y = event.clientY; lastMove = performance.now();
     if (!started) { points.forEach(point => { point.x = x; point.y = y; }); started = true; }
+    // Keep the small ring on the actual hit point even during fast motion.
+    // Reduced-motion users get stationary concentric rings without a trail.
+    points.forEach((point,i)=>{if(i===0||reduced.matches){point.x=x;point.y=y;position(rings[i],point);}});
     trail.classList.add('visible');
     if (!frame) frame = requestAnimationFrame(draw);
   }, { passive: true });
@@ -48,7 +52,8 @@ if (stage && typeof window.matchMedia === 'function') {
   document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); });
   window.addEventListener('blur', hide);
   function updatePointerMode() {
-    document.body.classList.toggle('orbit-cursor', finePointer.matches && !reduced.matches);
+    document.documentElement.classList.toggle('orbit-cursor',finePointer.matches);
+    document.body.classList.toggle('orbit-cursor',finePointer.matches);
     hide();
   }
   reduced.addEventListener?.('change', updatePointerMode);

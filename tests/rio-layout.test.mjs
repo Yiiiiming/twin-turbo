@@ -17,7 +17,10 @@ test.afterEach(()=>setTrack('coast'));
 test('Rio adds thirty curated plots without moving or replacing Christ, Sugarloaf or Lapa',t=>{
  setTrack('coast-rio');const old=oldPlots();assert.equal(old.length,3);assert.equal(createHash('sha256').update(JSON.stringify(old)).digest('hex'),'985edca92bc1f3cca9bd811dbfc455428a6cc3f672e632b38b57d3db816a201d');
  // Captured before adding Rio's new modules. Deliberate baselines: no update flag.
- const hashes={'christ-redeemer':'d56ceaea25750e60e672d14bf14d2e0c3f62c91e735e208a9700d654b40df4d3',sugarloaf:'51672bd9d4d0d4fabf71a3072d9cf7eb54a2ce2be763b673577cc9817b6fab93','lapa-aqueduct':'0bba0d981a394fc642b4b91a75b87c17ae370778f77c5a68f955d85ce67d4c48'};
+ // 2026-10-23: user explicitly requested removal of Sugarloaf's strange rod.
+ // Its buried cable/cabin were removed; the mountain, station, plot and route
+ // remain unchanged. Only this model fingerprint reflects that authorization.
+ const hashes={'christ-redeemer':'d56ceaea25750e60e672d14bf14d2e0c3f62c91e735e208a9700d654b40df4d3',sugarloaf:'f192f5a7a8f45c3e22693939574741da4c0768af1c05b08ffb7ac85c06d3e0a7','lapa-aqueduct':'0bba0d981a394fc642b4b91a75b87c17ae370778f77c5a68f955d85ce67d4c48'};
  for(const [kind,hash]of Object.entries(hashes)){const item={kind,x:0,z:0,angle:0},mesh=new ModelMesh(item);addCityLandmark(mesh,item);assert.equal(createHash('sha256').update(JSON.stringify(mesh.faces)).digest('hex'),hash,kind+' accepted model changed');}
  assert.equal(cityLandmarkPlacements().length,33);assert.equal(newPlots().length,30);assert.equal(new Set(newPlots().map(p=>p.kind)).size,30);
  // Force a genuinely cold fixed placement by a harmless external metadata key.

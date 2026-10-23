@@ -173,16 +173,34 @@ function capitol(mesh,item){
  dome(mesh,x,z,165,44,59,'#7c8b81');mesh.cone(x,222,z,11,22,trim,24,8);mesh.cone(x,244,z,5,23,'#b9c1a9',16,0);
 }
 function guitar(mesh,item){
- const {x,z}=item;boxAt(mesh,item,0,7,0,65,14,47,'#786961');boxAt(mesh,item,0,46,0,9,86,9,'#263a45');
- const center=point(item,0,92,-2),a=item.angle,right=[Math.cos(a),0,Math.sin(a)];
- const oval=(cx,cy,rx,ry,color)=>{
-  const p=t=>[center[0]+right[0]*(cx+Math.cos(t)*rx),cy+Math.sin(t)*ry,center[2]+right[2]*(cx+Math.cos(t)*rx)];
-  for(let i=0;i<40;i++)mesh.triangle([center[0]+right[0]*cx,cy,center[2]+right[2]*cx],p(i/40*TAU),p((i+1)/40*TAU),color,.8);
+ boxAt(mesh,item,0,7,0,65,14,47,'#786961');boxAt(mesh,item,0,46,0,9,86,9,'#263a45');
+ // The former two filled ovals overlapped at exactly z=-2, as did the
+ // sound-hole disc. Partition their union at the true ellipse intersection:
+ // front colour regions share only an edge, and the back has its own depth.
+ const widthAt=(y,cy,rx,ry)=>rx*Math.sqrt(Math.max(0,1-((y-cy)/ry)**2));
+ let lo=84,hi=109;
+ for(let i=0;i<40;i++){const y=(lo+hi)/2;if(widthAt(y,84,27,25)>widthAt(y,106,20,21))lo=y;else hi=y;}
+ const seam=(lo+hi)/2,front=-5,back=5.5;
+ const bodyPart=(cy,rx,ry,lower,color)=>{
+  const cut=Math.asin((seam-cy)/ry),from=lower?cut:Math.PI-cut,to=lower?-Math.PI-cut:cut;
+  const outline=Array.from({length:41},(_,i)=>{const a=from+(to-from)*i/40;return[Math.cos(a)*rx,cy+Math.sin(a)*ry];});
+  for(let i=0;i<outline.length;i++){
+   const a=outline[i],b=outline[(i+1)%outline.length];
+   mesh.triangle(point(item,0,cy,front),point(item,...a,front),point(item,...b,front),color,.8);
+   mesh.triangle(point(item,0,cy,back),point(item,...b,back),point(item,...a,back),color,.35);
+   // Do not extrude the shared colour seam into a hidden interior wall.
+   if(i<outline.length-1)mesh.quad(point(item,...a,front),point(item,...a,back),point(item,...b,back),point(item,...b,front),'#a86b58',.25);
+  }
  };
- oval(0,84,27,25,'#e6a778');oval(0,106,20,21,'#df8986');oval(0,104,8,8,'#314954');
+ bodyPart(84,27,25,true,'#e6a778');bodyPart(106,20,21,false,'#df8986');
+ for(let i=0;i<40;i++){
+  const a=i/40*TAU,b=(i+1)/40*TAU;
+  mesh.triangle(point(item,0,104,-6.3),point(item,Math.cos(b)*8,104+Math.sin(b)*8,-6.3),point(item,Math.cos(a)*8,104+Math.sin(a)*8,-6.3),'#314954',.8);
+ }
  boxAt(mesh,item,0,139,-2,8,58,4,'#a86b58');boxAt(mesh,item,0,171,-2,14,15,5,'#e1b383');
  for(const side of [-1,1])for(let i=0;i<3;i++)boxAt(mesh,item,side*10,167+i*5,-2,7,2,3,'#c1d6d0');
- for(const string of [-2,-.7,.7,2])beam(mesh,point(item,string,73,-4.2),point(item,string,176,-4.2),.5,'#f1edc1');
+ // Full string thickness clears the body, hole, neck and headstock faces.
+ for(const string of [-2,-.7,.7,2])beam(mesh,point(item,string,73,-7.8),point(item,string,176,-7.8),.5,'#f1edc1');
  // Stage pavilion and vertical sound bars make the district read at racing speed.
  boxAt(mesh,item,52,26,22,62,52,65,'#694c48');boxAt(mesh,item,52,55,22,68,6,69,'#344654');
  for(let i=0;i<5;i++)boxAt(mesh,item,32+i*10,35,56,4,15+i%3*8,1,i%2?'#88d7c2':'#e99ea9',.8);
@@ -227,9 +245,9 @@ function sugarloaf(mesh,item){
  // Rounded granite shoulder and dome instead of a stack of angular mountains.
  for(const [y,r,h,next]of [[0,232,49,212],[49,212,61,180],[110,180,77,145],[187,145,63,103],[250,103,43,59],[293,59,17,.2]])mesh.cone(x,y,z,r,h,y<110?'#788776':'#a9ac98',64,next,.12);
  const top=point(item,0,317,0);mesh.box(top[0],top[1],top[2],28,13,23,'#d5c9ab',item.angle);mesh.box(top[0],326,top[2],34,5,28,'#5d7477',item.angle);
- // Visible cable car and its cable stay inside the reserved mountain plot.
- beam(mesh,point(item,-160,152,55),point(item,0,330,0),1.2,'#465957');
- boxAt(mesh,item,-92,216,31,24,18,16,'#d8b958');boxAt(mesh,item,-92,220,31,25,7,17,'#45636e');
+ // Keep the summit station on the continuous granite silhouette. The old
+ // short cable and cabin intersected the mountain, leaving an isolated rod
+ // visible at its top instead of a connected cable-car route.
 }
 function lapa(mesh,item){
  const cream='#e0dfcb',shade='#c4cbbf';

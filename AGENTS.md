@@ -1,5 +1,9 @@
 # Twin Turbo: route preservation
 
+## Main-version publishing preference, 2026-10-23
+
+The user explicitly authorized publishing the main game and said “正常就直接在主版本发布就可以了”. After validating ordinary requested main-game changes, publish them to the existing `yiiiiming/twin-turbo` GitHub Pages site without asking again. The separately created London Beta was rejected and abandoned; do not merge or publish it. This preference does not authorize unrequested route changes, unrelated uploads or repository visibility changes.
+
 ## User instruction, 2026-10-12
 
 The user has frozen **every existing map's racing route** after the accepted

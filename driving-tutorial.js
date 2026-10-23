@@ -2,7 +2,7 @@ const STEPS = [
   { title: ['起步加速', 'Get moving'], text: ['按住油门，让赛车跑起来。', 'Hold the accelerator and get the car moving.'], actions: ['accelerate'] },
   { title: ['行驶中转向', 'Steer while moving'], text: ['保持前进，轻按左转或右转。', 'Keep moving and make a gentle left or right turn.'], actions: ['accelerate', 'left', 'right'] },
   { title: ['减速刹车', 'Slow down'], text: ['松开油门，按住刹车降速。', 'Release the accelerator and hold the brake to slow down.'], actions: ['brake'] },
-  { title: ['氮气加速', 'Use nitro'], text: ['按住油门和氮气。尾焰越长，剩余氮气越多；变短表示正在消耗，熄灭表示用完。', 'Hold the accelerator and nitro. Longer flames mean more nitro; shorter flames mean less, and no flame means empty.'], actions: ['accelerate', 'boost'] },
+  { title: ['氮气加速', 'Use nitro'], text: ['按住油门和氮气。时速盘下沿的亮弧越长，余量越多；尾焰也会随余量缩短。', 'Hold the accelerator and nitro. A longer arc below the speedometer means more nitro; the flames shorten as it runs out.'], actions: ['accelerate', 'boost'] },
   { title: ['回到赛道', 'Reset to the track'], text: ['按复位键，试着安全回到赛道。', 'Press reset to return safely to the track.'], actions: ['rescue'] },
 ];
 

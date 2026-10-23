@@ -19,6 +19,9 @@ const ctx = hud.getContext('2d');
 const engine = new RaceEngine({laps:1});
 let renderer;
 const keys = new Set();
+// A modifier such as Shift does not repeat its keydown. Keep the physical
+// boost hold separate from driving inputs cleared by setup and cinematic cuts.
+const heldBoostKeys = new Set();
 let controlStorage; try { controlStorage = window.localStorage; } catch {}
 const bindings = new ControlBindings(controlStorage);
 const i18n = createI18n({ document, storage: controlStorage, onChange: () => {refreshTrackUI();refreshFullscreenUI();refreshPauseUI();renderChallengeRoster();buildChallengeRacePanel();drivingTutorial.refresh();if(engine.state==='finished'&&raceMode==='ai')renderChallengeResults(engine.cars[0]);} });
@@ -134,7 +137,7 @@ const selectedLaps = 1;
 let selectedMode = 'ai', raceMode = 'local', lastRescueCounts = [0, 0];
 let selectedColor = 'cyan';
 let lastTime = performance.now(), lastState = '', lastCount = 0;
-let goUntil = 0, soundEnabled = false, audio = null, audioNodes = [];
+let soundEnabled = false, audio = null, audioNodes = [];
 let lastLaps = [0, 0], notices = ['', ''], noticeUntil = [0, 0], toastTime = 0;
 let lastLaunchResetCounts = [0, 0];
 let entryWindowFocused=true;
@@ -367,6 +370,9 @@ function updateUI(now) {
     const gaugeFraction=Math.max(0,Math.min(speed/420,1));
     $('speed-fill'+car.id).style.strokeDashoffset=String(100-gaugeFraction*100);
     $('speed-needle'+car.id).style.transform=`rotate(${-130+gaugeFraction*260}deg)`;
+    const nitroCharge=Math.max(0,Math.min(100,car.boost));
+    $('speed-nitro'+car.id).style.strokeDashoffset=String(100-nitroCharge);
+    $('speed-nitro'+car.id).style.opacity=nitroCharge>0?'1':'0';
     $('speed-gauge'+car.id).classList.toggle('is-boosting',car.boosting);
     $('speed-mode'+car.id).textContent=car.boosting?'BOOST':car.speed<-.5?'REVERSE':'KM/H';
     const position=raceMode==='ai'?liveGhostPosition(car,ghostTimelines):{
@@ -398,7 +404,7 @@ function updateUI(now) {
     $('pause').disabled=!['racing','countdown','paused'].includes(engine.state);refreshPauseUI();
     document.body.classList.toggle('racing',engine.state==='racing');
     $('arena-tag-text').textContent=engine.state==='racing'?'LIVE / CHASE CAM':'CHASE CAM / P1';
-    if(engine.state==='racing' && lastState==='countdown'){goUntil=now+1;tone(880,.2,.08);}
+    if(engine.state==='racing' && lastState==='countdown')tone(880,.2,.08);
     if(engine.state==='finished'&&raceMode!=='tutorial'){
       ghostClient.endRace();
       leaderboard.setRaceActive(false);
@@ -423,10 +429,9 @@ function updateUI(now) {
     }
     lastState=engine.state;
   }
-  const counting=engine.state==='countdown'&&!raceEntry.active,showGo=engine.state==='racing'&&now<goUntil;
-  $('countdown').classList.toggle('hidden',!counting&&!showGo);
+  const counting=engine.state==='countdown'&&!raceEntry.active;
+  $('countdown').classList.toggle('hidden',!counting);
   if(counting){const count=Math.max(1,Math.ceil(engine.countdown));if($('countdown').firstElementChild.textContent!==String(count))$('countdown').firstElementChild.textContent=count;$('countdown').lastElementChild.textContent='READY TO RACE';if(count!==lastCount){lastCount=count;tone(440,.09,.05);}}
-  else if(showGo){if($('countdown').firstElementChild.textContent!=='GO!')$('countdown').firstElementChild.textContent='GO!';$('countdown').lastElementChild.textContent='全油门出发';}
 }
 
 function initAudio(){if(audio)return;const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;audio=new Audio();for(let i=0;i<2;i++){const oscillator=audio.createOscillator(),filter=audio.createBiquadFilter(),gain=audio.createGain();oscillator.type='sawtooth';filter.type='lowpass';filter.frequency.value=360;gain.gain.value=0;oscillator.connect(filter);filter.connect(gain);gain.connect(audio.destination);oscillator.start();audioNodes.push({oscillator,gain,filter});}}
@@ -454,7 +459,7 @@ function begin(skipGhosts = false) {
     : activeGhosts.map(ghost=>`${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」 · ${fmt(ghost.entry.timeMs/1000)}`).join('  /  ');
   raceMode=selectedMode; if(engine.cars.length!==(raceMode!=='local'?1:2))engine.setPlayerCount(raceMode!=='local'?1:2); renderer.setSinglePlayer(raceMode!=='local'); engine.start(1); applyPlayerColors(); lastRescueCounts=[0,0];
   buildChallengeRacePanel();
-  keys.clear(); lastLaps=[0,0]; lastLaunchResetCounts=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine); goUntil=0;
+  keys.clear(); lastLaps=[0,0]; lastLaunchResetCounts=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine);
   if(raceMode==='tutorial')drivingTutorial.start(engine.cars[0]);
   renderer.setEntryProgress?.(raceEntry.active?0:null);
   canvas.focus({preventScroll:true}); if(soundEnabled){initAudio();audio?.resume();}
@@ -700,6 +705,7 @@ function nativeActivation(event) {
   return ['Enter', 'Space'].includes(event.code)
     && event.target?.closest?.('button, a, input, select, textarea, [contenteditable]');
 }
+function isBoostKey(code){return [1,2].some(player=>bindings.code(player,'boost')===code);}
 window.addEventListener('keydown',event=>{
   if ($('language-dialog').open || $('settings-dialog').open) return;
   if ($('bindings-dialog').open) {
@@ -713,12 +719,20 @@ window.addEventListener('keydown',event=>{
     refreshBindings();return;
   }
   if(event.metaKey||event.ctrlKey||event.altKey)return;
-  if($('help-dialog').open || $('race-setup-dialog').open || leaderboard.busyDialog || typingTarget(event))return;
+  if($('help-dialog').open || leaderboard.busyDialog || typingTarget(event))return;
   if(!$('records-center').hidden){
     if(event.code==='Escape'&&!event.repeat){event.preventDefault();closeRecords();}
     return;
   }
   if(nativeActivation(event))return;
+  if(isBoostKey(event.code)){
+    // Holding Enter to activate a menu button can start repeating only after
+    // that button launches the race and focuses the canvas. Such repeats must
+    // not turn a UI activation (or a text-field key) into a driving hold.
+    if(!event.repeat)heldBoostKeys.add(event.code);
+    else if(!heldBoostKeys.has(event.code))return;
+  }
+  if($('race-setup-dialog').open)return;
   if(controlKeys.has(event.code)&&!(event.code==='Escape'&&document.fullscreenElement))event.preventDefault();
   if(raceEntry.active){if(!event.repeat&&['Escape','Space'].includes(event.code))skipRaceEntry();keys.clear();return;}
   if(drivingTutorial.completed){if(event.code==='Escape'&&!event.repeat)returnToMenu();return;}
@@ -731,26 +745,30 @@ window.addEventListener('keydown',event=>{
   if(!event.repeat&&engine.state==='racing') for(const id of [1,2]) if(event.code===bindings.code(id,'rescue')){rescue(raceMode!=='local'?1:id);return;}
   if (['racing', 'countdown'].includes(engine.state) && bindings.recognizes(event.code)) keys.add(event.code);
 });
-window.addEventListener('keyup',event=>{keys.delete(event.code);if(event.code==='Escape')fullscreenEscapeGuard=false;if(controlKeys.has(event.code)&&!$('settings-dialog').open&&!$('help-dialog').open&&!$('bindings-dialog').open&&!$('race-setup-dialog').open&&$('records-center').hidden&&!leaderboard.busyDialog&&!typingTarget(event)&&!nativeActivation(event))event.preventDefault();});
-window.addEventListener('blur',()=>{entryWindowFocused=false;keys.clear();if(!raceEntry.active)engine.pause();});
+window.addEventListener('keyup',event=>{keys.delete(event.code);heldBoostKeys.delete(event.code);if(event.code==='Escape')fullscreenEscapeGuard=false;if(controlKeys.has(event.code)&&!$('settings-dialog').open&&!$('help-dialog').open&&!$('bindings-dialog').open&&!$('race-setup-dialog').open&&$('records-center').hidden&&!leaderboard.busyDialog&&!typingTarget(event)&&!nativeActivation(event))event.preventDefault();});
+window.addEventListener('blur',()=>{entryWindowFocused=false;keys.clear();heldBoostKeys.clear();if(!raceEntry.active)engine.pause();});
 window.addEventListener('focus',()=>{entryWindowFocused=true;});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();if(!raceEntry.active)engine.pause();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();heldBoostKeys.clear();if(!raceEntry.active)engine.pause();}});
 function loop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, .05);
   lastTime = timestamp;
   const now = timestamp / 1000;
   toastTime += engine.state === 'racing' ? dt : 0;
-  if (!renderer.available) { keys.clear(); if(!raceEntry.active)engine.pause(); }
+  if (!renderer.available) { keys.clear(); heldBoostKeys.clear(); if(!raceEntry.active)engine.pause(); }
   const entering=raceEntry.active;
   const entryState=raceEntry.update(entering&&!document.hidden&&entryWindowFocused&&renderer.available?dt:0);
   renderer.setEntryProgress?.(entryState.active?(entryState.previewProgress??0):null);
-  const frameKeys = bindings.frameKeys(keys, raceMode !== 'local');
+  const pressed=new Set(keys);
+  for(const code of heldBoostKeys){if(isBoostKey(code))pressed.add(code);else heldBoostKeys.delete(code);}
+  const frameKeys = bindings.frameKeys(pressed, raceMode !== 'local');
   if(entering){
     keys.clear();
     if(!entryState.active)renderer.resetCameras(engine);
   }else{
     if(raceMode!=='tutorial'){ghostRecorder.sample(engine,raceMode==='ai'?[1]:[1,2]);splitTiming.sample(engine);}
-    engine.step(dt, frameKeys);
+    // Present the clear track at time zero before applying any racing input.
+    // A frame crossing the final beat must not drive beneath the old overlay.
+    engine.step(engine.state==='countdown'?Math.min(dt,engine.countdown):dt, frameKeys);
     if(raceMode==='tutorial'){
       if(engine.state==='racing')drivingTutorial.update(engine.cars[0],frameKeys);
       if(engine.state==='finished')drivingTutorial.finish('lap');

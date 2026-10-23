@@ -728,6 +728,103 @@ test('entry skips and cancellation restore normal cameras without moving cars or
   assert.equal(ui.nodes.get('race-stage').classList.contains('race-entry-active'),false);
 });
 
+function accelerateToBoost(ui,codes,players,expected=true){
+  for(const code of codes)ui.key(code);
+  for(let i=0;i<60;i++){
+    const eligible=players.map(id=>ui.engine.cars[id-1].speed>40);
+    ui.frame();
+    if(eligible.every(Boolean)){
+      for(const id of players)assert.equal(ui.engine.cars[id-1].boosting,expected,`P${id}: first full tick above the existing speed threshold`);
+      return;
+    }
+  }
+  assert.fail('real acceleration must reach the existing boost threshold');
+}
+function bindUI(ui,player,action,code){
+  ui.click('open-bindings');
+  ui.document.querySelectorAll('[data-bind-player][data-bind-action]').find(button=>Number(button.dataset.bindPlayer)===player&&button.dataset.bindAction===action).click();
+  ui.key(code);ui.click('bindings-done');
+  assert.equal(ui.bindings.code(player,action),code);
+}
+test('both boost keys held before launch survive setup and the whole intro without spending fuel during countdown',async t=>{
+  const ui=await loadUI(t,{entryDuration:9.6});
+  ui.key('ShiftLeft',{target:ui.document.body});ui.click('start');
+  ui.key('Enter',{target:ui.document.body});ui.click('setup-launch');
+  ui.advance(3.9);assert.equal(ui.keys.size,0,'cinematic continues to reject ordinary driving input');
+  while(ui.raceEntry.active)ui.frame();
+  assert.equal(ui.engine.countdown,3);assert.equal(ui.engine.time,0);
+  ui.key('KeyW');ui.key('ArrowUp');ui.advance(2.9);
+  assert.ok(ui.engine.cars.every(car=>car.boost===100&&car.speed===0&&!car.boosting),'holding boost never consumes fuel or launches during 3–2–1');
+  ui.advance(.11);accelerateToBoost(ui,['KeyW','ArrowUp'],[1,2]);
+  assert.ok(ui.engine.cars.every(car=>car.boost<100),'neither player needs a second boost keydown');
+  ui.keyup('ShiftLeft');ui.frame();
+  assert.equal(ui.engine.cars[0].boosting,false);assert.equal(ui.engine.cars[1].boosting,true);
+  ui.keyup('Enter');ui.frame();assert.equal(ui.engine.cars[1].boosting,false);
+});
+test('custom boost held during intro survives restart and skip, including the alternate solo layout',async t=>{
+  const ui=await loadUI(t,{entryDuration:9.6});
+  bindUI(ui,1,'boost','KeyB');bindUI(ui,2,'boost','ShiftRight');
+  ui.launch();ui.key('KeyB');ui.key('ShiftRight');ui.advance(.3);
+  ui.click('restart');ui.click('setup-launch');ui.advance(.2);ui.key('Space');ui.advance(3.01);
+  accelerateToBoost(ui,['KeyW','ArrowUp'],[1,2]);
+  ui.keyup('KeyB');ui.keyup('ShiftRight');ui.click('pause-menu');
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();
+  ui.key('ShiftRight',{target:ui.document.body});ui.click('start');ui.click('setup-skip');
+  ui.key('Space');ui.advance(3.01);accelerateToBoost(ui,['ArrowUp'],[1]);
+  assert.equal(ui.engine.cars.length,1,'alternate P2 binding drives only the actual solo car');
+  ui.keyup('ShiftRight');ui.frame();assert.equal(ui.engine.cars[0].boosting,false);
+});
+test('releasing boost, losing focus or hiding the page during intro clears its physical hold',async t=>{
+  for(const reason of ['keyup','blur','hidden'])await t.test(reason,async t=>{
+    const ui=await loadUI(t,{entryDuration:9.6});ui.launch();ui.key('ShiftLeft');ui.advance(.2);
+    if(reason==='keyup')ui.keyup('ShiftLeft');
+    else if(reason==='blur'){ui.window.dispatch('blur');ui.window.dispatch('focus');}
+    else{ui.document.hidden=true;ui.document.dispatch('visibilitychange');ui.document.hidden=false;ui.document.dispatch('visibilitychange');}
+    ui.key('Space');ui.advance(3.01);accelerateToBoost(ui,['KeyW'],[1],false);
+    assert.equal(ui.engine.cars[0].boost,100);
+    ui.key('ShiftLeft');ui.frame();assert.equal(ui.engine.cars[0].boosting,true);
+    if(reason==='keyup')ui.keyup('ShiftLeft');
+    else if(reason==='blur'){ui.window.dispatch('blur');ui.window.dispatch('focus');}
+    else{ui.document.hidden=true;ui.document.dispatch('visibilitychange');ui.document.hidden=false;ui.document.dispatch('visibilitychange');}
+    ui.frame();assert.equal(ui.engine.cars[0].boosting,false,'release or focus loss also stops an active boost');
+    if(reason!=='keyup'){ui.click('resume');ui.key('KeyW');ui.frame();assert.equal(ui.engine.cars[0].boosting,false,'resuming never resurrects a hold lost outside the game');}
+  });
+});
+test('typing, settings, key capture and native launch activation cannot become a held boost',async t=>{
+  const ui=await loadUI(t,{entryDuration:9.6});
+  bindUI(ui,1,'boost','KeyB'); // Choosing B is a binding edit, not a driving keydown.
+  ui.key('KeyB',{target:ui.document.createElement('input')});
+  ui.click('menu-settings');ui.key('KeyB');ui.click('close-settings');
+  ui.click('start');ui.key('Enter',{target:ui.nodes.get('setup-launch')});ui.click('setup-launch');
+  ui.key('Space');ui.advance(3.01);accelerateToBoost(ui,['KeyW','ArrowUp'],[1,2],false);
+  assert.ok(ui.engine.cars.every(car=>car.boost===100));
+});
+test('holding native launch Enter cannot become boost when repeats follow focus into the game',async t=>{
+  for(const mode of ['local','ai'])await t.test(mode,async t=>{
+    const ui=await loadUI(t,{entryDuration:9.6});
+    ui.modeButtons.find(button=>button.dataset.mode===mode).click();
+    ui.click('start');await ui.flush();
+    ui.key('Enter',{target:ui.nodes.get('setup-launch')});ui.click('setup-launch');
+    assert.equal(ui.document.activeElement.id,'game');
+    ui.key('Enter',{repeat:true});ui.advance(.2);ui.key('Space');
+    ui.key('Enter',{repeat:true});ui.advance(3.01);
+    const player=mode==='local'?2:1;
+    accelerateToBoost(ui,['ArrowUp'],[player],false);
+    ui.key('Enter',{repeat:true});ui.frame();
+    assert.equal(ui.engine.cars[player-1].boosting,false,'ordinary racing input must also reject the original button hold');
+    assert.equal(ui.engine.cars[player-1].boost,100);
+    ui.keyup('Enter');ui.key('Enter');ui.frame();
+    assert.equal(ui.engine.cars[player-1].boosting,true,'a fresh canvas Enter still boosts normally');
+  });
+});
+test('a held key removed from boost bindings cannot leak into its newly assigned rescue action',async t=>{
+  const ui=await loadUI(t,{entryDuration:9.6});
+  bindUI(ui,1,'boost','KeyB');ui.key('KeyB',{target:ui.document.body});
+  bindUI(ui,1,'boost','ShiftLeft');bindUI(ui,1,'rescue','KeyB');
+  ui.launch();ui.key('Space');ui.advance(3.01);accelerateToBoost(ui,['KeyW'],[1],false);
+  assert.equal(ui.engine.cars[0].rescueCount,0);assert.equal(ui.engine.cars[0].boost,100);
+});
+
 test('tutorial advances through five real driving actions with no ghosts, qualification, saved cards or recordings',async t=>{
   const ui=await loadUI(t,{entryDuration:9.6});
   ui.modeButtons.find(button=>button.dataset.mode==='tutorial').click();
@@ -754,7 +851,8 @@ test('tutorial advances through five real driving actions with no ghosts, qualif
   for(let n=0;n<150&&fuelBefore-ui.engine.cars[0].boost<58;n++)boostFrame();
   assert.ok(fuelBefore-ui.engine.cars[0].boost>=58&&fuelBefore-ui.engine.cars[0].boost<60);
   assert.equal(ui.drivingTutorial.step,3,'the flame-length instruction stays visible until sixty fuel units have actually been used');
-  assert.match(ui.drivingTutorial.element.children[2].textContent,/尾焰越长/);
+  assert.match(ui.drivingTutorial.element.children[2].textContent,/时速盘下沿的亮弧越长/);
+  assert.match(ui.drivingTutorial.element.children[2].textContent,/尾焰也会随余量缩短/);
   for(let n=0;n<30&&ui.drivingTutorial.step<4;n++)boostFrame();
   assert.equal(ui.drivingTutorial.step,4);assert.ok(fuelBefore-ui.engine.cars[0].boost>=60);
   assert.equal(ui.drivingTutorial.element.children[3].children[0].textContent,'Q','reset instruction only shows the primary rescue key');
@@ -901,6 +999,44 @@ test('settings can select an orange single-player car with both control layouts,
   ui.keyup('KeyW'); ui.key('KeyK'); ui.advance(.2);
   assert.ok(ui.engine.cars[0].speed > 100, 'remapped alternate acceleration also drives the human');
   assert.equal(ui.engine.cars.length, 1, 'no hidden physical opponent can collide or finish');
+});
+
+test('the final countdown beat clears before either car or race clock can move',async t=>{
+  for(const entryDuration of [0,9.6])await t.test(`entry duration ${entryDuration}s`,async t=>{
+    const ui=await loadUI(t,{entryDuration});
+    ui.launch();
+    if(entryDuration)ui.advance(entryDuration);
+    const overlay=ui.nodes.get('countdown');
+    const grid=ui.engine.cars.map(({x,y})=>({x,y}));
+    ui.key('KeyW');ui.key('ArrowUp');ui.key('ShiftLeft');ui.key('Enter');
+    const beats=new Set();
+    for(let frame=1;frame<=99;frame++){
+      ui.frame(.03);
+      assert.equal(ui.engine.state,'countdown');
+      assert.equal(overlay.classList.contains('hidden'),false);
+      const beat=String(overlay.firstElementChild.textContent);beats.add(beat);
+      assert.equal(beat,String(Math.ceil(3-frame*.03)));
+      assert.equal(ui.engine.time,0);
+      ui.engine.cars.forEach((car,i)=>{
+        assert.equal(car.speed,0);assert.equal(car.boost,100);
+        assert.equal(car.x,grid[i].x);assert.equal(car.y,grid[i].y);
+      });
+    }
+    assert.deepEqual([...beats],['3','2','1']);
+    // A 50 ms frame crosses the remaining 30 ms of the visible "1".
+    ui.frame(.05);
+    assert.equal(ui.engine.state,'racing');
+    assert.equal(overlay.classList.contains('hidden'),true,'no lingering GO overlay');
+    assert.equal(ui.engine.time,0,'the first clear race frame is still time zero');
+    ui.engine.cars.forEach((car,i)=>{
+      assert.equal(car.speed,0);assert.equal(car.boost,100);
+      assert.equal(car.x,grid[i].x);assert.equal(car.y,grid[i].y);
+    });
+    ui.frame(.03);
+    assert.ok(ui.engine.time>0);
+    assert.ok(ui.engine.cars.every(car=>car.speed>0),'held throttle takes effect on the clear track');
+    assert.equal(overlay.classList.contains('hidden'),true);
+  });
 });
 
 test('fixed single lap, start focus, countdown HUD and both keyboard drivers use actual handlers', async t => {
@@ -1425,13 +1561,17 @@ test('driving HUD omits navigation prompts on straights and turns while retainin
   assert.ok(context.calls.some(call=>call[0]==='fillText'&&/逆向行驶/.test(call[1])));
 });
 
-test('above-car nitro charge bars and labels are absent for both cars at every boost level',async t=>{
+test('nitro charge lives in each speed dial without above-car bars or labels at every boost level',async t=>{
   const ui=await loadUI(t);ui.launch();ui.advance(3.1);ui.click('pause');
   const context=ui.nodes.get('hud').context,shapes=[];
   context.roundRect=(...bounds)=>shapes.push({bounds,color:context.fillStyle});
   for(const [charge,boosting]of [[100,false],[25,true],[0,false]]){
     ui.engine.cars.forEach(car=>Object.assign(car,{boost:charge,boosting}));
     shapes.length=0;context.calls.length=0;ui.frame(0);
+    for(const car of ui.engine.cars){
+      assert.equal(ui.nodes.get('speed-nitro'+car.id).style.strokeDashoffset,String(100-charge));
+      assert.equal(ui.nodes.get('speed-nitro'+car.id).style.opacity,charge>0?'1':'0');
+    }
     assert.doesNotMatch(context.calls.filter(call=>call[0]==='fillText').map(call=>call[1]).join(' '),/NITRO|%/);
     assert.equal(shapes.filter(shape=>shape.color==='#0b192680').length,0,'the above-car charge shell is removed');
     assert.equal(shapes.filter(shape=>shape.bounds[3]===4&&['#51dfe5','#ff9870','#c6f56b','#ffffff26'].includes(shape.color)).length,0,'no floating charge strip remains');
