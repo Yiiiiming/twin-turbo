@@ -7,8 +7,10 @@ import { GhostRecorder, sampleReplay } from './ghost-replay.js';
 import { RaceEngine, TRACK, TRACKS, trackPoint, projectTrack, mod, OFFROAD_GRACE_SECONDS } from './engine.js';
 import { RaceRenderer, sceneWeights } from './renderer.js';
 import { loadGhostChallenge } from './ghost-challenge.js';
-import { ghostProgressTimeline, liveGhostPosition, carNitroAnchor } from './race-hud.js';
+import { ghostProgressTimeline, liveGhostPosition } from './race-hud.js';
 import { UnifiedRecordsClient } from './unified-records.js';
+import { createRaceEntry } from './race-entry.js';
+import { createDrivingTutorial } from './driving-tutorial.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
@@ -19,13 +21,13 @@ let renderer;
 const keys = new Set();
 let controlStorage; try { controlStorage = window.localStorage; } catch {}
 const bindings = new ControlBindings(controlStorage);
-const i18n = createI18n({ document, storage: controlStorage, onChange: () => {refreshTrackUI();refreshFullscreenUI();renderChallengeRoster();buildChallengeRacePanel();if(engine.state==='finished'&&raceMode==='ai')renderChallengeResults(engine.cars[0]);} });
+const i18n = createI18n({ document, storage: controlStorage, onChange: () => {refreshTrackUI();refreshFullscreenUI();refreshPauseUI();renderChallengeRoster();buildChallengeRacePanel();drivingTutorial.refresh();if(engine.state==='finished'&&raceMode==='ai')renderChallengeResults(engine.cars[0]);} });
 let bindingCapture = null;
 
 const leaderboard = new UnifiedRecordsClient({ document, onSaved: () => {
   if (engine.state === 'finished') returnToMenu();
 }, onChallenge: async entry => {
-  if (ghostClient.locked || entry.kind === 'race' || entry.laps === 3) return;
+  if (selectedMode==='tutorial' || ghostClient.locked || entry.kind === 'race' || entry.laps === 3) return;
   if (engine.state === 'finished') returnToMenu();
   if (!['menu','finished'].includes(engine.state)) return;
   if (entry.city && entry.city !== TRACK.id) selectCircuit(entry.city);
@@ -36,7 +38,7 @@ const leaderboard = new UnifiedRecordsClient({ document, onSaved: () => {
 } });
 
 const ghostClient = new GhostClient({ document, recordsManaged: true, onSelection: selections => {
-  if (selectedMode !== 'ai' && ['menu','finished'].includes(engine.state)) $('ghost-race-label').textContent = selections.length
+  if (selectedMode === 'local' && ['menu','finished'].includes(engine.state)) $('ghost-race-label').textContent = selections.length
     ? selections.map(ghost => `${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」`).join('  /  ') : '';
 } });
 const ghostRecorder = new GhostRecorder();
@@ -135,6 +137,12 @@ let lastTime = performance.now(), lastState = '', lastCount = 0;
 let goUntil = 0, soundEnabled = false, audio = null, audioNodes = [];
 let lastLaps = [0, 0], notices = ['', ''], noticeUntil = [0, 0], toastTime = 0;
 let lastLaunchResetCounts = [0, 0];
+let entryWindowFocused=true;
+const raceEntry=createRaceEntry(document);
+const drivingTutorial=createDrivingTutorial(document,{bindings,language:()=>i18n.language,translate:value=>i18n.t(value),
+  onExit:()=>returnToMenu(),onComplete:()=>{keys.clear();engine.pause();}});
+function cancelRaceEntry(){raceEntry.cancel();renderer?.setEntryProgress?.(null);keys.clear();}
+function skipRaceEntry(){raceEntry.skip();renderer.setEntryProgress?.(null);renderer.resetCameras(engine);keys.clear();}
 const tau = Math.PI * 2;
 const fmt = value => {
   const centiseconds = Math.round(Math.max(0, value || 0) * 100);
@@ -182,25 +190,10 @@ function drawMiniMap(c, x, y, playerId) {
 function drawHUD(now) {
   ctx.setTransform(hud.width / 1200, 0, 0, hud.height / 700, 0, 0);
   ctx.clearRect(0, 0, 1200, 700);
-  const solo=selectedMode==='ai', viewWidth=solo?1200:600;
+  const solo=selectedMode!=='local', viewWidth=solo?1200:600;
   for (const [i, car] of engine.cars.slice(0,solo?1:2).entries()) {
     const x = i * 600, center=x+viewWidth/2;
     drawMiniMap(ctx, x + viewWidth - 182, 577, car.id);
-    if (['countdown','racing','paused'].includes(engine.state) && !car.finished) {
-      // Use the actual smoothed camera and its physical aspect ratio, then map
-      // the resulting screen point into this HUD's virtual coordinates.
-      const pixelsWide=solo?canvas.width:i?canvas.width-Math.floor(canvas.width/2):Math.floor(canvas.width/2), pixelsHigh=canvas.height;
-      const anchor=carNitroAnchor(renderer.cameras?.[i],car,pixelsWide,pixelsHigh);
-      if(anchor){
-        const nx=x+anchor.x/pixelsWide*viewWidth, ny=anchor.y/pixelsHigh*700;
-        ctx.save();ctx.translate(nx,ny);
-        const meterScale=Math.min(1.5,Math.max(1,1200/canvas.clientWidth));ctx.scale(meterScale,meterScale);
-        rounded(ctx,-48,-4,96,12,6,'#0b192680');
-        rounded(ctx,-42,0,84,4,2,'#ffffff26');
-        if(car.boost>0)rounded(ctx,-42,0,84*Math.max(0,Math.min(car.boost,100))/100,4,2,car.boosting?'#c6f56b':colors[i]);
-        ctx.restore();
-      }
-    }
     if (notices[i] && toastTime < noticeUntil[i] && engine.state === 'racing') {
       rounded(ctx, center - 137, 120, 274, 38, 7, '#10222ddd');
       ctx.font = '12px "Chakra Petch", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = colors[i];
@@ -353,6 +346,7 @@ function updateSplitUI(car) {
   }
 }
 function updateUI(now) {
+  drivingTutorial.element.hidden=!drivingTutorial.active||(!drivingTutorial.completed&&engine.state!=='racing');
   $('timer').textContent=fmt(engine.time);
   $('challenge-live').hidden = raceMode !== 'ai' || !activeGhosts.length || !['racing','paused'].includes(engine.state) || engine.time>=3;
   $('challenge-live').classList.toggle('roster-fading',engine.time>=2.5);
@@ -379,7 +373,7 @@ function updateUI(now) {
       place:1+engine.cars.filter(other=>other!==car&&(other.finished?(!car.finished||other.finishTime<car.finishTime):!car.finished&&other.progress>car.progress+.00001)).length,
       total:engine.cars.length
     };
-    $('race-position'+car.id).hidden=!['countdown','racing','paused'].includes(engine.state);
+    $('race-position'+car.id).hidden=raceMode==='tutorial'||!['countdown','racing','paused'].includes(engine.state);
     $('position-place'+car.id).textContent=position.place;
     $('position-total'+car.id).textContent=`/ ${position.total}`;
     const warning=engine.state==='racing'&&!car.finished&&car.offroad&&car.offroadTime>=OFFROAD_GRACE_SECONDS-3-1e-8;
@@ -388,7 +382,7 @@ function updateUI(now) {
     $('offroad-warning'+car.id).classList.toggle('hidden',!warning);
     if(warning&&$('offroad-countdown'+car.id).textContent!==warningText)$('offroad-countdown'+car.id).textContent=warningText;
     $('offroad'+car.id).textContent=car.finished?`第 ${place} 名 · 已完赛`:car.rescueCooldown>0?'返回赛道 · 罚停中':warning?warningText:car.missedCheckpoint?`漏过检查点 · 按 ${bindings.label(car.id,'rescue')} 回赛道`:car.impact>.15?'碰撞 · 减速':car.offroad?'草地减速':car.boosting?'NITRO ON':'';
-    $('finisher'+car.id).classList.toggle('hidden', !car.finished || engine.state !== 'racing');
+    $('finisher'+car.id).classList.toggle('hidden', raceMode==='tutorial' || !car.finished || engine.state !== 'racing');
     if (car.finished) {
       $('finisher-place'+car.id).textContent=`第 ${place} 名 · 已完赛`;
       $('finisher-time'+car.id).textContent=fmt(car.finishTime);
@@ -398,14 +392,14 @@ function updateUI(now) {
     document.body.dataset.raceState=engine.state;
     for(const {button}of trackCards.values())button.disabled=engine.state!=='menu';
     document.querySelectorAll('[data-city]').forEach(button=>button.disabled=engine.state!=='menu');
-    $('menu').classList.toggle('hidden',engine.state!=='menu');$('pause-panel').classList.toggle('hidden',engine.state!=='paused');$('result').classList.toggle('hidden',engine.state!=='finished');
+    $('menu').classList.toggle('hidden',engine.state!=='menu');$('pause-panel').classList.toggle('hidden',engine.state!=='paused'||drivingTutorial.completed);$('result').classList.toggle('hidden',engine.state!=='finished'||raceMode==='tutorial');
     // Reuse the same forms: finished races save here; abandoned laps remain accessible below.
     $(engine.state==='finished'?'result-save-host':'records-pending-host').appendChild($('records-results'));
-    $('pause').disabled=!['racing','countdown','paused'].includes(engine.state);$('pause').innerHTML=engine.state==='paused'?'继续 <kbd>Esc</kbd>':'暂停 <kbd>Esc</kbd>';
+    $('pause').disabled=!['racing','countdown','paused'].includes(engine.state);refreshPauseUI();
     document.body.classList.toggle('racing',engine.state==='racing');
     $('arena-tag-text').textContent=engine.state==='racing'?'LIVE / CHASE CAM':'CHASE CAM / P1';
     if(engine.state==='racing' && lastState==='countdown'){goUntil=now+1;tone(880,.2,.08);}
-    if(engine.state==='finished'){
+    if(engine.state==='finished'&&raceMode!=='tutorial'){
       ghostClient.endRace();
       leaderboard.setRaceActive(false);
       leaderboard.showResults(raceRecords(finishers));
@@ -429,7 +423,7 @@ function updateUI(now) {
     }
     lastState=engine.state;
   }
-  const counting=engine.state==='countdown',showGo=engine.state==='racing'&&now<goUntil;
+  const counting=engine.state==='countdown'&&!raceEntry.active,showGo=engine.state==='racing'&&now<goUntil;
   $('countdown').classList.toggle('hidden',!counting&&!showGo);
   if(counting){const count=Math.max(1,Math.ceil(engine.countdown));if($('countdown').firstElementChild.textContent!==String(count))$('countdown').firstElementChild.textContent=count;$('countdown').lastElementChild.textContent='READY TO RACE';if(count!==lastCount){lastCount=count;tone(440,.09,.05);}}
   else if(showGo){if($('countdown').firstElementChild.textContent!=='GO!')$('countdown').firstElementChild.textContent='GO!';$('countdown').lastElementChild.textContent='全油门出发';}
@@ -442,25 +436,34 @@ function begin(skipGhosts = false) {
   if ($('language-dialog').open || $('help-dialog').open || $('bindings-dialog').open || leaderboard.busyDialog || !renderer.available) return;
   const automatic=selectedMode==='ai'&&!manualGhosts;
   if(!skipGhosts && automatic && challengeSetup?.loading)return;
+  cancelRaceEntry();drivingTutorial.cancel();
+  fullscreenEscapeGuard=false;
+  // Cover the scene before fullscreen or race-state changes can paint a frame.
+  raceEntry.start(TRACK.id);entryWindowFocused=true;
   void requestRaceFullscreen();
   const opponents=automatic&&!skipGhosts ? challengeSetup?.ghosts||[] : null;
-  cancelChallengeLoad(); $('race-setup-dialog').close();
-  if (skipGhosts) ghostClient.node('ghost-enabled').checked = false;
-  leaderboard.newRace(); leaderboard.setRaceActive(true);
-  const manualSelections = ghostClient.startRace();
-  activeGhosts = skipGhosts ? [] : opponents || manualSelections;
+  cancelChallengeLoad(); if($('race-setup-dialog').open)$('race-setup-dialog').close();
+  if (skipGhosts&&selectedMode!=='tutorial') ghostClient.node('ghost-enabled').checked = false;
+  if(selectedMode!=='tutorial')leaderboard.newRace();
+  leaderboard.setRaceActive(selectedMode!=='tutorial');
+  const manualSelections = selectedMode==='tutorial'?[]:ghostClient.startRace();
+  activeGhosts = selectedMode==='tutorial'||skipGhosts ? [] : opponents || manualSelections;
   ghostTimelines=activeGhosts.map(ghost=>ghostProgressTimeline(ghost.replay));
   ghostRecorder.reset(); splitTiming.reset(activeGhosts);
   $('ghost-race-label').textContent = selectedMode==='ai' ? i18n.t(activeGhosts.length?'幽灵挑战':'不带幽灵')
     : activeGhosts.map(ghost=>`${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」 · ${fmt(ghost.entry.timeMs/1000)}`).join('  /  ');
-  raceMode=selectedMode; if(engine.cars.length!==(raceMode==='ai'?1:2))engine.setPlayerCount(raceMode==='ai'?1:2); renderer.setSinglePlayer(raceMode==='ai'); engine.start(1); applyPlayerColors(); lastRescueCounts=[0,0];
+  raceMode=selectedMode; if(engine.cars.length!==(raceMode!=='local'?1:2))engine.setPlayerCount(raceMode!=='local'?1:2); renderer.setSinglePlayer(raceMode!=='local'); engine.start(1); applyPlayerColors(); lastRescueCounts=[0,0];
   buildChallengeRacePanel();
   keys.clear(); lastLaps=[0,0]; lastLaunchResetCounts=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine); goUntil=0;
+  if(raceMode==='tutorial')drivingTutorial.start(engine.cars[0]);
+  renderer.setEntryProgress?.(raceEntry.active?0:null);
   canvas.focus({preventScroll:true}); if(soundEnabled){initAudio();audio?.resume();}
 }
 function openRaceSetup() {
   if ($('language-dialog').open || $('settings-dialog').open || $('help-dialog').open || $('bindings-dialog').open || !renderer.available) return;
   closeRecords(null,false);
+  cancelRaceEntry();
+  if(selectedMode==='tutorial'){begin(true);return;}
   if (['racing','countdown'].includes(engine.state)) engine.pause();
   keys.clear(); ghostClient.menu(); manualGhosts=selectedMode!=='ai';
   $('race-setup-summary').textContent = `${i18n.t(selectedMode==='ai'?'幽灵挑战':'本地双人')} · ${trackName()} · ${i18n.t(`${selectedLaps} 圈`)}`;
@@ -474,18 +477,25 @@ $('setup-close').addEventListener('click',()=>$('race-setup-dialog').close());
 $('setup-manual').addEventListener('click',chooseManualGhosts);
 $('setup-auto').addEventListener('click',()=>{manualGhosts=false;updateSetupMode();void matchChallenge();});
 $('challenge-retry').addEventListener('click',()=>void matchChallenge());
-$('race-setup-dialog').addEventListener('close',()=>{cancelChallengeLoad();keys.clear();if(['racing','countdown','paused'].includes(engine.state))ghostClient.startRace();});
-function togglePause(){
+$('race-setup-dialog').addEventListener('close',()=>{cancelChallengeLoad();keys.clear();if(raceMode!=='tutorial'&&['racing','countdown','paused'].includes(engine.state))ghostClient.startRace();});
+function resumeRace(fullscreen=false){
+  if(drivingTutorial.completed||engine.state!=='paused')return;
+  if(fullscreen)void requestRaceFullscreen();
+  fullscreenEscapeGuard=false;keys.clear();engine.resume();canvas.focus({preventScroll:true});
+}
+function togglePause(fullscreen=false){
+  if(drivingTutorial.completed)return;
+  if(raceEntry.active){skipRaceEntry();return;}
   if (engine.state === 'paused') {
-    engine.resume();
-    canvas.focus({preventScroll:true});
+    resumeRace(fullscreen);
   } else engine.pause();
   keys.clear();
 }
-function rescue(id){if(engine.cars[id-1].finished)return;ghostRecorder.invalidate(id);engine.rescue(id);lastRescueCounts[id-1]=engine.cars[id-1].rescueCount;renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
+function rescue(id){if(engine.cars[id-1].finished)return;const before=engine.cars[id-1].rescueCount;if(raceMode!=='tutorial')ghostRecorder.invalidate(id);engine.rescue(id);if(raceMode==='tutorial')drivingTutorial.manualRescue(before,engine.cars[id-1]);lastRescueCounts[id-1]=engine.cars[id-1].rescueCount;renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
 $('start').addEventListener('click',openRaceSetup);$('again').addEventListener('click',showRaceStart);$('restart').addEventListener('click',openRaceSetup);
-$('resume').addEventListener('click',()=>{keys.clear();engine.resume();canvas.focus({preventScroll:true});});$('pause').addEventListener('click',togglePause);
+$('resume').addEventListener('click',()=>resumeRace(true));$('pause').addEventListener('click',()=>togglePause(true));
 function raceRecords(cars = engine.cars) {
+  if(raceMode==='tutorial')return [];
   return cars.filter(car => !(raceMode === 'ai' && car.id === 2)).map(car => ({
     playerId:car.id, driverLabel:names[car.id-1], mode:raceMode, laps:engine.laps, city:TRACK.id,
     finished:Boolean(car.finished), timeMs:car.finished ? Math.round(car.finishTime * 1000) : undefined,
@@ -493,12 +503,13 @@ function raceRecords(cars = engine.cars) {
   }));
 }
 function returnToMenu() {
+  cancelRaceEntry();drivingTutorial.cancel();
   cancelChallengeLoad();challengeSetup=null;ghostClient.menu(); leaderboard.setRaceActive(false);
-  if (!['finished','menu'].includes(engine.state)) leaderboard.showResults(raceRecords());
+  if (raceMode!=='tutorial'&&!['finished','menu'].includes(engine.state)) leaderboard.showResults(raceRecords());
   ghostRecorder.reset(); splitTiming.reset(); activeGhosts=[]; buildChallengeRacePanel(); renderer.setGhostPoses?.([]);
   engine.reset(); applyPlayerColors();  lastRescueCounts=[0,0]; keys.clear(); renderer.resetCameras(engine);
   const selected = ghostClient.node('ghost-enabled').checked ? ghostClient.selections() : [];
-  $('ghost-race-label').textContent = (selectedMode==='ai'?[]:selected).map(ghost => `${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」`).join('  /  ');
+  $('ghost-race-label').textContent = (selectedMode!=='local'?[]:selected).map(ghost => `${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」`).join('  /  ');
   updateUI(performance.now()/1000);
 }
 let recordsReturnFocus=null;
@@ -539,7 +550,7 @@ function selectLaps() {
 }
 
 function applyPlayerColors() {
-  const flipped = selectedMode === 'ai' && selectedColor === 'orange';
+  const flipped = selectedMode !== 'local' && selectedColor === 'orange';
   const indices = flipped ? [1,0] : [0,1];
   const palette = ['#51dfe5','#ff9870'], labels = ['青色闪电','橙色风暴'];
   engine.cars.forEach((car,i)=>{car.colorIndex=indices[i];colors[i]=palette[indices[i]];names[i]=labels[indices[i]];});
@@ -564,24 +575,27 @@ function refreshBindings() {
     button.setAttribute('aria-label',`P${player} ${ACTION_LABELS[action]}：${button.textContent}`);
   });
   document.querySelectorAll('[data-control-player]').forEach(node=>node.textContent=bindings.label(Number(node.dataset.controlPlayer),node.dataset.controlAction));
-  canvas.setAttribute('aria-label',selectedMode==='ai'?'单人完整视野斜后方赛车。自定义按键见下方操作说明。':'左右分屏斜后方赛车。自定义按键见下方操作说明。');
+  canvas.setAttribute('aria-label',selectedMode!=='local'?'单人完整视野斜后方赛车。自定义按键见下方操作说明。':'左右分屏斜后方赛车。自定义按键见下方操作说明。');
   $('ai-control-note').textContent='幽灵均不碰撞；你完赛后立即结算。';
+  drivingTutorial.refresh();
+  refreshPauseUI();
 }
 function updateMode() {
-  const solo=selectedMode==='ai'; if(engine.cars.length!==(solo?1:2))engine.setPlayerCount(solo?1:2); applyPlayerColors();
+  const solo=selectedMode!=='local'; if(engine.cars.length!==(solo?1:2))engine.setPlayerCount(solo?1:2); applyPlayerColors();
   renderer.setSinglePlayer(solo); document.body.classList.toggle('solo-mode',solo);
+  document.body.classList.toggle('tutorial-mode',selectedMode==='tutorial');
   $('race-arena').setAttribute('aria-label',solo?'单人赛道，镜头跟随你的赛车':'左右分屏赛道，左侧玩家一，右侧玩家二');
   $('player2-label').textContent=solo?'GHOST CHALLENGE':'PLAYER 02'; $('control-player2-chip').textContent=solo?'GHOST':'P2';
-  $('mode-label').textContent=solo?'幽灵挑战':'双人分屏'; $('mode-english').textContent=solo?'SINGLE PLAYER':'LOCAL MULTIPLAYER';
+  $('mode-label').textContent=selectedMode==='tutorial'?'新手教程':solo?'幽灵挑战':'双人分屏'; $('mode-english').textContent=solo?'SINGLE PLAYER':'LOCAL MULTIPLAYER';
   $('player-color-select').classList.toggle('hidden',!solo);
   $('player1-alternate-controls').classList.toggle('hidden',!solo);
   $('player2-controls').classList.toggle('hidden',solo); $('ai-control-note').classList.toggle('hidden',!solo);
-  $('help-mode-description').textContent=solo?'镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶，完赛后结算。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
+  $('help-mode-description').textContent=selectedMode==='tutorial'?'跟着提示练习加速、转向、刹车、氮气与复位。练习不记录成绩。':solo?'镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶，完赛后结算。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
   document.querySelectorAll('[data-mode]').forEach(button=>{const active=button.dataset.mode===selectedMode;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   document.querySelectorAll('[data-player-color]').forEach(button=>{const active=button.dataset.playerColor===selectedColor;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   refreshBindings();
 }
-document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{if(engine.state!=='menu')return;selectedMode=button.dataset.mode==='ai'?'ai':'local';updateMode();}));
+document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{if(engine.state!=='menu')return;selectedMode=['ai','tutorial'].includes(button.dataset.mode)?button.dataset.mode:'local';updateMode();}));
 document.querySelectorAll('[data-player-color]').forEach(button=>button.addEventListener('click',()=>{if(engine.state!=='menu')return;selectedColor=button.dataset.playerColor==='orange'?'orange':'cyan';updateMode();}));
 function openBindings() {
   engine.pause(); keys.clear(); bindingCapture=null; refreshBindings();
@@ -612,13 +626,20 @@ $('sound').addEventListener('click',()=>{soundEnabled=!soundEnabled;$('sound').s
 $('help').addEventListener('click',()=>{engine.pause();keys.clear();$('help-dialog').showModal();});
 $('close-help').addEventListener('click',()=>$('help-dialog').close());$('help-done').addEventListener('click',()=>$('help-dialog').close());
 $('help-dialog').addEventListener('click',event=>{if(event.target===$('help-dialog')){const r=$('help-dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('help-dialog').close();}});
+function refreshPauseUI() {
+  const customP=bindings.recognizes('KeyP'),shortcut=customP?'Esc':'P';
+  $('pause').innerHTML=`${i18n.t(engine.state==='paused'?'继续':'暂停')} <kbd>${shortcut}</kbd>`;
+  $('pause').setAttribute('aria-label',i18n.t(engine.state==='paused'?'继续比赛':'暂停比赛'));
+  $('pause-shortcut').textContent=shortcut;
+  $('pause-help-text').textContent=i18n.t(customP?'暂停 / 继续 · 退出全屏会自动暂停。P 已用于自定义驾驶。':'暂停 / 继续，保持全屏 · Esc 退出全屏会自动暂停。');
+}
 function refreshFullscreenUI() {
   const label=i18n.t(document.fullscreenElement?'退出全屏':'全屏');
   $('fullscreen-label').textContent=label;
   $('fullscreen').setAttribute('aria-label',label);
   $('fullscreen').setAttribute('title',label);
 }
-let firstFullscreenGesture=true;
+let firstFullscreenGesture=true,fullscreenActive=Boolean(document.fullscreenElement),fullscreenEscapeGuard=false;
 async function requestRaceFullscreen() {
   const stage=$('race-stage');
   if(document.fullscreenElement || document.fullscreenEnabled===false || typeof stage.requestFullscreen!=='function')return;
@@ -633,7 +654,7 @@ function fullscreenOnFirstGesture(event) {
   firstFullscreenGesture=false;
   // These controls own their request, especially the user's explicit exit.
   const button=event.target?.closest?.('button');
-  if(['fullscreen','fullscreen-exit','setup-launch','setup-skip'].includes(button?.id))return;
+  if(['fullscreen','fullscreen-exit','setup-launch','setup-skip','resume','pause'].includes(button?.id))return;
   void requestRaceFullscreen();
 }
 async function toggleFullscreen() {
@@ -649,7 +670,9 @@ $('fullscreen-exit').addEventListener('click', toggleFullscreen);
 window.addEventListener('click',fullscreenOnFirstGesture,{capture:true});
 window.addEventListener('keydown',fullscreenOnFirstGesture,{capture:true});
 document.addEventListener('fullscreenchange',()=>{
-  if(document.fullscreenElement){
+  const active=Boolean(document.fullscreenElement),exited=fullscreenActive&&!active;fullscreenActive=active;
+  if(active){
+    fullscreenEscapeGuard=false;
     firstFullscreenGesture=false;
     const languageDialog=$('language-dialog');
     if(languageDialog.open){
@@ -658,10 +681,16 @@ document.addEventListener('fullscreenchange',()=>{
       languageDialog.close();languageDialog.showModal();
       focused?.focus({preventScroll:true});
     }
+  }else if(exited){
+    // Some browsers consume Escape; others dispatch it before or after this
+    // event. Exiting always pauses, and the same key press must never resume.
+    fullscreenEscapeGuard=true;keys.clear();
+    if(raceEntry.active)skipRaceEntry();
+    engine.pause();
   }
   refreshFullscreenUI();resize();
 });
-const controlKeys={has:code=>bindings.recognizes(code)||['Space','Escape'].includes(code)};
+const controlKeys={has:code=>bindings.recognizes(code)||['Space','Escape','KeyP'].includes(code)};
 
 function typingTarget(event) {
   return event.isComposing || event.keyCode === 229
@@ -690,35 +719,52 @@ window.addEventListener('keydown',event=>{
     return;
   }
   if(nativeActivation(event))return;
-  if(controlKeys.has(event.code))event.preventDefault();
-  if(event.code==='Escape'&&!event.repeat){togglePause();return;}
+  if(controlKeys.has(event.code)&&!(event.code==='Escape'&&document.fullscreenElement))event.preventDefault();
+  if(raceEntry.active){if(!event.repeat&&['Escape','Space'].includes(event.code))skipRaceEntry();keys.clear();return;}
+  if(drivingTutorial.completed){if(event.code==='Escape'&&!event.repeat)returnToMenu();return;}
+  if(event.code==='Escape'&&!event.repeat){
+    if(document.fullscreenElement||fullscreenEscapeGuard){keys.clear();engine.pause();}else togglePause();
+    return;
+  }
+  if(event.code==='KeyP'&&!bindings.recognizes('KeyP')){if(!event.repeat)togglePause();return;}
   if(event.code==='Space'&&!event.repeat){if(engine.state==='menu'||engine.state==='finished')openRaceSetup();else togglePause();return;}
-  if(!event.repeat&&engine.state==='racing') for(const id of [1,2]) if(event.code===bindings.code(id,'rescue')){rescue(raceMode==='ai'?1:id);return;}
+  if(!event.repeat&&engine.state==='racing') for(const id of [1,2]) if(event.code===bindings.code(id,'rescue')){rescue(raceMode!=='local'?1:id);return;}
   if (['racing', 'countdown'].includes(engine.state) && bindings.recognizes(event.code)) keys.add(event.code);
 });
-window.addEventListener('keyup',event=>{keys.delete(event.code);if(controlKeys.has(event.code)&&!$('settings-dialog').open&&!$('help-dialog').open&&!$('bindings-dialog').open&&!$('race-setup-dialog').open&&$('records-center').hidden&&!leaderboard.busyDialog&&!typingTarget(event)&&!nativeActivation(event))event.preventDefault();});
-window.addEventListener('blur',()=>{keys.clear();engine.pause();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();engine.pause();}});
+window.addEventListener('keyup',event=>{keys.delete(event.code);if(event.code==='Escape')fullscreenEscapeGuard=false;if(controlKeys.has(event.code)&&!$('settings-dialog').open&&!$('help-dialog').open&&!$('bindings-dialog').open&&!$('race-setup-dialog').open&&$('records-center').hidden&&!leaderboard.busyDialog&&!typingTarget(event)&&!nativeActivation(event))event.preventDefault();});
+window.addEventListener('blur',()=>{entryWindowFocused=false;keys.clear();if(!raceEntry.active)engine.pause();});
+window.addEventListener('focus',()=>{entryWindowFocused=true;});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();if(!raceEntry.active)engine.pause();}});
 function loop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, .05);
   lastTime = timestamp;
   const now = timestamp / 1000;
   toastTime += engine.state === 'racing' ? dt : 0;
-  if (!renderer.available) { keys.clear(); engine.pause(); }
-  let frameKeys = bindings.frameKeys(keys, raceMode === 'ai');
-  ghostRecorder.sample(engine, raceMode === 'ai' ? [1] : [1, 2]);
-  splitTiming.sample(engine);
-  engine.step(dt, frameKeys);
+  if (!renderer.available) { keys.clear(); if(!raceEntry.active)engine.pause(); }
+  const entering=raceEntry.active;
+  const entryState=raceEntry.update(entering&&!document.hidden&&entryWindowFocused&&renderer.available?dt:0);
+  renderer.setEntryProgress?.(entryState.active?(entryState.previewProgress??0):null);
+  const frameKeys = bindings.frameKeys(keys, raceMode !== 'local');
+  if(entering){
+    keys.clear();
+    if(!entryState.active)renderer.resetCameras(engine);
+  }else{
+    if(raceMode!=='tutorial'){ghostRecorder.sample(engine,raceMode==='ai'?[1]:[1,2]);splitTiming.sample(engine);}
+    engine.step(dt, frameKeys);
+    if(raceMode==='tutorial'){
+      if(engine.state==='racing')drivingTutorial.update(engine.cars[0],frameKeys);
+      if(engine.state==='finished')drivingTutorial.finish('lap');
+    }
+  }
   for(const [i,car] of engine.cars.entries()){
     if(car.rescueCount>lastRescueCounts[i]){
-      ghostRecorder.invalidate(car.id);renderer.resetCameras(engine,car.id);
+      if(raceMode!=='tutorial')ghostRecorder.invalidate(car.id);renderer.resetCameras(engine,car.id);
       notices[i]=car.rescueReason==='offroad'?'离开赛道满 7 秒 · 已自动复位':'返回赛道 · 罚停 2 秒';
       noticeUntil[i]=toastTime+2.2;
     }
     lastRescueCounts[i]=car.rescueCount;
   }
-  splitTiming.sample(engine);
-  ghostRecorder.sample(engine, raceMode === 'ai' ? [1] : [1, 2]);
+  if(!entering&&raceMode!=='tutorial'){splitTiming.sample(engine);ghostRecorder.sample(engine,raceMode==='ai'?[1]:[1,2]);}
   renderer.setGhostPoses?.(engine.cars.map(car => !car.finished && ['racing','paused'].includes(engine.state) ? activeGhosts.filter(ghost=>(ghost.replay.kind==='race'||car._started) && (raceMode!=='ai'||challengeElapsed(car)<=ghost.replay.durationMs)).map(ghost => ({...sampleReplay(ghost.replay,(ghost.replay.kind==='race'?engine.time:car.lapTime)*1000),slotId:ghost.slotId})).filter(pose=>Number.isFinite(pose.x)) : []));
   updateRaceNotices();
   renderer.render(engine, dt, now);

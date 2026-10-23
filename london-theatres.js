@@ -135,11 +135,11 @@ function showPanel(f,x,y,z,w,h,color){
 // These advertise a fictional game programme; they do not assert real residencies.
 function musicalPoster(f,x,y,z,w,h,show){
  const schemes={phantom:['#162c49','#f0dfbe'],frozen:['#244f7c','#b8dfdb'],lion:['#e9b341','#30281e'],mis:['#263e62','#f0dfbe'],wicked:['#204c38','#acd389'],hamilton:['#946735','#edce81'],mormon:['#467eaf','#f4e8c4'],wrong:['#683745','#f2cc98']};
- const [bg,ink]=schemes[show],left=x-w/2,base=y-h/2,p=(u,v)=>[left+u*w,base+v*h,z-.45];
- panel(f,x,y,z,w+3,h+3,gold);panel(f,x,y,z-.1,w,h,bg,.04);
- panel(f,x,base+h*.91,z-.2,w*.86,.55,ink);word(f,'WEST END',x,base+h*.92,z-.3,h*.047,w*.73,ink,.25);
- const tri=(a,b,c,col=ink)=>f.tri(p(...a),p(...b),p(...c),col,.1);
- const disk=(u,v,r,col=ink)=>frontDisk(f,left+u*w,base+v*h,z-.4,r*Math.min(w,h),col,.12,20);
+ const [bg,ink]=schemes[show],left=x-w/2,base=y-h/2,wicked=show==='wicked',p=(u,v,depth=.45)=>[left+u*w,base+v*h,z-depth];
+ panel(f,x,y,z,w+3,h+3,gold);panel(f,x,y,z-(wicked?.5:.1),w,h,bg,.04);
+ panel(f,x,base+h*.91,z-(wicked?3:.2),w*.86,.55,ink);word(f,'WEST END',x,base+h*.92,z-(wicked?3:.3),h*.047,w*.73,ink,.25);
+ const tri=(a,b,c,col=ink,depth=.45)=>f.tri(p(...a,depth),p(...b,depth),p(...c,depth),col,.1);
+ const disk=(u,v,r,col=ink,depth=.4)=>frontDisk(f,left+u*w,base+v*h,z-depth,r*Math.min(w,h),col,.12,20);
  if(show==='mormon'){
   tri([.05,.49],[.29,.83],[.55,.49],'#dfdfc6');tri([.35,.49],[.69,.81],[.96,.49],'#a5c0c2');
   panel(f,x,base+h*.58,z-.5,w*.31,h*.23,'#f0eee1');tri([.45,.71],[.55,.71],[.5,.54],'#243342');
@@ -159,8 +159,11 @@ function musicalPoster(f,x,y,z,w,h,show){
   for(let i=0;i<6;i++){const a=i/6*TAU,dx=Math.cos(a)*.25,dy=Math.sin(a)*.2;tri([.49,.67],[.5+dx,.67+dy],[.51,.68]);}
   tri([.1,.5],[.32,.73],[.49,.5],'#82b7c8');tri([.4,.5],[.69,.75],[.9,.5],'#a7cdcd');
  }else if(show==='wicked'){
-  disk(.5,.69,.25,'#91bd75');disk(.59,.73,.21,bg);tri([.19,.53],[.39,.81],[.5,.54],'#182e31');
-  tri([.15,.53],[.56,.53],[.35,.57],'#182e31');panel(f,x+w*.18,base+h*.62,z-.6,w*.25,h*.025,'#c5cba0');
+  // The crescent is composited from overlapping disks. Separate each paint
+  // layer by half a unit; coplanar fans flicker in the moving chase camera.
+  // The header stays in front where the top of the moon meets its lettering.
+  disk(.5,.69,.25,'#91bd75',1);disk(.59,.73,.21,bg,1.5);tri([.19,.53],[.39,.81],[.5,.54],'#182e31',2);
+  tri([.15,.53],[.56,.53],[.35,.57],'#182e31',2);panel(f,x+w*.18,base+h*.62,z-2.5,w*.25,h*.025,'#c5cba0');
  }else if(show==='hamilton'){
   for(let i=0;i<5;i++){const a=i/5*TAU-Math.PI/2,b=a+Math.PI/5;tri([.5,.68],[.5+Math.cos(a)*.26,.68-Math.sin(a)*.19],[.5+Math.cos(b)*.11,.68-Math.sin(b)*.08]);}
   for(let i=0;i<5;i++)panel(f,left+w*(.25+i*.12),base+h*.53,z-.6,w*.07,h*(.08+(i%3)*.025),'#553d2e');
@@ -169,8 +172,8 @@ function musicalPoster(f,x,y,z,w,h,show){
   for(let i=0;i<5;i++)panel(f,left+w*(.18+i*.16),base+h*.54,z-.5,w*.11,h*(.09+(i%2)*.05),'#24354a');
  }
  const titles={phantom:['THE PHANTOM','OF THE OPERA'],frozen:['FROZEN'],lion:['THE LION','KING'],mis:['LES','MISERABLES'],wicked:['WICKED'],hamilton:['HAMILTON'],mormon:['THE BOOK','OF MORMON'],wrong:['THE PLAY','THAT GOES','WRONG']}[show];
- titles.forEach((line,i)=>word(f,line,x,base+h*(.36-i*.11),z-.8,h*.075,w*.88,ink,.27));
- word(f,'ON STAGE',x,base+h*.045,z-.8,h*.041,w*.65,ink,.2);
+ titles.forEach((line,i)=>word(f,line,x,base+h*(.36-i*.11),z-(wicked?1:.8),h*.075,w*.88,ink,.27));
+ word(f,'ON STAGE',x,base+h*.045,z-(wicked?1:.8),h*.041,w*.65,ink,.2);
 }
 function theatreBillboard(f,key){
  const {x,y,z,width:w,height:h}=LONDON_THEATRE_ADS.find(poster=>poster.key===key);

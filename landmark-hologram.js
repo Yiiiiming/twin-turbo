@@ -109,7 +109,7 @@ export function landmarkHologramGeometry(trackId) {
   return result;
 }
 
-function paint(ctx, model, width, height, yaw, time, reduced) {
+export function paintLandmarkHologram(ctx, model, width, height, yaw, time, reduced) {
   ctx.clearRect(0,0,width,height);
   const pitch = model.kind === 'circuit' ? .70 : .18, cp=Math.cos(pitch),sp=Math.sin(pitch),cs=Math.cos(yaw),sn=Math.sin(yaw);
   const scale = Math.min(width*.83/(2*model.radius),height*.78/Math.max(1,model.height*cp+2*model.radius*sp));
@@ -176,7 +176,7 @@ export function initLandmarkHologram(doc = globalThis.document) {
   const active=()=>!disposed&&!doc.hidden&&intersecting&&!host.hidden&&!menu?.hidden&&!menu?.classList.contains('hidden')&&
     !doc.querySelector('dialog[open]')&&!(doc.getElementById('records-center')&&!doc.getElementById('records-center').hidden)&&
     width>0&&height>0;
-  const draw=time=>{if(!model||!active())return;const dpr=Math.min(2,win.devicePixelRatio||1);ctx.setTransform(dpr,0,0,dpr,0,0);paint(ctx,model,width,height,yaw,time,reduced);dirty=false;};
+  const draw=time=>{if(!model||!active())return;const dpr=Math.min(2,win.devicePixelRatio||1);ctx.setTransform(dpr,0,0,dpr,0,0);paintLandmarkHologram(ctx,model,width,height,yaw,time,reduced);dirty=false;};
   function tick(time){
     frame=0;if(!active()){lastTime=0;return;}
     const delta=lastTime?Math.min(100,time-lastTime):0;lastTime=time;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTrack, trackPoint, RaceEngine } from '../engine.js';
-import { THEATRE_POSTERS, LONDON_THEATRE_ADS, LONDON_THEATRES, theatrePosterSurfaces } from '../london-theatres.js';
+import { THEATRE_POSTERS, LONDON_THEATRE_ADS, LONDON_THEATRES, theatrePosterSurfaces, addLondonTheatre } from '../london-theatres.js';
 import { RaceRenderer, londonLandmarkPlacements, lookAt, multiply, perspective, updateChaseCamera } from '../renderer.js';
 
 function mockGL(){
@@ -93,4 +93,36 @@ test('large illustrated panels remain ahead of the existing balcony and column c
  // Victoria Palace balcony has a front at -48, capitals at -47.8;
  // Drury Lane balustrade reaches -55. Panels need a stable positive gap.
  const limit={hamilton:-49.5,frozen:-55.5};for(const [key,front]of Object.entries(limit)){const panel=LONDON_THEATRE_ADS.find(ad=>ad.key===key);assert.ok(panel.z<front,key+' illustration is obscured by facade ornament');}
+});
+
+test('Wicked overlapping paint layers retain depth clearance after world rotation and GPU float conversion',t=>{
+ setTrack('coast-london');t.after(()=>setTrack('coast'));
+ const ad=LONDON_THEATRE_ADS.find(ad=>ad.key==='wicked'),placement=londonLandmarkPlacements().find(item=>item.kind===ad.kind),base=ad.y-ad.height/2;
+ for(const angle of [placement.angle,0,.713,Math.PI,-1.2]){
+  const item={...placement,angle},c=Math.cos(angle),s=Math.sin(angle),faces=[],boxes=[];
+  // Match the renderer's Float32 vertex upload, then measure along the actual
+  // rotated facade normal, rather than only checking source depth constants.
+  const local=p=>{const [x,y,z]=p.map(Math.fround),dx=x-item.x,dz=z-item.z;return [c*dx+s*dz,y-(item.elevation||0),-s*dx+c*dz];};
+  const mesh={colliders:[],cone(){},triangle(a,b,c,color){faces.push({points:[a,b,c].map(local),color});},quad(a,b,c,d,color){faces.push({points:[a,b,c,d].map(local),color});},box(x,y,z,w,h,d,color,rotation=0){
+   const cs=Math.cos(rotation),sn=Math.sin(rotation),points=[];
+   for(const a of [-1,1])for(const b of [-1,1])for(const e of [-1,1])points.push(local([x+cs*a*w/2-sn*e*d/2,y+b*h/2,z+sn*a*w/2+cs*e*d/2]));
+   boxes.push({points,w,h,d,color});
+  }};
+  addLondonTheatre(mesh,item);
+  const layer=(color,count)=>{const selected=faces.filter(face=>face.color===color&&face.points.length===count);assert.ok(selected.length,`${color}: paint layer missing`);return selected;};
+  const moon=layer('#91bd75',3),cutout=layer('#204c38',3),hat=layer('#182e31',3),eye=layer('#c5cba0',4),paper=layer('#204c38',4);
+  assert.equal(moon.length,20);assert.equal(cutout.length,20);assert.equal(hat.length,2);
+  const depths=layer=>layer.flatMap(face=>face.points.map(point=>point[2]));
+  const clear=(back,front,label)=>assert.ok(Math.min(...depths(back))-Math.max(...depths(front))>.45,`${label}: overlapping paint has insufficient depth separation at rotation ${angle}`);
+  clear(paper,moon,'paper/moon');clear(moon,cutout,'moon/cutout');clear(cutout,hat,'cutout/hat');clear(hat,eye,'hat/eye');
+  // Confirm this exercises real overlapping triangles, not disjoint art that
+  // would appear stable even if both faces accidentally returned to one plane.
+  const covers=(face,u,v)=>{const point=[ad.x+(u-.5)*ad.width,base+v*ad.height],signs=face.points.map((a,i)=>{const b=face.points[(i+1)%face.points.length];return (b[0]-a[0])*(point[1]-a[1])-(b[1]-a[1])*(point[0]-a[0]);});return signs.every(n=>n>=-.001)||signs.every(n=>n<=.001);};
+  assert.ok(moon.some(face=>covers(face,.55,.73))&&cutout.some(face=>covers(face,.55,.73)),'crescent cutout must actually overlap its moon');
+  assert.ok(moon.some(face=>covers(face,.43,.65))&&hat.some(face=>covers(face,.43,.65)),'hat must actually overlap its moon');
+  const ink=faces.filter(face=>face.color==='#acd389'),header=ink.filter(face=>Math.min(...face.points.map(point=>point[1]))>base+ad.height*.915),title=ink.filter(face=>Math.max(...face.points.map(point=>point[1]))<base+ad.height*.45);
+  assert.ok(header.length&&title.length);clear(eye,header,'artwork/header');clear(paper,title,'paper/title');
+  const backing=boxes.find(box=>box.w===117&&box.h===68&&box.d===3),lightbox=boxes.find(box=>box.w===ad.width+5&&box.h===ad.height+5&&box.d===1.8);
+  assert.ok(backing&&lightbox);clear([backing],paper,'facade/paper');clear([lightbox],paper,'lightbox/paper');
+ }
 });

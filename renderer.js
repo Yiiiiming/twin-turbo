@@ -17,6 +17,8 @@ import { addLondonMagicScenery, addMagicCharacter, addMagicFlyingCar } from './l
 import { londonMagicState, magicBodyMatrix, magicArmMatrix, MagicEffects } from './london-magic-effects.js';
 import { SPLIT_FRACTIONS } from './split-timing.js';
 import { CHALLENGE_COLORS } from './ghost-challenge.js';
+import { createEntryCameraPlan, entryCameraForProgress, entryMeshOcclusion } from './entry-cameras.js';
+import { addBeijingGreatWall } from './beijing-great-wall.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
 
@@ -1019,6 +1021,18 @@ function buildWorld() {
 /** Headless physics verification uses the exact production mesh-building path. */
 export function sceneObstacles() {return buildWorld().obstacles;}
 
+const entryBoundaryCache=new WeakMap();
+/** CPU-only view protection uses the same visible wall/ridge geometry. It does
+ * not add a draw call, change solids, or substitute an enclosing collision box. */
+export function sceneEntryBoundary(){
+  if(TRACK.theme!=='beijing')return null;
+  if(!entryBoundaryCache.has(TRACK)){
+    const mesh=new MeshBuilder();addBeijingGreatWall(mesh);
+    entryBoundaryCache.set(TRACK,entryMeshOcclusion(mesh.data));
+  }
+  return entryBoundaryCache.get(TRACK);
+}
+
 function carMesh(color) {
   const m=new MeshBuilder();
   // X is the vehicle's forward axis; lamps and rear wing make orientation clear.
@@ -1069,14 +1083,33 @@ function ghostCarMesh(color = '#b8a2ed') {
   }
   return mesh;
 }
-function flameMesh() {
-  const m=new MeshBuilder();
-  for(const side of [-1,1]) {
-    const x=-23,z=side*6;
-    m.triangle([x,5,z-2.5],[x,11,z],[-52,7,z],'#62d7ff',1);
-    m.triangle([x,11,z],[x,5,z+2.5],[-52,7,z],'#92efff',1);
-    m.triangle([x,5,z+2.5],[x,5,z-2.5],[-52,7,z],'#387dff',1);
-    m.triangle([x-1,6,z-1],[x-1,9,z+1],[-40,7,z],'#e0fdff',1);
+/** Remaining charge is visible even while coasting. Boost changes intensity,
+ * not the meaning of flame length; no animation/randomness can fake fuel. */
+export function nitroFlameState(car) {
+  const fraction=clamp(Number.isFinite(car.boost)?car.boost/100:0,0,1);
+  return {fraction,length:44*fraction,active:Boolean(car.boosting)&&fraction>0};
+}
+export function nitroFlameModel(carModel,car) {
+  const state=nitroFlameState(car);if(!state.length)return null;
+  const local=identity();local[0]=state.length;local[12]=-23;local[13]=7.2;
+  return multiply(carModel,local);
+}
+function flameMesh(active=false) {
+  const m=new MeshBuilder(),width=active?3.2:2.0;
+  const rings=[[0,1],[.18,.94],[.48,.62],[.77,.25],[1,0]],sides=10;
+  for(const side of [-1,1])for(const core of [false,true]){
+    const radius=width*(core?.43:1),length=core?.73:1;
+    const p=(t,r,a)=>[-t*length,Math.sin(a)*r*radius,side*6+Math.cos(a)*r*radius];
+    for(let ring=0;ring<rings.length-1;ring++){
+      const [t,r]=rings[ring],[nextT,nextR]=rings[ring+1];
+      const alpha=(active?.76:.50)*(core?1:.65)*(1-t*.55);
+      const color=core?[.72,.97,1,alpha]:[.25,.60,1,alpha];
+      for(let i=0;i<sides;i++){
+        const a=i/sides*TAU,b=(i+1)/sides*TAU;
+        if(nextR===0)m.triangle(p(t,r,a),p(nextT,0,0),p(t,r,b),color,active?1:.72);
+        else m.quad(p(t,r,a),p(nextT,nextR,a),p(nextT,nextR,b),p(t,r,b),color,active?1:.72);
+      }
+    }
   }
   return m;
 }
@@ -1105,6 +1138,7 @@ export function sceneWeights(x,y) {
 export class RaceRenderer {
   constructor(canvas,{sceneUrls={}}={}) {
     this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};this.obstacles=[];this.ghostPoses=[];this.singlePlayer=false;
+    this.entryProgress=null;this.entryPlan=null;this.entryCamera=null;
     this.posterUrls=Object.fromEntries(THEATRE_POSTERS.map(p=>[p.key,globalThis.__TWIN_TURBO_POSTERS__?.[p.key]||`./assets/posters/${p.file}`]));
     this.sceneUrls={coast:'./assets/coast.png',alpine:'./assets/alpine.png',city:'./assets/city.png',clouds:'./assets/cloud-sky.jpg',...sceneUrls};
     try {
@@ -1130,7 +1164,7 @@ export class RaceRenderer {
     this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
     const world=buildWorld();
     this.obstacles=world.obstacles;
-    this.meshes={terrain:upload(gl,world.terrain),road:upload(gl,buildRoad()),water:upload(gl,world.water),props:upload(gl,world.props),magic:world.magic.data.length?upload(gl,world.magic):{count:0},cars:[upload(gl,carMesh('#57dbe6')),upload(gl,carMesh('#ff9870'))],ghost:upload(gl,ghostCarMesh()),ghostGold:upload(gl,ghostCarMesh('#ffd166')),flames:upload(gl,flameMesh()),shadow:upload(gl,shadowMesh())};
+    this.meshes={terrain:upload(gl,world.terrain),road:upload(gl,buildRoad()),water:upload(gl,world.water),props:upload(gl,world.props),magic:world.magic.data.length?upload(gl,world.magic):{count:0},cars:[upload(gl,carMesh('#57dbe6')),upload(gl,carMesh('#ff9870'))],ghost:upload(gl,ghostCarMesh()),ghostGold:upload(gl,ghostCarMesh('#ffd166')),flames:upload(gl,flameMesh(true)),flameIdle:upload(gl,flameMesh(false)),shadow:upload(gl,shadowMesh())};
     this.ghostMeshes = [this.meshes.ghost, this.meshes.ghostGold];
     this.trackId=TRACK.id;
     this.worldMatrix=identity();
@@ -1143,6 +1177,7 @@ export class RaceRenderer {
   }
   rebuild(engine) {
     if(!this.available)return this;
+    this.setEntryProgress(null);
     const gl=this.gl,world=buildWorld();
     for(const [key,builder] of Object.entries({terrain:world.terrain,road:buildRoad(),water:world.water,props:world.props,magic:world.magic})) {
       const previous=this.meshes[key];this.meshes[key]=key==='magic'&&!builder.data.length?{count:0}:upload(gl,builder);if(previous?.buffer)gl.deleteBuffer?.(previous.buffer);
@@ -1256,6 +1291,15 @@ export class RaceRenderer {
     if(this.singlePlayer!==singlePlayer){this.singlePlayer=singlePlayer;this.cameras=[null,null];}
     return this;
   }
+  // Intro time belongs to the UI controller. Rendering never advances a car,
+  // countdown, replay or race clock, and null restores the usual viewports.
+  setEntryProgress(progress) {
+    const value=Number.isFinite(progress)?clamp(progress,0,1):null;
+    if(value===null||this.entryProgress===null||value<this.entryProgress)this.entryPlan=null;
+    this.entryProgress=value;
+    if(value===null)this.entryCamera=null;
+    return this;
+  }
   // Each driver's view follows its own lap clock. This state never enters physics.
   setGhostPoses(poses = []) {
     const count = this.singlePlayer ? CHALLENGE_COLORS.length : 2;
@@ -1316,14 +1360,19 @@ export class RaceRenderer {
     this._refreshAustinScoreboard();
     this._updateMagic(engine);
     gl.enable(gl.SCISSOR_TEST);gl.disable(gl.BLEND);
-    const divider=Math.floor(w/2);
-    for(let i=0;i<(this.singlePlayer?1:2);i++) {
+    const divider=Math.floor(w/2),entering=this.entryProgress!==null;
+    for(let i=0;i<(this.singlePlayer||entering?1:2);i++) {
       const car=engine.cars[i];if(!car)continue;
-      const x=i?divider:0,width=this.singlePlayer?w:i?w-divider:divider;
+      const x=i?divider:0,width=this.singlePlayer||entering?w:i?w-divider:divider;
       gl.viewport(x,0,width,h);gl.scissor(x,0,width,h);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-      const camera=this.cameras[i]=updateChaseCamera(car,this.cameras[i],dt);
-      const aspect=width/h;
-      this._sky(camera,sceneWeights(car.x,car.y),aspect,londonMagicBlend(car));
+      const chase=this.cameras[i]=updateChaseCamera(car,this.cameras[i],dt);
+      const aspect=width/h;let camera=chase;
+      if(entering){
+        if(!this.entryPlan||this.entryPlan.aspect!==aspect)this.entryPlan=createEntryCameraPlan(TRACK,car,{landmarks:harborLandmarkPlacements(),obstacles:this.obstacles,lamps:roadsideLamps(),boundary:sceneEntryBoundary(),chase:updateChaseCamera(car,null),aspect});
+        camera=this.entryCamera=entryCameraForProgress(TRACK,car,this.entryProgress,this.entryPlan);
+      }
+      const skyPosition=entering?{x:camera.eye[0],y:camera.eye[2],elevation:camera.eye[1]}:car;
+      this._sky(camera,sceneWeights(skyPosition.x,skyPosition.y),aspect,londonMagicBlend(skyPosition));
       const viewProjection=multiply(perspective(camera.fov,aspect),lookAt(camera.eye,camera.target));
       gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,viewProjection);
       gl.uniform3fv(this.uniforms.uEye,camera.eye);
@@ -1338,7 +1387,12 @@ export class RaceRenderer {
         const bounce=vehicle.offroad?Math.sin(now*.041+vehicle.id)*Math.min(Math.abs(vehicle.speed)/100,1)*.7:0;
         const model=modelMatrix(vehicle.x,(vehicle.elevation||0)+1.5+bounce,vehicle.y,vehicle.angle,roll,Math.atan(vehicle.slope||0));
         this._mesh(this.meshes.cars[vehicle.colorIndex === 1 ? 1 : vehicle.colorIndex === 0 ? 0 : j%2],model);
-        if(vehicle.boosting)this._mesh(this.meshes.flames,model);
+        const flame=nitroFlameModel(model,vehicle);
+        if(flame){
+          gl.enable(gl.BLEND);gl.depthMask(false);
+          this._mesh(vehicle.boosting?this.meshes.flames:this.meshes.flameIdle,flame);
+          gl.depthMask(true);gl.disable(gl.BLEND);
+        }
       }
       this._magicSpells();
       const ghosts = [...(this.ghostPoses?.[i] || [])].sort((a,b)=>

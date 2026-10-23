@@ -5,10 +5,11 @@ enhanceTrackSelect(document);
 initLandmarkHologram(document);
 
 // Subtle three-ring pointer trail, derived from the chosen Canva waiting-room UI.
-// Decoration only: no input capture and no work during a running race.
+// Decoration only: never captures input; fades after inactivity while driving.
 const stage = document.getElementById('race-stage');
 if (stage && typeof window.matchMedia === 'function') {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
   const trail = document.createElement('div');
   trail.className = 'pointer-orbits';
   trail.setAttribute('aria-hidden', 'true');
@@ -21,7 +22,9 @@ if (stage && typeof window.matchMedia === 'function') {
   function hide() { trail.classList.remove('visible'); started = false; if (frame) cancelAnimationFrame(frame); frame = 0; }
   function draw(now) {
     frame = 0;
-    if (reduced.matches || document.hidden || ['racing', 'countdown'].includes(document.body.dataset.raceState)) { hide(); return; }
+    if (reduced.matches || document.hidden) { hide(); return; }
+    const driving = ['racing', 'countdown'].includes(document.body.dataset.raceState);
+    if (driving && now - lastMove > 1500) { hide(); return; }
     const elapsed = Math.min(40, now - previous || 16.7); previous = now;
     let distance = 0;
     points.forEach((point, i) => {
@@ -30,11 +33,10 @@ if (stage && typeof window.matchMedia === 'function') {
       rings[i].style.transform = `translate3d(${point.x}px,${point.y}px,0) translate(-50%,-50%)`;
       distance += Math.abs(point.x - x) + Math.abs(point.y - y);
     });
-    if (now - lastMove > 1500) trail.classList.remove('visible');
-    if (distance > .2 || now - lastMove <= 1800) frame = requestAnimationFrame(draw);
+    if (distance > .2 || driving) frame = requestAnimationFrame(draw);
   }
   document.addEventListener('pointermove', event => {
-    if (event.pointerType === 'touch' || reduced.matches || ['racing', 'countdown'].includes(document.body.dataset.raceState)) { hide(); return; }
+    if (event.pointerType === 'touch' || !finePointer.matches || reduced.matches) { hide(); return; }
     const host = event.target.closest?.('dialog[open]') || stage;
     if (trail.parentNode !== host) host.appendChild(trail);
     x = event.clientX; y = event.clientY; lastMove = performance.now();
@@ -45,5 +47,11 @@ if (stage && typeof window.matchMedia === 'function') {
   document.addEventListener('pointerout', event => { if (!event.relatedTarget) hide(); }, { passive: true });
   document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); });
   window.addEventListener('blur', hide);
-  reduced.addEventListener?.('change', hide);
+  function updatePointerMode() {
+    document.body.classList.toggle('orbit-cursor', finePointer.matches && !reduced.matches);
+    hide();
+  }
+  reduced.addEventListener?.('change', updatePointerMode);
+  finePointer.addEventListener?.('change', updatePointerMode);
+  updatePointerMode();
 }

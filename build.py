@@ -9,7 +9,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parent
 html = (ROOT / 'index.html').read_text()
-css = (ROOT / 'style.css').read_text() + '\n' + (ROOT / 'arcade-panels.css').read_text() + '\n' + (ROOT / 'race-type.css').read_text()
+css = '\n'.join((ROOT / name).read_text() for name in ('style.css', 'arcade-panels.css', 'race-type.css', 'race-entry.css', 'driving-tutorial.css'))
 
 def module_source(name):
     source = (ROOT / name).read_text()
@@ -30,6 +30,8 @@ def edition(styles, prelude=''):
     result = html.replace('<link rel="stylesheet" href="./style.css">', '<style>\n' + styles + '\n</style>')
     result = result.replace('<link rel="stylesheet" href="./arcade-panels.css">', '')
     result = result.replace('<link rel="stylesheet" href="./race-type.css">', '')
+    result = result.replace('<link rel="stylesheet" href="./race-entry.css">', '')
+    result = result.replace('<link rel="stylesheet" href="./driving-tutorial.css">', '')
     result = result.replace('<script type="module" src="./main.js"></script>', '<script>\n' + prelude + script + '\n</script>')
     return result.replace('href="./" aria-label="Twin Turbo 首页"', 'href="#" aria-label="Twin Turbo 首页"')
 

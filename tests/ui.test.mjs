@@ -128,7 +128,7 @@ function canvasContext() {
   });
 }
 
-async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=coast', language = 'zh', configureRace = true, fullscreenAtLoad = false } = {}) {
+async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=coast', language = 'zh', configureRace = true, fullscreenAtLoad = false, entryDuration = 0 } = {}) {
   setTrack('coast'); t.after(() => setTrack('coast'));
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const document = new MockTarget();
@@ -215,6 +215,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
       this.resetCalls = []; this.rebuildCalls = []; this.renderCount = 0;
     }
     setGhostPoses(poses) { this.ghostPoses = poses; }
+    setEntryProgress(progress) { this.entryProgress=progress;return this; }
     setSinglePlayer(enabled) { this.singlePlayer=Boolean(enabled);return this; }
     rebuild(engine) { this.rebuildCalls.push(engine); engine.setObstacles(this.obstacles);this.resetCameras(engine);return this; }
     resetCameras(engine, playerId) {
@@ -226,9 +227,19 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     }
   }`;
   const rendererURL = `data:text/javascript;base64,${Buffer.from(rendererModule).toString('base64')}`;
+  // Timing integration uses a deterministic entry clock. race-entry.test.mjs
+  // exercises the real animation controller and reduced-motion lifecycle.
+  const entryModule=`export function createRaceEntry(document){let active=false,elapsed=0;const starts=[];const stage=document.getElementById('race-stage');
+    function cancel(){active=false;stage.classList.remove('race-entry-active');}
+    return {starts,start(track){starts.push(track);elapsed=0;active=${entryDuration}>0;stage.classList.toggle('race-entry-active',active);},
+      update(dt){if(active){elapsed+=dt;if(elapsed>=${entryDuration}-1e-9)cancel();}return {active,previewProgress:elapsed>=3.6?Math.min(1,(elapsed-3.6)/6):null};},
+      skip:cancel,cancel,get active(){return active;},get elapsed(){return elapsed;}};}`;
+  const entryURL=`data:text/javascript;base64,${Buffer.from(entryModule).toString('base64')}`;
   const source = (await readFile(sourceURL, 'utf8'))
     // Decorative pointer animation is independent of the deterministic race loop.
     .replace("import './ui-effects.js';", "import 'data:text/javascript,export{}';")
+    .replace("from './race-entry.js'", `from '${entryURL}'`)
+    .replace("from './driving-tutorial.js'", `from '${new URL('../driving-tutorial.js', import.meta.url).href}'`)
     .replace("from './i18n.js'", `from '${new URL('../i18n.js', import.meta.url).href}'`)
     .replace("from './race-hud.js'", `from '${new URL('../race-hud.js', import.meta.url).href}'`)
     .replace("from './controls.js'", `from '${new URL('../controls.js', import.meta.url).href}'`)
@@ -244,7 +255,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     .replace("from './leaderboard-client.js'", `from '${new URL('../leaderboard-client.js', import.meta.url).href}'`);
   // Load shipped application source unmodified except dependency resolution and
   // read-only test exports. No duplicated event handlers or production hooks.
-  const entry = `${source}\nexport { engine, keys, renderer, bindings, leaderboard, ghostClient, ghostRecorder, splitTiming, i18n, trackCards, activeGhosts, challengeSetup };\n// test instance ${++instance}`;
+  const entry = `${source}\nexport { engine, keys, renderer, bindings, leaderboard, ghostClient, ghostRecorder, splitTiming, i18n, trackCards, activeGhosts, challengeSetup, raceEntry, drivingTutorial };\n// test instance ${++instance}`;
   const application = await import(`data:text/javascript;base64,${Buffer.from(entry).toString('base64')}`);
   const ui = {
     ...application, application, nodes, allNodes, document, window, lapButtons, lapLabels, modeButtons, html, requests,
@@ -407,6 +418,66 @@ test('page load can enter fullscreen and never reverses the first manual exit',a
   assert.equal(ui.document.fullscreenExits,1);
   ui.window.dispatch('click',{target:ui.nodes.get('start'),isTrusted:true});
   assert.equal(stage.fullscreenAttempts,1,'a successful load consumes the first-gesture fallback');
+});
+
+test('native fullscreen exit pauses once regardless of Escape event order, repeats or blur',async t=>{
+  for(const order of ['no key event','keydown first','fullscreenchange first'])await t.test(order,async t=>{
+    const ui=await loadUI(t);ui.launch();ui.advance(3.1);ui.key('KeyW');ui.advance(.1);
+    const stage=ui.nodes.get('race-stage'),attempts=stage.fullscreenAttempts,time=ui.engine.time;
+    const exit=()=>{ui.document.fullscreenElement=null;ui.document.dispatch('fullscreenchange');};
+    if(order==='keydown first'){ui.key('Escape');exit();}
+    else {exit();if(order==='fullscreenchange first')ui.key('Escape');}
+    assert.equal(ui.engine.state,'paused');assert.equal(ui.keys.size,0);
+    ui.key('Escape',{repeat:true});ui.window.dispatch('blur');ui.document.dispatch('fullscreenchange');ui.advance(.2);
+    assert.equal(ui.engine.state,'paused');assert.equal(ui.engine.time,time);
+    assert.equal(ui.nodes.get('pause-panel').classList.contains('hidden'),false);
+    assert.equal(ui.document.fullscreenElement,null);assert.equal(stage.fullscreenAttempts,attempts);
+    ui.keyup('Escape');ui.window.dispatch('focus');ui.key('Escape');ui.frame();
+    assert.equal(ui.engine.state,'racing','a later, separate Escape press can resume in window mode');
+    assert.equal(ui.document.fullscreenElement,null);assert.equal(stage.fullscreenAttempts,attempts,'keyboard resume does not re-enter fullscreen');
+  });
+});
+
+test('P pauses and resumes without changing fullscreen, while the resume button requests it synchronously',async t=>{
+  const ui=await loadUI(t);ui.launch();ui.advance(3.1);
+  const stage=ui.nodes.get('race-stage'),attempts=stage.fullscreenAttempts;
+  ui.key('KeyP');ui.frame();assert.equal(ui.engine.state,'paused');assert.equal(ui.document.fullscreenElement,stage);
+  assert.match(ui.nodes.get('pause').innerHTML,/<kbd>P<\/kbd>/);
+  ui.key('KeyP',{repeat:true});assert.equal(ui.engine.state,'paused');
+  ui.keyup('KeyP');ui.key('KeyP');assert.equal(ui.engine.state,'racing');assert.equal(stage.fullscreenAttempts,attempts);
+  ui.document.fullscreenElement=null;ui.document.dispatch('fullscreenchange');
+  ui.key('KeyP');assert.equal(ui.engine.state,'racing');assert.equal(ui.document.fullscreenElement,null,'P can resume outside fullscreen');
+  assert.equal(stage.fullscreenAttempts,attempts);
+  ui.keyup('KeyP');ui.key('KeyP');assert.equal(ui.engine.state,'paused');
+  ui.click('resume');assert.equal(stage.fullscreenAttempts,attempts+1,'request runs inside the trusted button handler before an await');
+  assert.equal(ui.document.fullscreenElement,stage);assert.equal(ui.engine.state,'racing');assert.equal(ui.keys.size,0);
+  ui.click('language-en');assert.equal(ui.nodes.get('pause-shortcut').textContent,'P');
+  assert.match(ui.nodes.get('pause-help-text').textContent,/without leaving fullscreen/);
+});
+
+test('a custom P driving binding retains its action and changes pause hints to Escape',async t=>{
+  const ui=await loadUI(t),bind=ui.document.querySelectorAll('[data-bind-player][data-bind-action]').find(button=>button.dataset.bindPlayer==='2'&&button.dataset.bindAction==='accelerate');
+  ui.click('open-bindings');bind.click();ui.key('KeyP');ui.click('bindings-done');
+  assert.equal(ui.bindings.code(2,'accelerate'),'KeyP');assert.match(ui.nodes.get('pause').innerHTML,/<kbd>Esc<\/kbd>/);
+  assert.equal(ui.nodes.get('pause-shortcut').textContent,'Esc');assert.match(ui.nodes.get('pause-help-text').textContent,/P 已用于/);
+  assert.equal(JSON.parse(ui.window.localStorage.getItem('twin-turbo-controls-v1'))[1].accelerate,'KeyP');
+  ui.launch();ui.advance(3.1);ui.key('KeyP');ui.advance(.4);
+  assert.equal(ui.engine.state,'racing');assert.ok(ui.engine.cars[1].speed>70,'P still accelerates the selected player');
+  ui.keyup('KeyP');ui.click('pause');ui.key('KeyP');assert.equal(ui.engine.state,'paused','a driving key cannot resume a paused game');
+  ui.click('pause-bindings');ui.click('bindings-reset');ui.click('bindings-done');
+  assert.match(ui.nodes.get('pause').innerHTML,/<kbd>P<\/kbd>/);ui.nodes.get('game').focus();ui.key('KeyP');assert.equal(ui.engine.state,'racing');
+});
+
+test('leaving fullscreen during either intro phase shows a usable pause and preserves the full countdown',async t=>{
+  for(const elapsed of [1,4])await t.test(`intro at ${elapsed}s`,async t=>{
+    const ui=await loadUI(t,{entryDuration:9.6});ui.launch();ui.advance(elapsed);
+    assert.equal(ui.raceEntry.active,true);ui.document.fullscreenElement=null;ui.document.dispatch('fullscreenchange');ui.frame();
+    assert.equal(ui.raceEntry.active,false);assert.equal(ui.renderer.entryProgress,null);
+    assert.equal(ui.engine.state,'paused');assert.equal(ui.engine.countdown,3);assert.equal(ui.engine.time,0);
+    assert.equal(ui.nodes.get('pause-panel').classList.contains('hidden'),false);
+    ui.click('resume');assert.equal(ui.engine.state,'countdown');assert.equal(ui.engine.countdown,3);
+    ui.advance(2.9);assert.equal(ui.engine.state,'countdown');ui.advance(.2);assert.equal(ui.engine.state,'racing');
+  });
 });
 
 test('fullscreen re-shows only an open language dialog above the stage and preserves the focused language choice',async t=>{
@@ -612,6 +683,147 @@ test('start and Space open preparation before countdown, with an explicit no-gho
   assert.equal(ui.engine.time, before);
   ui.click('setup-launch'); ui.frame();
   assert.equal(ui.engine.state, 'countdown'); assert.equal(ui.engine.time, 0);
+});
+
+test('cinematic entry freezes every race clock and recorder through blur and hidden tabs, then retains the full countdown',async t=>{
+  const ui=await loadUI(t,{entryDuration:9.6});
+  const startEngine=ui.engine.start.bind(ui.engine);
+  ui.engine.start=(...args)=>{assert.equal(ui.raceEntry.active,true,'the opaque entry cover exists before the engine can expose the racing scene');return startEngine(...args);};
+  let recordings=0,splits=0;
+  const record=ui.ghostRecorder.sample.bind(ui.ghostRecorder),split=ui.splitTiming.sample.bind(ui.splitTiming);
+  ui.ghostRecorder.sample=(...args)=>{recordings++;return record(...args);};
+  ui.splitTiming.sample=(...args)=>{splits++;return split(...args);};
+  ui.launch();const start=ui.engine.cars.map(car=>[car.x,car.y,car.angle]);
+  assert.equal(ui.raceEntry.active,true);assert.equal(ui.renderer.entryProgress,0);
+  assert.equal(ui.raceEntry.starts.at(-1),'coast');
+  ui.key('KeyW');ui.key('ArrowUp');ui.advance(3.9);
+  assert.equal(ui.keys.size,0);assert.equal(ui.engine.time,0);assert.equal(ui.engine.countdown,3);
+  assert.equal(recordings,0);assert.equal(splits,0);
+  assert.deepEqual(ui.engine.cars.map(car=>[car.x,car.y,car.angle]),start);
+  assert.ok(ui.renderer.entryProgress>0&&ui.renderer.entryProgress<1);
+  const elapsed=ui.raceEntry.elapsed;
+  ui.window.dispatch('blur');ui.advance(1);
+  assert.equal(ui.raceEntry.elapsed,elapsed);assert.equal(ui.engine.state,'countdown');
+  ui.window.dispatch('focus');ui.document.hidden=true;ui.document.dispatch('visibilitychange');ui.advance(1);
+  assert.equal(ui.raceEntry.elapsed,elapsed);assert.equal(ui.engine.countdown,3);
+  ui.document.hidden=false;ui.document.dispatch('visibilitychange');
+  while(ui.raceEntry.active)ui.frame();
+  assert.equal(ui.renderer.entryProgress,null,'the final preview snapshot cannot retain the cinematic camera');
+  assert.equal(ui.engine.time,0);assert.equal(ui.engine.countdown,3);
+  assert.equal(recordings,0);assert.equal(splits,0);
+  assert.equal(ui.nodes.get('countdown').classList.contains('hidden'),false);
+  ui.advance(2.9);assert.equal(ui.engine.state,'countdown');
+  ui.advance(.2);assert.equal(ui.engine.state,'racing');assert.ok(recordings>0&&splits>0);
+});
+
+test('entry skips and cancellation restore normal cameras without moving cars or consuming countdown',async t=>{
+  const ui=await loadUI(t,{entryDuration:9.6});ui.launch();ui.advance(2.5);
+  ui.key('Escape');assert.equal(ui.raceEntry.active,false);assert.equal(ui.renderer.entryProgress,null);
+  assert.equal(ui.engine.countdown,3);assert.equal(ui.engine.state,'countdown');
+  ui.click('restart');assert.equal(ui.renderer.entryProgress,null);ui.click('setup-launch');
+  assert.equal(ui.raceEntry.active,true);ui.advance(.4);ui.key('Space');
+  assert.equal(ui.raceEntry.active,false);assert.equal(ui.engine.countdown,3);assert.equal(ui.keys.size,0);
+  ui.click('restart');ui.click('setup-launch');ui.advance(2.5);ui.click('pause-menu');ui.frame();
+  assert.equal(ui.raceEntry.active,false);assert.equal(ui.renderer.entryProgress,null);assert.equal(ui.engine.state,'menu');
+  assert.equal(ui.nodes.get('race-stage').classList.contains('race-entry-active'),false);
+});
+
+test('tutorial advances through five real driving actions with no ghosts, qualification, saved cards or recordings',async t=>{
+  const ui=await loadUI(t,{entryDuration:9.6});
+  ui.modeButtons.find(button=>button.dataset.mode==='tutorial').click();
+  const beforeRequests=ui.requests.length;
+  let recordings=0,splits=0,results=0,newRaces=0,ghostStarts=0;
+  ui.ghostRecorder.sample=()=>recordings++;ui.splitTiming.sample=()=>splits++;
+  ui.leaderboard.showResults=()=>results++;ui.leaderboard.newRace=()=>newRaces++;ui.ghostClient.startRace=()=>{ghostStarts++;return[];};
+  ui.click('start');
+  assert.equal(ui.engine.cars.length,1);assert.equal(ui.renderer.singlePlayer,true);
+  assert.equal(ui.nodes.get('race-setup-dialog').open,false);assert.equal(ui.raceEntry.active,true);
+  assert.equal(ui.drivingTutorial.element.hidden,true);assert.equal(ui.application.activeGhosts.length,0);
+  ui.key('Space');ui.advance(3.1);
+  assert.equal(ui.drivingTutorial.element.hidden,false);
+  ui.key('KeyA');ui.advance(.2);ui.keyup('KeyA');assert.equal(ui.drivingTutorial.step,0,'stationary steering does not count as acceleration');
+  const until=step=>{for(let n=0;n<120&&ui.drivingTutorial.step<step;n++)ui.frame();assert.equal(ui.drivingTutorial.step,step);};
+  ui.key('KeyW');until(1);
+  ui.key('KeyA');until(2);ui.keyup('KeyA');ui.keyup('KeyW');
+  ui.key('KeyS');until(3);ui.keyup('KeyS');
+  const fuelBefore=ui.engine.cars[0].boost;
+  const guideDriver=new RaceAI({carId:1});
+  const boostFrame=()=>{const steering=guideDriver.update(ui.engine,1/60);for(const code of ['KeyA','KeyD'])steering.has(code)?ui.key(code):ui.keyup(code);ui.frame();};
+  ui.key('KeyW');ui.key('ShiftLeft');
+  // Continue steering through the longer boost exercise using real key input.
+  for(let n=0;n<150&&fuelBefore-ui.engine.cars[0].boost<58;n++)boostFrame();
+  assert.ok(fuelBefore-ui.engine.cars[0].boost>=58&&fuelBefore-ui.engine.cars[0].boost<60);
+  assert.equal(ui.drivingTutorial.step,3,'the flame-length instruction stays visible until sixty fuel units have actually been used');
+  assert.match(ui.drivingTutorial.element.children[2].textContent,/尾焰越长/);
+  for(let n=0;n<30&&ui.drivingTutorial.step<4;n++)boostFrame();
+  assert.equal(ui.drivingTutorial.step,4);assert.ok(fuelBefore-ui.engine.cars[0].boost>=60);
+  assert.equal(ui.drivingTutorial.element.children[3].children[0].textContent,'Q','reset instruction only shows the primary rescue key');
+  for(const code of ['KeyW','ShiftLeft','KeyA','KeyD'])ui.keyup(code);
+  const car=ui.engine.cars[0],resets=car.rescueCount;
+  ui.key('KeyQ');ui.frame();await ui.flush();
+  assert.equal(car.rescueCount,resets+1);assert.equal(ui.drivingTutorial.completed,true);assert.equal(ui.engine.state,'paused');
+  assert.equal(ui.nodes.get('result').classList.contains('hidden'),true);
+  assert.equal(ui.nodes.get('pause-panel').classList.contains('hidden'),true);
+  assert.equal(ui.document.activeElement,ui.drivingTutorial.element.children.at(-1));
+  assert.deepEqual([recordings,splits,results,newRaces,ghostStarts],[0,0,0,0,0]);
+  assert.equal(ui.requests.length,beforeRequests,'practice performs no ghost matching, qualification or upload');
+  ui.drivingTutorial.element.children.at(-1).click();ui.frame();
+  assert.equal(ui.engine.state,'menu');assert.equal(ui.drivingTutorial.element.hidden,true);assert.equal(results,0);
+});
+
+test('tutorial counts only actual boost spending across refills and ignores recovery or launch teleports',async t=>{
+  const ui=await loadUI(t),guide=ui.drivingTutorial,car={speed:0,angle:0,boost:100,boosting:false,rescueCount:0,launchResetCount:0};
+  guide.start(car);
+  car.speed=55;guide.update(car,new Set(['KeyW']));
+  car.angle=.1;guide.update(car,new Set(['KeyW','KeyA']));
+  car.speed=30;guide.update(car,new Set(['KeyS']));assert.equal(guide.step,3);
+  const boostKeys=new Set(['KeyW','ShiftLeft']);
+  for(const reset of ['rescueCount','launchResetCount']){
+    car[reset]++;car.boost=0;car.boosting=true;guide.update(car,boostKeys);
+    assert.equal(guide.step,3,`${reset}: fuel changes during a teleport cannot complete the lesson`);
+    car.boost=100;car.boosting=false;guide.update(car,new Set());
+  }
+  const spend=amount=>{car.boosting=true;for(let i=0;i<amount;i++){car.boost--;guide.update(car,boostKeys);}};
+  spend(29);assert.equal(guide.step,3);
+  car.boost=100;car.boosting=false;guide.update(car,new Set());assert.equal(guide.step,3,'recharging is not consumption');
+  spend(30);assert.equal(guide.step,3,'fifty-nine units across two attempts are still insufficient');
+  spend(1);assert.equal(guide.step,4,'sixty genuine units complete the nitro step');
+});
+
+test('tutorial pause hides the guide, resume keeps the lesson, and restart repeats entry with a fresh full countdown',async t=>{
+  const ui=await loadUI(t,{entryDuration:9.6});
+  ui.modeButtons.find(button=>button.dataset.mode==='tutorial').click();ui.click('start');ui.key('Space');ui.advance(3.1);
+  ui.key('KeyW');ui.advance(.4);ui.keyup('KeyW');assert.equal(ui.drivingTutorial.step,1);
+  ui.key('Escape');ui.frame();
+  assert.equal(ui.engine.state,'paused');assert.equal(ui.drivingTutorial.element.hidden,true);
+  assert.equal(ui.nodes.get('pause-panel').classList.contains('hidden'),false);
+  const time=ui.engine.time;ui.advance(.5);assert.equal(ui.engine.time,time);
+  ui.key('KeyP');ui.frame();
+  assert.equal(ui.engine.state,'racing');assert.equal(ui.drivingTutorial.step,1);assert.equal(ui.drivingTutorial.element.hidden,false);
+  ui.key('Escape');ui.frame();ui.click('restart');ui.frame(0);
+  assert.equal(ui.raceEntry.active,true);assert.equal(ui.raceEntry.elapsed,0);
+  assert.equal(ui.drivingTutorial.step,0);assert.equal(ui.drivingTutorial.element.hidden,true);
+  assert.equal(ui.engine.state,'countdown');assert.equal(ui.engine.countdown,3);assert.equal(ui.engine.time,0);
+  ui.key('Space');ui.advance(3.1);assert.equal(ui.drivingTutorial.element.hidden,false);
+  ui.drivingTutorial.element.children.at(-1).click();ui.frame();
+  assert.equal(ui.engine.state,'menu');assert.equal(ui.raceEntry.active,false);assert.equal(ui.drivingTutorial.element.hidden,true);
+});
+
+test('tutorial follows custom and alternate controls, survives resets, and finishes a practice lap without the record flow',async t=>{
+  const ui=await loadUI(t);
+  assert.equal(ui.bindings.set(1,'accelerate','KeyF').ok,true);
+  ui.modeButtons.find(button=>button.dataset.mode==='tutorial').click();ui.click('start');ui.advance(3.1);
+  assert.match(ui.drivingTutorial.element.children[3].children[0].textContent,/F.*↑/);
+  ui.key('KeyW');ui.advance(.4);ui.keyup('KeyW');assert.equal(ui.drivingTutorial.step,0);
+  ui.key('ArrowUp');ui.advance(.4);ui.keyup('ArrowUp');assert.equal(ui.drivingTutorial.step,1);
+  ui.key('Slash');ui.frame();assert.equal(ui.engine.cars[0].rescueCount,1);assert.equal(ui.drivingTutorial.step,1,'an early reset leaves the unfinished lesson available');
+  ui.click('language-en');assert.equal(ui.drivingTutorial.element.children[1].textContent,'Steer while moving');
+  let results=0;ui.leaderboard.showResults=()=>results++;
+  const car=ui.engine.cars[0];Object.assign(car,{finished:true,lap:1,finishTime:41,bestLap:40});ui.engine.winner=car;ui.engine.state='finished';ui.frame();await ui.flush();
+  assert.equal(ui.drivingTutorial.completed,true);assert.match(ui.drivingTutorial.element.children[2].textContent,/Practice lap complete/);
+  assert.equal(ui.nodes.get('result').classList.contains('hidden'),true);assert.equal(results,0);
+  assert.equal(ui.ghostRecorder.bestReplay(1),null);assert.equal(ui.requests.filter(request=>request.method==='POST').length,0);
+  ui.nodes.get('game').focus();ui.key('Escape');assert.equal(ui.engine.state,'menu');assert.equal(results,0);
 });
 
 test('restart preparation can return to the main menu without launching or retaining a paused race', async t => {
@@ -1213,35 +1425,17 @@ test('driving HUD omits navigation prompts on straights and turns while retainin
   assert.ok(context.calls.some(call=>call[0]==='fillText'&&/逆向行驶/.test(call[1])));
 });
 
-test('above-car nitro HUD is a slim bar without words, preserving charge length and both player and boosting colors',async t=>{
+test('above-car nitro charge bars and labels are absent for both cars at every boost level',async t=>{
   const ui=await loadUI(t);ui.launch();ui.advance(3.1);ui.click('pause');
   const context=ui.nodes.get('hud').context,shapes=[];
   context.roundRect=(...bounds)=>shapes.push({bounds,color:context.fillStyle});
-  ui.renderer.cameras=ui.engine.cars.map(car=>({
-    eye:[car.x,car.elevation+42,car.y-100],target:[car.x,car.elevation+42,car.y],fov:Math.PI/2,
-  }));
-  const draw=()=>{
+  for(const [charge,boosting]of [[100,false],[25,true],[0,false]]){
+    ui.engine.cars.forEach(car=>Object.assign(car,{boost:charge,boosting}));
     shapes.length=0;context.calls.length=0;ui.frame(0);
     assert.doesNotMatch(context.calls.filter(call=>call[0]==='fillText').map(call=>call[1]).join(' '),/NITRO|%/);
-    const shells=shapes.filter(shape=>shape.color==='#0b192680');
-    assert.equal(shells.length,2,'each car keeps its own above-car meter');
-    for(const {bounds:[x,y,width,height]} of shells){
-      assert.ok(height<=14,'the label-free shell is only as tall as the bar and padding');
-      assert.ok(x<=-42&&x+width>=42&&y<=0&&y+height>=4,'the slim shell still encloses the full 84-pixel meter');
-    }
-    assert.equal(shapes.filter(shape=>shape.color==='#ffffff26').length,2,'empty charge still has a visible track');
-    return shapes.filter(shape=>['#51dfe5','#ff9870','#c6f56b'].includes(shape.color));
-  };
-  Object.assign(ui.engine.cars[0],{boost:100,boosting:false});
-  Object.assign(ui.engine.cars[1],{boost:50,boosting:false});
-  assert.deepEqual(draw().map(({bounds,color})=>({width:bounds[2],height:bounds[3],color})),[
-    {width:84,height:4,color:'#51dfe5'},{width:42,height:4,color:'#ff9870'},
-  ]);
-  Object.assign(ui.engine.cars[0],{boost:0,boosting:false});
-  Object.assign(ui.engine.cars[1],{boost:25,boosting:true});
-  assert.deepEqual(draw().map(({bounds,color})=>({width:bounds[2],height:bounds[3],color})),[
-    {width:21,height:4,color:'#c6f56b'},
-  ],'depleted charge disappears and active nitro keeps its lime color');
+    assert.equal(shapes.filter(shape=>shape.color==='#0b192680').length,0,'the above-car charge shell is removed');
+    assert.equal(shapes.filter(shape=>shape.bounds[3]===4&&['#51dfe5','#ff9870','#c6f56b','#ffffff26'].includes(shape.color)).length,0,'no floating charge strip remains');
+  }
 });
 
 test('all six solo split rivals follow actual checkpoint crossing order without promoting the nearest or dropping the remaining five',async t=>{
