@@ -150,6 +150,7 @@ test('ghost challenge setup and results translate fully without exposing AI mode
     ['幽灵挑战', 'Ghost Challenge'], ['榜首挑战', 'Leaderboard challenge'], ['自选幽灵', 'Choose ghosts'],
     ['重新匹配','Match again'],['幽灵挑战对手','Ghost challengers'],['自动匹配','Auto-match'],['正在匹配本图最快的三位车手…','Matching this circuit’s three fastest drivers…'],
     ['配速幽灵','Pace ghost'],['人类纪录','Player record'],['自由计时','Time trial'],['开始挑战','Start challenge'],
+    ['人类幽灵优先，配速幽灵补位。','Human ghosts first. Pace ghosts fill the gaps.'],
     ['本场挑战排名','Challenge standings'],['你','You'],['挑战完成','Challenge complete'],['自由计时完成','Time trial complete'],
     ['目标用时','Target time'],['已匹配 3 位人类幽灵和 3 位配速幽灵。','Matched 3 player ghosts and 3 pace ghosts.'],
     ['已匹配 1 位人类幽灵和 3 位配速幽灵。','Matched 1 player ghost and 3 pace ghosts.'],
@@ -165,7 +166,7 @@ test('ghost challenge setup and results translate fully without exposing AI mode
     '最快的三位不同车手，加上三位配速幽灵。',
     '配速目标约比最慢的人类幽灵多 1、2、3 秒，不参与排行榜。',
     '幽灵均不碰撞；你完赛后立即结算。','选择你喜欢的车色。',
-    '镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶。',
+    '人类幽灵优先，配速幽灵补位。',
     '你驾驶青色赛车，与人类纪录和配速幽灵较量。WASD 或方向键均可驾驶。',
     '你驾驶橙色赛车，与人类纪录和配速幽灵较量。WASD 或方向键均可驾驶。',
   ])assert.doesNotMatch(translateText(source),/[\u3400-\u9fff]/,source);

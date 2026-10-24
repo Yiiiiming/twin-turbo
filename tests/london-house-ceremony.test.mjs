@@ -4,7 +4,7 @@ import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack } from '.
 import { RaceRenderer, roadsideLamps, updateChaseCamera, perspective, lookAt, multiply } from '../src/renderer.js';
 import { entrySegmentBlocked } from '../src/entry-cameras.js';
 import { HOUSE_BANNERS, houseCrestTriangles } from '../src/london-house-banner-models.js';
-import { HouseCeremony, HOUSE_CEREMONY_LOCATION, bannerPoint, appendHouseBanners } from '../src/london-house-ceremony.js';
+import { HouseCeremony, HOUSE_CEREMONY_LOCATION, HOUSE_CEREMONY_TIMING, bannerPoint, appendHouseBanners } from '../src/london-house-ceremony.js';
 import { londonMagicPlacements } from '../src/london-magic-layout.js';
 import { londonMagicState, MagicEffects, MAGIC_EFFECT_VERTICES, magicBodyMatrix, magicArmMatrix } from '../src/london-magic-effects.js';
 
@@ -13,6 +13,8 @@ const place = (car, s, lane = 0) => Object.assign(car, trackPoint(s, lane), { _l
 const transform = (matrix, point) => [0, 1, 2].map(row =>
   matrix[row] * point[0] + matrix[4 + row] * point[1] + matrix[8 + row] * point[2] + matrix[12 + row]);
 const near = (a,b,epsilon=1e-6) => assert.ok(Math.abs(a-b)<epsilon, `${a} != ${b}`);
+const ceremonyEnd=HOUSE_CEREMONY_TIMING.release+3*HOUSE_CEREMONY_TIMING.stagger+HOUSE_CEREMONY_TIMING.descent;
+const entryS=HOUSE_CEREMONY_TIMING.triggerS+1;
 
 function recordingGL() {
   let bound, program, viewport, id=0;
@@ -68,33 +70,40 @@ test('the four house banners retain distinct heraldry and original colors withou
 
 test('the first approaching racer triggers one timely shared ceremony per lap, with reset and twelve-map isolation',()=>{
   setTrack('coast-london');const engine=new RaceEngine(),ceremony=new HouseCeremony();
-  place(engine.cars[0],5150);place(engine.cars[1],4500);engine.time=20;engine.state='countdown';
+  place(engine.cars[0],entryS);place(engine.cars[1],entryS-400);engine.time=20;engine.state='countdown';
   assert.equal(ceremony.update(engine).elapsed,null,'the cinematic/countdown must not consume the entrance event');
-  engine.state='racing';place(engine.cars[0],5150,300);
+  engine.state='racing';place(engine.cars[0],entryS,300);
   assert.equal(ceremony.update(engine).elapsed,null,'a remote off-road car cannot summon flags');
-  place(engine.cars[0],5150);const waiting=ceremony.update(engine);
+  place(engine.cars[0],entryS);const waiting=ceremony.update(engine);
   assert.equal(waiting.elapsed,0);assert.equal(waiting.banners.length,0);
-  engine.time=20.3;const raising=ceremony.update(engine);
-  assert.ok(raising.caster.armPitch>waiting.caster.armPitch+.3,'Dumbledore must visibly lift his wand');
-  assert.ok(raising.banners.length>0&&raising.banners.length<4,'houses unfold in a brief sequence');
-  engine.time=21.65;const open=ceremony.update(engine);
+  engine.time=20.8;const raising=ceremony.update(engine);
+  assert.ok(raising.caster.armPitch>waiting.caster.armPitch+1.5,'Dumbledore must visibly lift his wand above the resting pose');
+  assert.ok(Math.hypot(...raising.caster.wand.map((value,i)=>value-waiting.caster.wand[i]))>25,'the rendered wand tip must trace a broad gesture');
+  assert.equal(raising.banners.length,0,'the lift leads the flags instead of occurring after their appearance');
+  engine.time=20+HOUSE_CEREMONY_TIMING.release+.1;const release=ceremony.update(engine);
+  assert.equal(release.banners.length,1,'the houses enter with a deliberate stagger');
+  engine.time=22.4;const sweeping=ceremony.update(engine);
+  assert.ok(sweeping.caster.armYaw>raising.caster.armYaw+.5,'the held lift must flow into an outward sweep');
+  assert.ok(sweeping.caster.armSpread>raising.caster.armSpread+.1);
+  assert.ok(ceremonyEnd>=3.8&&ceremonyEnd<=4.5,'the complete descent is unhurried but finishes during the drive-by');
+  engine.time=20+ceremonyEnd+.01;const open=ceremony.update(engine);
   assert.equal(open.banners.length,4);assert.ok(open.banners.every(b=>b.unfold===1&&b.progress===1),'all four flags must unfold before a fast driver passes');
   engine.state='paused';const frozen=structuredClone(ceremony.update(engine));
   assert.deepEqual(ceremony.update(engine),frozen,'both views and pause use one simulation timestamp');
-  engine.state='racing';place(engine.cars[0],7100);place(engine.cars[1],5150);engine.time=22;
-  assert.equal(ceremony.update(engine).elapsed,2,'a trailing second player cannot restart the same lap ceremony');
-  place(engine.cars[0],5150);engine.time=23;assert.equal(ceremony.update(engine).elapsed,3,'reverse re-entry cannot restart the same lap');
-  engine.cars[1].lap=1;engine.time=24;assert.equal(ceremony.update(engine).elapsed,0,'a later lap may summon the banners again');
+  engine.state='racing';place(engine.cars[0],7100);place(engine.cars[1],entryS);engine.time=25;
+  assert.equal(ceremony.update(engine).elapsed,5,'a trailing second player cannot restart the same lap ceremony');
+  place(engine.cars[0],entryS);engine.time=26;assert.equal(ceremony.update(engine).elapsed,6,'reverse re-entry cannot restart the same lap');
+  engine.cars[1].lap=1;engine.time=27;assert.equal(ceremony.update(engine).elapsed,0,'a later lap may summon the banners again');
   engine.time=0;engine.state='countdown';assert.equal(ceremony.update(engine).elapsed,null,'restart clears the previous performance');
   for(const id of Object.keys(TRACKS)){setTrack(id);const state=ceremony.update(engine);if(id!=='coast-london')assert.equal(state,null,id);}
 });
 
 test('unfolding cloth and animal badges share the reserved spell buffer without altering a single existing spell vertex',()=>{
   setTrack('coast-london');const engine=new RaceEngine(),ceremony=new HouseCeremony(),items=londonMagicPlacements(),pool=new MagicEffects();
-  const data=pool.data;engine.state='racing';place(engine.cars[0],5150);place(engine.cars[1],4500);let maximum=0;
+  const data=pool.data;engine.state='racing';place(engine.cars[0],entryS);place(engine.cars[1],entryS-400);let maximum=0;
   for(const epoch of [0,17.37,1000.731]){
     ceremony.reset();engine.time=epoch;ceremony.update(engine);
-    for(let frame=0;frame<=360;frame++){
+    for(let frame=0;frame<=600;frame++){
       engine.time=epoch+frame/120;const state=ceremony.update(engine);pool.update(londonMagicState(items,engine.time));
       const count=pool.count,before=data.slice(0,count*11),range=appendHouseBanners(pool,state);
       assert.equal(pool.data,data);assert.equal(data.length,MAGIC_EFFECT_VERTICES*11);
@@ -110,11 +119,12 @@ test('unfolding cloth and animal badges share the reserved spell buffer without 
 
 test('the uploaded heraldry remains in front of the actual triangulated cloth throughout its flutter cycle',()=>{
   setTrack('coast-london');const engine=new RaceEngine(),ceremony=new HouseCeremony();engine.state='racing';
-  place(engine.cars[0],5150);engine.time=0;ceremony.update(engine);
+  place(engine.cars[0],entryS);engine.time=0;ceremony.update(engine);
   const pool={data:new Float32Array(4096*11),count:0},us=[0,.045,.25,.5,.75,.955,1];
   let minimum=Infinity;
-  for(let frame=0;frame<=60;frame++){
-    engine.time=1.65+frame/20;const state=ceremony.update(engine);
+  for(let frame=0;frame<=120;frame++){
+    engine.time=ceremonyEnd+.01+frame/20;const state=ceremony.update(engine);
+    assert.equal(state.banners.length,4);assert.ok(state.banners.every(b=>b.unfold===1));
     for(const banner of state.banners){
       pool.count=0;appendHouseBanners(pool,{...state,banners:[banner]});
       const depth=index=>(pool.data[index*11]-banner.x)*Math.cos(banner.angle)+(pool.data[index*11+2]-banner.z)*Math.sin(banner.angle);
@@ -139,14 +149,15 @@ test('the uploaded heraldry remains in front of the actual triangulated cloth th
 
 test('the complete summoning path and settled flags clear the racing lane, flying car envelope, scenery and streetlights',()=>{
   setTrack('coast-london');const {renderer,gl}=scene(),engine=new RaceEngine(),ceremony=new HouseCeremony();
-  engine.state='racing';place(engine.cars[0],5100);place(engine.cars[1],4500);engine.time=30;ceremony.update(engine);
+  engine.state='racing';place(engine.cars[0],entryS);place(engine.cars[1],entryS-400);engine.time=30;ceremony.update(engine);
   const solids=[...renderer.obstacles,...lampBodies()];
+  const previous=new Map(),lanes=[-126,-42,42,126];
   for(const [x,y,z] of bounds(gl.buffers.get(renderer.magicMeshes.car.buffer))){
     assert.ok(Math.hypot(x,y,z)<40,'the complete flying-car hull must fit the tested horizontal envelope at every heading');
     assert.ok(147+Math.abs(y)+Math.abs(x)*Math.sin(.045)+Math.abs(z)*Math.sin(.08)<178,
       'maximum hover, pitch and bank must fit the tested height envelope');
   }
-  for(let step=0;step<=240;step++){
+  for(let step=0;step<=300;step++){
     engine.time=30+step/60;const state=ceremony.update(engine);
     for(const part of ['body','arm']){
       const mesh=renderer.magicMeshes[`dumbledore:${part}`],matrix=part==='body'?magicBodyMatrix(state.caster):magicArmMatrix(state.caster);
@@ -155,6 +166,18 @@ test('the complete summoning path and settled flags clear the racing lane, flyin
       for(const point of points)assert.ok(projectTrack(point[0],point[2],HOUSE_CEREMONY_LOCATION.casterS).distance>TRACK.roadWidth/2+10,'Dumbledore remains beside the racing lane');
     }
     for(const banner of state.banners){
+      const target=trackPoint(HOUSE_CEREMONY_LOCATION.bannerS,lanes[banner.index]);
+      near(banner.x,target.x);near(banner.z,target.y);
+      assert.ok(banner.y>=target.elevation+HOUSE_CEREMONY_LOCATION.top-1e-6,'the roll lowers from above its final hanging position');
+      const last=previous.get(banner.index);
+      if(last){assert.ok(banner.y<=last.y+1e-6,'flags descend instead of flying out from the caster');assert.ok(banner.unfold>=last.unfold,'vertical unrolling must not reverse');}
+      else{
+        assert.ok(banner.y>target.elevation+HOUSE_CEREMONY_LOCATION.top+200,'the first glimpse must be high overhead');
+        const left=bannerPoint(banner,0,0),right=bannerPoint(banner,1,0),bottom=bannerPoint(banner,.5,1),top=bannerPoint(banner,.5,0);
+        assert.ok(Math.hypot(right[0]-left[0],right[2]-left[2])>HOUSE_CEREMONY_LOCATION.width*.85,'the initial roll already spans the banner width');
+        assert.ok(top[1]-bottom[1]<10,'the rolled fabric opens downward rather than growing from a tiny point');
+      }
+      previous.set(banner.index,banner);
       const points=[];for(const u of [0,.25,.5,.75,1])for(const v of [0,.25,.5,.75,1])points.push(bannerPoint(banner,u,v));
       for(const p of points){
         const road=projectTrack(p[0],p[2],HOUSE_CEREMONY_LOCATION.bannerS);
@@ -169,7 +192,9 @@ test('the complete summoning path and settled flags clear the racing lane, flyin
       if(banner.unfold===1)assert.ok(Math.min(...points.map(p=>p[1]))>=189.99,'settled banners stay fully above the flying car');
     }
   }
-  engine.time=32;const state=ceremony.update(engine);
+  assert.equal(previous.size,4);
+  engine.time=30+Math.max(5.1,ceremonyEnd+.1);const state=ceremony.update(engine);
+  assert.equal(state.banners.length,4);assert.ok(state.banners.every(b=>b.unfold===1));
   for(const speed of [0,363,517])for(const lane of [-25,0,25]){
     const camera=updateChaseCamera({...trackPoint(5500,lane),speed},null),m=multiply(perspective(camera.fov,16/9),lookAt(camera.eye,camera.target));
     for(const b of state.banners)for(const uv of [[0,0],[1,0],[0,1],[1,1]]){
@@ -177,27 +202,30 @@ test('the complete summoning path and settled flags clear the racing lane, flyin
       assert.ok(clip[3]>0&&Math.abs(clip[0]/clip[3])<1&&Math.abs(clip[1]/clip[3])<1,'all four banners must be visible in the real approach camera');
     }
   }
-  // A driver holding maximum boost must see the complete summoning sequence,
-  // including all four fully opened banners, before passing underneath them.
-  ceremony.reset();engine.time=0;place(engine.cars[0],5100);ceremony.update(engine);
-  for(const elapsed of [.6,.9,1.2,1.59,1.8]){
-    engine.time=elapsed;const state=ceremony.update(engine),camera=updateChaseCamera({...trackPoint(5100+elapsed*517),speed:517,boosting:true},null);
+  // The approach bend initially reveals the ceremony from the side. After
+  // turning into Hogwarts, both normal and maximum-boost racers see the slow
+  // unrolling and the complete final banner before passing underneath it.
+  for(const speed of [363,517]){
+   ceremony.reset();engine.time=0;place(engine.cars[0],entryS);ceremony.update(engine);
+   for(const elapsed of [2.2,2.6,3,3.5,ceremonyEnd+.01]){
+    engine.time=elapsed;const state=ceremony.update(engine),camera=updateChaseCamera({...trackPoint(entryS+elapsed*speed),speed,boosting:speed===517},null);
     const matrix=multiply(perspective(camera.fov,16/9),lookAt(camera.eye,camera.target));
     assert.equal(state.banners.length,4);
     for(const b of state.banners)for(const uv of [[0,0],[1,0],[0,1],[1,1],[.5,.5]]){
       const point=[...bannerPoint(b,...uv),1],clip=[0,1,2,3].map(row=>point.reduce((sum,n,i)=>sum+n*matrix[i*4+row],0));
-      assert.ok(clip[3]>0&&Math.abs(clip[0]/clip[3])<1&&Math.abs(clip[1]/clip[3])<1,`the fastest driver misses the flags at ${elapsed}`);
+      assert.ok(clip[3]>0&&Math.abs(clip[0]/clip[3])<1&&Math.abs(clip[1]/clip[3])<1,`the driver at speed ${speed} misses the flags at ${elapsed}`);
     }
+   }
   }
 });
 
 test('production renders opaque cloth and additive spells from separate ranges in one shared upload and fits six ghosts under 40 MB',()=>{
   setTrack('coast-london');const {renderer,gl}=scene(),engine=new RaceEngine();engine.state='racing';
-  engine.setObstacles(renderer.obstacles);place(engine.cars[0],5150);place(engine.cars[1],5150,20);engine.time=40;
+  engine.setObstacles(renderer.obstacles);place(engine.cars[0],entryS);place(engine.cars[1],entryS,20);engine.time=40;
   const initialObstacles=structuredClone(renderer.obstacles),traffic=structuredClone(engine.traffic),world=engine.obstacleWorld;
   assert.equal(gl.uploads.filter(u=>u.usage===gl.DYNAMIC_DRAW).length,1,'flags reuse the existing spell allocation');
   const effects=renderer.magicMeshes.effects,initialPool=gl.buffers.get(effects.buffer);assert.equal(initialPool.length,4096*11);assert.ok(initialPool.every(v=>v===0));
-  renderer.resetCameras(engine);renderer.render(engine,0,0);engine.time=41.65;
+  renderer.resetCameras(engine);renderer.render(engine,0,0);engine.time=40+ceremonyEnd+.01;
   place(engine.cars[0],5500);place(engine.cars[1],5500,20);renderer.resetCameras(engine);gl.draws.length=0;gl.subloads.length=0;
   const uploads=gl.uploads.length;renderer.render(engine,0,1e12);
   assert.equal(gl.subloads.length,1);assert.equal(gl.subloads[0].buffer,effects.buffer);

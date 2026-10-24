@@ -42,10 +42,25 @@ export function magicBodyMatrix(actor){
  const c=Math.cos(actor.angle),s=Math.sin(actor.angle),cp=Math.cos(actor.bodyRoll||0),sp=Math.sin(actor.bodyRoll||0);
  return new Float32Array([c,0,s,0,-s*sp,cp,c*sp,0,-s*cp,-sp,c*cp,0,actor.x,actor.y,actor.z,1]);
 }
-/** Right-shoulder X rotation composed with the same moving body as the robe. */
+/** Right-shoulder X rotation composed with the same moving body as the robe.
+ * Optional yaw and outward spread give the summoning gesture a broad silhouette.
+ * Existing duel poses retain the original matrix calculation exactly. */
 export function magicArmMatrix(actor){
  const c=Math.cos(actor.angle),s=Math.sin(actor.angle),body=actor.bodyRoll||0,
   cp=Math.cos(body+actor.armPitch),sp=Math.sin(body+actor.armPitch),bs=Math.sin(body),bc=Math.cos(body);
+ const yaw=actor.armYaw||0,spread=actor.armSpread||0;
+ if(yaw||spread){
+  const cy=Math.cos(yaw),sy=Math.sin(yaw),cd=Math.cos(spread),sd=Math.sin(spread),
+   ap=Math.cos(actor.armPitch),as=Math.sin(actor.armPitch);
+  // Body * shoulder translation * Rz(-spread) * Ry(-yaw) * Rx(pitch).
+  // Positive spread keeps a raised right hand outside the beard and head.
+  const column=(x,y,z)=>[c*x-s*bs*y-s*bc*z,bc*y-bs*z,s*x+c*bs*y+c*bc*z],
+   x=column(cd*cy,-sd*cy,sy),
+   y=column(-cd*sy*as+sd*ap,sd*sy*as+cd*ap,cy*as),
+   z=column(-cd*sy*ap-sd*as,sd*sy*ap-cd*as,cy*ap);
+  return new Float32Array([...x,0,...y,0,...z,0,
+   actor.x+c*8-s*38*bs,actor.y+38*bc,actor.z+s*8+c*38*bs,1]);
+ }
  return new Float32Array([c,0,s,0,-s*sp,cp,c*sp,0,-s*cp,-sp,c*cp,0,
   actor.x+c*8-s*38*bs,actor.y+38*bc,actor.z+s*8+c*38*bs,1]);
 }

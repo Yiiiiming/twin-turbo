@@ -34,7 +34,7 @@ const PHRASES = [
 ['每圈设 3 个计时门和终点计时点。通过后显示与对手在同一圈、同一点的差距；载入幽灵时也会显示单圈对比。这条赛道有长直道、连续 S 弯和回头弯。弯前松油或轻点刹车，出弯再用氮气。氮气会自动恢复。树木、建筑与护栏会挡住车辆，撞上会减速；离开赛道后有 7 秒返回时间，最后 3 秒会显示倒计时；及时回到路面即可继续正常计圈，连续离开满 7 秒会自动复位。卡住时，玩家一按','Each lap has three timing gates and a finish split. Compare times at the same point, including your ghosts. Ease off before bends and use nitro on exit. Nitro recharges automatically. Trees, buildings and barriers are solid. Return to the road within 7 seconds to keep racing normally. A countdown appears for the final 3 seconds; after 7 continuous seconds off-road, the car automatically recovers. If stuck, P1 presses '],
 ['、玩家二按',', and P2 presses '],['返回赛道，并承受 2 秒罚停。',' to recover, with a 2-second penalty.'],['暂停 / 继续 · 离开游戏窗口会自动暂停。','Pause / resume · Switching away automatically pauses the race.'],
 ['点击要修改的动作，再按一个新键。重复键会提示；Esc 取消选键。','Select an action, then press a new key. Duplicate keys are rejected; Esc cancels.'],
-['请选择字母、数字、方向键、Shift、Enter 或标点键；空格和 Esc 留给开始与暂停。','Use a letter, number, arrow, Shift, Enter or punctuation key. Space and Esc are reserved for starting and pausing.'],
+['请选择字母、数字、方向键、Shift、Enter 或标点键；空格、Esc 和 U 留给开始、暂停与重开。','Use a letter, number, arrow, Shift, Enter or punctuation key. Space, Esc and U are reserved for starting, pausing and restarting.'],
 ['请只按一个键，不使用系统组合键。','Press one key without a system modifier.'],['已恢复默认键位并保存。','Default key bindings restored and saved.'],['已恢复默认键位，本次游玩有效。','Default keys restored for this session.'],['键位已修改，本次游玩有效。','Key updated for this session.'],['键位已保存。','Key binding saved.'],['已取消选键。','Key change cancelled.'],['请使用浏览器的全屏功能','Please use your browser’s fullscreen control'],
 ['输入昵称查找幽灵，也可以找自己的最快单圈。','Search a nickname, including your own.'],['选择紫色或金色，再查找想挑战的昵称。','Choose purple or gold, then search a driver’s nickname.'],['本场不带幽灵，已选记录会保留供下次使用。','Ghosts are off for this race. Your choices remain available.'],['昵称已修改，请重新查找；已加入的幽灵会保留。','Nickname changed. Search again; your selected ghosts are kept.'],['可以选择两个不同颜色的幽灵，也可以直接发车。','Choose two colored ghosts, or head straight to the start.'],
 ['连接超时，请重试。','Connection timed out. Please retry.'],['这份幽灵已不存在，请重新查找。','This ghost is no longer available. Search again.'],['暂时无法连接记录服务，请稍后重试。','Records are temporarily unavailable. Please retry.'],['记录版本已变化，请刷新游戏后重试。','The record version changed. Please refresh the game.'],['暂时无法连接记录服务，请联网后重试。','Could not connect to records. Check your connection and retry.'],['暂时无法连接记录服务。','Could not connect to records.'],['先输入昵称，最多 16 个字符。','Enter a nickname, up to 16 characters.'],['请输入昵称，最多 16 个字符。','Enter a nickname, up to 16 characters.'],['请先查找并选择一份幽灵。','Search for and choose a ghost first.'],['这份幽灵数据不完整，请重新查找。','This ghost is incomplete. Please search again.'],
@@ -117,7 +117,7 @@ PHRASES.push(
 ["目标用时", "Target time"],
 ["幽灵均不碰撞；你完赛后立即结算。", "Ghosts have no collisions. Results appear as soon as you finish."],
 ["选择你喜欢的车色。", "Choose your favorite car color."],
-["镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶。", "The full view follows your car as you challenge this circuit’s fastest player ghosts and three pace ghosts. Use either keyboard layout."]
+["人类幽灵优先，配速幽灵补位。", "Human ghosts first. Pace ghosts fill the gaps."]
 );
 PHRASES.push(['回到路面即可取消倒计时','Return to the road to cancel the countdown'],['离开赛道满 7 秒 · 已自动复位','7 seconds off-road · Automatically recovered']);
 const exact = new Map(PHRASES);

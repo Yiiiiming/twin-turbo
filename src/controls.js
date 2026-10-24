@@ -7,7 +7,7 @@ export const DEFAULT_BINDINGS = Object.freeze([
 const STORAGE_KEY = 'twin-turbo-controls-v1';
 const fresh = () => DEFAULT_BINDINGS.map(player => ({...player}));
 export function allowedKey(code) {
-  return /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Shift(Left|Right)|Enter|NumpadEnter|Numpad(Add|Subtract|Multiply|Divide|Decimal)|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Backquote)$/.test(code || '');
+  return code !== 'KeyU' && /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Shift(Left|Right)|Enter|NumpadEnter|Numpad(Add|Subtract|Multiply|Divide|Decimal)|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Backquote)$/.test(code || '');
 }
 export function keyLabel(code) {
   const names = {ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'左 Shift',ShiftRight:'右 Shift',Enter:'Enter',NumpadEnter:'小键盘 Enter',Minus:'−',Equal:'=',BracketLeft:'[',BracketRight:']',Backslash:'\\',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backquote:'`',NumpadAdd:'小键盘 +',NumpadSubtract:'小键盘 −',NumpadMultiply:'小键盘 ×',NumpadDivide:'小键盘 ÷',NumpadDecimal:'小键盘 .'};
@@ -19,11 +19,20 @@ export class ControlBindings {
     try {
       const saved = JSON.parse(storage?.getItem(STORAGE_KEY));
       const codes = saved?.flatMap(player => ACTIONS.map(action => player?.[action]));
-      if (saved?.length === 2 && codes?.length === 12 && codes.every(allowedKey) && new Set(codes).size === 12) this.bindings = saved.map(player=>Object.fromEntries(ACTIONS.map(action=>[action,player[action]])));
+      if (saved?.length === 2 && codes?.length === 12 && codes.every(code=>code==='KeyU'||allowedKey(code)) && new Set(codes).size === 12) {
+        this.bindings = saved.map(player=>Object.fromEntries(ACTIONS.map(action=>[action,player[action]])));
+        // U is now restart. Move only its old driving action, preserving all
+        // other custom controls even when that action's default is already used.
+        for(let player=0;player<2;player++)for(const action of ACTIONS)if(this.bindings[player][action]==='KeyU'){
+          const candidates=[DEFAULT_BINDINGS[player][action],...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter=>'Key'+letter)];
+          this.bindings[player][action]=candidates.find(code=>allowedKey(code)&&!this.recognizes(code));
+          this.persist();
+        }
+      }
     } catch {}
   }
   set(player, action, code) {
-    if (![1,2].includes(player) || !ACTIONS.includes(action) || !allowedKey(code)) return {ok:false,message:'请选择字母、数字、方向键、Shift、Enter 或标点键；空格和 Esc 留给开始与暂停。'};
+    if (![1,2].includes(player) || !ACTIONS.includes(action) || !allowedKey(code)) return {ok:false,message:'请选择字母、数字、方向键、Shift、Enter 或标点键；空格、Esc 和 U 留给开始、暂停与重开。'};
     for (let i=0;i<2;i++) for (const other of ACTIONS) {
       if ((i !== player-1 || other !== action) && this.bindings[i][other] === code) return {ok:false,message:`${keyLabel(code)} 已用于 P${i+1} 的${ACTION_LABELS[other]}，请换一个键。`};
     }

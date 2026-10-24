@@ -7,7 +7,7 @@ const memoryStorage = initial => {
   return { values, getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
 };
 const customMap = [
-  { accelerate: 'KeyI', brake: 'KeyK', left: 'KeyJ', right: 'KeyL', boost: 'ShiftRight', rescue: 'KeyU' },
+  { accelerate: 'KeyI', brake: 'KeyK', left: 'KeyJ', right: 'KeyL', boost: 'ShiftRight', rescue: 'KeyO' },
   { accelerate: 'Numpad8', brake: 'Numpad5', left: 'Numpad4', right: 'Numpad6', boost: 'NumpadEnter', rescue: 'Numpad0' },
 ];
 
@@ -15,9 +15,9 @@ test('custom physical keys translate to all ten engine controls, with rescue han
   const bindings = new ControlBindings(memoryStorage(JSON.stringify(customMap)));
   const pressed = new Set(customMap.flatMap(player => Object.values(player)));
   assert.deepEqual(bindings.frameKeys(pressed), new Set(DEFAULT_BINDINGS.flatMap(player => ACTIONS.filter(action => action !== 'rescue').map(action => player[action]))));
-  assert.deepEqual(bindings.frameKeys(new Set(['KeyU', 'Numpad0'])), new Set());
+  assert.deepEqual(bindings.frameKeys(new Set(['KeyO', 'Numpad0'])), new Set());
   assert.deepEqual(bindings.frameKeys(new Set(['KeyW', 'ArrowUp', 'KeyZ'])), new Set(), 'old defaults and unrelated keys cannot drive after remapping');
-  assert.equal(bindings.code(1, 'rescue'), 'KeyU'); assert.equal(bindings.code(2, 'rescue'), 'Numpad0');
+  assert.equal(bindings.code(1, 'rescue'), 'KeyO'); assert.equal(bindings.code(2, 'rescue'), 'Numpad0');
 });
 
 test('solo mode maps either physical control set to the human P1 without driving AI', () => {
@@ -26,6 +26,27 @@ test('solo mode maps either physical control set to the human P1 without driving
   assert.deepEqual(bindings.frameKeys(pressed, true), new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft']));
   assert.deepEqual(bindings.frameKeys(new Set(Object.values(customMap[1])), true), new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft']));
   assert.equal(bindings.recognizes('Numpad8'), true, 'both user control sets remain recognized');
+});
+
+test('legacy U bindings migrate only their action to a free key and leave restart unbound from driving', () => {
+  for(const defaultOccupied of [false,true]){
+    const saved=structuredClone(customMap);saved[0].rescue='KeyU';
+    if(defaultOccupied)saved[1].accelerate='KeyQ';
+    const storage=memoryStorage(JSON.stringify(saved)),bindings=new ControlBindings(storage);
+    assert.equal(bindings.code(1,'rescue'),defaultOccupied?'KeyA':'KeyQ');
+    for(let player=0;player<2;player++)for(const action of ACTIONS)if(player!==0||action!=='rescue')
+      assert.equal(bindings.code(player+1,action),saved[player][action],action);
+    assert.equal(bindings.recognizes('KeyU'),false);
+    assert.equal(new Set(bindings.bindings.flatMap(player=>Object.values(player))).size,12);
+    assert.deepEqual(bindings.frameKeys(new Set(['KeyU'])),new Set());
+    assert.deepEqual(JSON.parse(storage.values.get('twin-turbo-controls-v1')),bindings.bindings);
+    assert.deepEqual(new ControlBindings(storage).bindings,bindings.bindings,'migration remains stable on reload');
+  }
+  const saved=structuredClone(customMap);saved[0].boost='KeyU';
+  const storage={getItem:()=>JSON.stringify(saved),setItem(){throw new Error('quota');}};
+  const bindings=new ControlBindings(storage);
+  assert.equal(bindings.code(1,'boost'),'ShiftLeft','migration still works without writable storage');
+  assert.equal(bindings.code(1,'rescue'),customMap[0].rescue);
 });
 
 test('one changed key persists and restores without mutating the frozen defaults', () => {
@@ -49,7 +70,7 @@ test('duplicate keys across both players and invalid player or action never chan
 
 test('reserved keys and key-combination strings are rejected while supported physical codes remain distinct', () => {
   const bindings = new ControlBindings();
-  for (const code of ['Space', 'Escape', 'Tab', 'MetaLeft', 'ControlLeft', 'AltRight', 'F5', 'CapsLock', 'Delete', 'Control+KeyA', 'a', '', undefined, null]) {
+  for (const code of ['Space', 'Escape', 'KeyU', 'Tab', 'MetaLeft', 'ControlLeft', 'AltRight', 'F5', 'CapsLock', 'Delete', 'Control+KeyA', 'a', '', undefined, null]) {
     assert.equal(allowedKey(code), false, String(code)); assert.equal(bindings.set(1, 'accelerate', code).ok, false);
   }
   for (const code of ['KeyZ', 'Digit7', 'Numpad7', 'ArrowLeft', 'ShiftLeft', 'ShiftRight', 'Enter', 'NumpadEnter', 'NumpadAdd', 'Slash', 'Backquote']) assert.equal(allowedKey(code), true, code);

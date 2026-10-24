@@ -949,7 +949,8 @@ test('tutorial follows custom and alternate controls, survives resets, and finis
   assert.equal(ui.drivingTutorial.completed,true);assert.match(ui.drivingTutorial.element.children[2].textContent,/Practice lap complete/);
   assert.equal(ui.nodes.get('result').classList.contains('hidden'),true);assert.equal(results,0);
   assert.equal(ui.ghostRecorder.bestReplay(1),null);assert.equal(ui.requests.filter(request=>request.method==='POST').length,0);
-  ui.nodes.get('game').focus();ui.key('Escape');assert.equal(ui.engine.state,'menu');assert.equal(results,0);
+  ui.nodes.get('game').focus();ui.key('KeyU');assert.equal(ui.drivingTutorial.completed,true);assert.equal(ui.nodes.get('race-setup-dialog').open,false);
+  ui.key('Escape');assert.equal(ui.engine.state,'menu');assert.equal(results,0);
 });
 
 test('restart preparation can return to the main menu without launching or retaining a paused race', async t => {
@@ -974,6 +975,66 @@ test('restart preparation can return to the main menu without launching or retai
   ui.click('start'); ui.click('setup-menu'); ui.frame();
   assert.equal(ui.engine.state, 'menu', 'the same action also works before the first launch');
   assert.equal(ui.nodes.get('race-setup-dialog').open, false);
+});
+
+test('U opens the existing restart preparation from the countdown, racing and pause without resetting early',async t=>{
+  const ui=await loadCoastUI(t,{entryDuration:9.6});
+  assert.match(ui.html,/<button id="restart"[^>]*aria-keyshortcuts="U">重开 <kbd[^>]*>U<\/kbd><\/button>/);
+  ui.key('KeyU');assert.equal(ui.nodes.get('race-setup-dialog').open,false,'menu does not launch a race');
+  ui.launch();assert.equal(ui.raceEntry.active,true);
+  const starts=ui.raceEntry.starts.length;
+  ui.key('KeyU');assert.equal(ui.raceEntry.starts.length,starts,'entry animation is not restarted');
+  assert.equal(ui.nodes.get('race-setup-dialog').open,false);
+  ui.key('Space');assert.equal(ui.engine.state,'countdown');
+  assert.equal(ui.key('KeyU').defaultPrevented,true);
+  assert.equal(ui.engine.state,'paused');assert.equal(ui.nodes.get('race-setup-dialog').open,true);
+  assert.equal(ui.engine.time,0);assert.equal(ui.raceEntry.starts.length,starts);
+  ui.click('setup-close');ui.key('KeyU',{repeat:true});
+  assert.equal(ui.nodes.get('race-setup-dialog').open,false,'holding U cannot reopen the dialog');
+  ui.key('KeyU');assert.equal(ui.nodes.get('race-setup-dialog').open,true,'U works while paused');
+  ui.click('setup-close');ui.click('resume');ui.advance(3.1);ui.key('KeyW');ui.advance(.2);
+  const time=ui.engine.time,poses=ui.engine.cars.map(({x,y,rescueCount})=>({x,y,rescueCount}));
+  ui.key('KeyU');ui.advance(.2);
+  assert.equal(ui.engine.state,'paused');assert.equal(ui.engine.time,time);assert.equal(ui.keys.size,0);
+  assert.deepEqual(ui.engine.cars.map(({x,y,rescueCount})=>({x,y,rescueCount})),poses,'restart waits for confirmation and never rescues');
+  ui.click('setup-launch');
+  assert.equal(ui.raceEntry.starts.length,starts+1);assert.equal(ui.engine.time,0);assert.equal(ui.raceEntry.active,true);
+});
+
+test('U restart respects text editing, system shortcuts and modal controls, and cannot become a driving binding',async t=>{
+  const ui=await loadCoastUI(t);ui.launch();ui.advance(3.1);
+  for(const tag of ['input','textarea','select','div']){
+    const target=ui.document.createElement(tag);target.isContentEditable=tag==='div';
+    assert.equal(ui.key('KeyU',{target}).defaultPrevented,false);
+    assert.equal(ui.nodes.get('race-setup-dialog').open,false);assert.equal(ui.engine.state,'racing');
+  }
+  for(const options of [{ctrlKey:true},{metaKey:true},{altKey:true},{isComposing:true},{keyCode:229}]){
+    assert.equal(ui.key('KeyU',options).defaultPrevented,false);
+    assert.equal(ui.nodes.get('race-setup-dialog').open,false);assert.equal(ui.engine.state,'racing');
+  }
+  ui.click('pause-settings');assert.equal(ui.key('KeyU').defaultPrevented,false);
+  assert.equal(ui.nodes.get('race-setup-dialog').open,false);ui.click('close-settings');
+  ui.click('pause-bindings');
+  const bind=ui.document.querySelectorAll('[data-bind-player][data-bind-action]').find(button=>button.dataset.bindPlayer==='1'&&button.dataset.bindAction==='rescue');
+  bind.click();ui.key('KeyU');
+  assert.equal(ui.nodes.get('race-setup-dialog').open,false);
+  assert.equal(ui.bindings.code(1,'rescue'),'KeyQ');assert.match(ui.nodes.get('bindings-message').textContent,/U/);
+  ui.key('Escape');ui.click('bindings-done');ui.click('resume');
+  ui.key('KeyU');assert.equal(ui.nodes.get('race-setup-dialog').open,true);
+});
+
+test('a migrated U rescue binding opens restart without rescue, while tutorial U repeats the existing lesson flow',async t=>{
+  const saved=[{accelerate:'KeyW',brake:'KeyS',left:'KeyA',right:'KeyD',boost:'ShiftLeft',rescue:'KeyU'},
+    {accelerate:'ArrowUp',brake:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',boost:'Enter',rescue:'Slash'}];
+  const ui=await loadCoastUI(t,{storageValues:{'twin-turbo-controls-v1':JSON.stringify(saved)}});
+  ui.launch();ui.advance(3.1);ui.key('KeyU');
+  assert.equal(ui.nodes.get('race-setup-dialog').open,true);assert.equal(ui.engine.cars[0].rescueCount,0);
+  assert.equal(ui.bindings.code(1,'rescue'),'KeyQ');
+  ui.click('setup-menu');ui.modeButtons.find(button=>button.dataset.mode==='tutorial').click();ui.click('start');ui.advance(3.1);
+  ui.key('KeyW');ui.advance(.4);ui.keyup('KeyW');assert.equal(ui.drivingTutorial.step,1);
+  ui.key('KeyU',{repeat:true});assert.equal(ui.drivingTutorial.step,1);
+  ui.key('KeyU');assert.equal(ui.drivingTutorial.step,0);assert.equal(ui.engine.state,'countdown');assert.equal(ui.engine.time,0);
+  assert.equal(ui.nodes.get('race-setup-dialog').open,false,'tutorial uses its existing direct restart flow');
 });
 
 test('custom bindings reject conflicts and reserved keys, then drive the real player with the new key', async t => {
@@ -1121,7 +1182,7 @@ test('help dialog blocks game shortcuts and preserves a paused race until explic
   assert.equal(ui.nodes.get('help-dialog').open, true);
   assert.equal(ui.engine.state, 'paused'); assert.equal(ui.keys.size, 0);
   const before = ui.engine.time;
-  for (const code of ['KeyW', 'ArrowUp', 'Enter', 'Space', 'Escape']) {
+  for (const code of ['KeyW', 'ArrowUp', 'Enter', 'Space', 'Escape', 'KeyU']) {
     const event = ui.key(code); assert.equal(event.defaultPrevented, false);
   }
   ui.launch('restart'); ui.advance(0.1);
@@ -1193,7 +1254,7 @@ test('finish overlay directly offers the sole nickname form without leaving full
   assert.equal(ui.nodes.get('records-center').scrollCalls?.length||0,0,'finishing never scrolls to the page leaderboard');
   assert.equal((ui.html.match(/id="records-results"/g)||[]).length,1,'there is only one save area');
   assert.equal(ui.document.activeElement, card.input, 'only human result receives keyboard focus');
-  for (const code of ['KeyW', 'Space', 'Enter', 'ArrowUp', 'Escape']) {
+  for (const code of ['KeyW', 'Space', 'Enter', 'ArrowUp', 'Escape', 'KeyU']) {
     assert.equal(ui.key(code).defaultPrevented, false);
   }
   card.input.dispatch('compositionstart');
@@ -1936,7 +1997,7 @@ function challengeFixture(laps = 1) {
   const entries = times.map((timeMs,index) => ({ id:`challenge-driver-${index}`, name:['Alice','Bob','Carol'][index],
     timeMs, playerId:1, mode:'local', createdAt:index+1, ...(laps===3?{kind:'race',laps:3}:{}) }));
   // The challenge must tolerate old responses containing repeat names or a
-  // legacy AI entry without occupying one of the three human places.
+  // legacy AI entry without displacing eligible human ladder steps.
   const board = [entries[0], {...entries[0], id:'challenge-repeat-alice', name:'ＡＬＩＣＥ', timeMs:times[0]+100},
     {...entries[0], id:'challenge-legacy-ai', name:'Old AI', timeMs:times[0]+200, playerId:2, mode:'ai'}, ...entries.slice(1)];
   const replay = entry => ({version:1,durationMs:entry.timeMs,
@@ -2015,6 +2076,27 @@ test('automatic solo setup waits for matching, then starts three distinct human 
   assert.ok(Number(ui.nodes.get('speed-fill1').style.strokeDashoffset)<100,'actual movement fills the speed dial');
   assert.equal(ui.nodes.has('setup-start-rule'),false,'the removed rule is not in the setup');
   assert.equal(ui.requests.filter(request=>request.method==='POST').length,0,'matching and pacing never submit records');
+});
+
+test('interleaved machines and repeated human runs keep correct bilingual names in setup, live roster and results',async t=>{
+  const fixture=challengeFixture(1);
+  fixture.entries=[fixture.entries[0],{...fixture.entries[0],id:'challenge-alice-second',timeMs:44000},
+    {...fixture.entries[1],timeMs:46000}];fixture.board=fixture.entries;
+  const ui=await loadCoastUI(t,{fetchImpl:challengeFetch(fixture)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();ui.click('start');await ui.flush();
+  const setupNames=()=>ui.nodes.get('challenge-roster').children.map(row=>row.children[0].children[0].textContent);
+  assert.deepEqual(setupNames(),['Alice1','配速幽灵 1','Alice2','配速幽灵 2','Bob','配速幽灵 3']);
+  assert.equal(ui.application.challengeSetup.ghosts[2].entry.name,'Alice','display suffix never edits the original human identity');
+  ui.click('language-en');
+  const english=['Alice1','Pace Ghost 1','Alice2','Pace Ghost 2','Bob','Pace Ghost 3'];
+  assert.deepEqual(setupNames(),english,'machine numbers do not depend on their interleaved color slot');
+  ui.click('setup-launch');ui.advance(3.1);
+  assert.deepEqual(ui.nodes.get('challenge-live-list').children.map(row=>row.children[0].textContent),english);
+  const car=ui.engine.cars[0];
+  Object.assign(car,{finished:true,_started:true,lap:1,finishTime:49,lastLap:48,bestLap:48,speed:0});
+  ui.engine.time=49;ui.frame();await ui.flush();
+  assert.deepEqual(ui.nodes.get('challenge-results-list').children.map(row=>row.children[1].textContent),[...english,'You']);
+  assert.equal(ui.requests.filter(request=>request.method==='POST').length,0);
 });
 
 for(const laps of [1])test(`Ghost Challenge ${laps}-lap results use the correct clock and finish immediately with only the human save card`,async t=>{

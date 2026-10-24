@@ -58,7 +58,7 @@ let ghostTimelines = [];
 function cancelChallengeLoad() {
   challengeRequest++; challengeAbort?.abort(); challengeAbort = null;
 }
-function challengeLabel(ghost) { return ghost.synthetic ? `${i18n.t('配速幽灵')} ${ghost.slotId - 2}` : ghost.entry.name; }
+function challengeLabel(ghost) { return ghost.synthetic && i18n.language==='en' ? ghost.entry.nameEn : ghost.displayName || ghost.entry.name; }
 function renderChallengeRoster() {
   const roster = $('challenge-roster'); roster.replaceChildren();
   for (const ghost of challengeSetup?.ghosts || []) {
@@ -601,7 +601,7 @@ function updateMode() {
   $('mode-label').textContent=selectedMode==='tutorial'?'新手教程':solo?'幽灵挑战':'双人分屏'; $('mode-english').textContent=solo?'SINGLE PLAYER':'LOCAL MULTIPLAYER';
   $('player1-alternate-controls').classList.toggle('hidden',!solo);
   $('player2-controls').classList.toggle('hidden',solo); $('ai-control-note').classList.toggle('hidden',!solo);
-  $('help-mode-description').textContent=selectedMode==='tutorial'?'跟着提示练习加速、转向、刹车、氮气与复位。练习不记录成绩。':solo?'镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
+  $('help-mode-description').textContent=selectedMode==='tutorial'?'跟着提示练习加速、转向、刹车、氮气与复位。练习不记录成绩。':solo?'人类幽灵优先，配速幽灵补位。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
   document.querySelectorAll('[data-mode]').forEach(button=>{const active=button.dataset.mode===selectedMode;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   refreshBindings();
 }
@@ -702,7 +702,7 @@ document.addEventListener('fullscreenchange',()=>{
   }
   refreshFullscreenUI();resize();
 });
-const controlKeys={has:code=>bindings.recognizes(code)||['Space','Escape','KeyP'].includes(code)};
+const controlKeys={has:code=>bindings.recognizes(code)||['Space','Escape','KeyP','KeyU'].includes(code)};
 
 function typingTarget(event) {
   return event.isComposing || event.keyCode === 229
@@ -743,6 +743,10 @@ window.addEventListener('keydown',event=>{
   if(controlKeys.has(event.code)&&!(event.code==='Escape'&&document.fullscreenElement))event.preventDefault();
   if(raceEntry.active){if(!event.repeat&&['Escape','Space'].includes(event.code))skipRaceEntry();keys.clear();return;}
   if(drivingTutorial.completed){if(event.code==='Escape'&&!event.repeat)returnToMenu();return;}
+  if(event.code==='KeyU'){
+    if(!event.repeat&&['racing','countdown','paused'].includes(engine.state))openRaceSetup();
+    return;
+  }
   if(event.code==='Escape'&&!event.repeat){
     if(document.fullscreenElement||fullscreenEscapeGuard){keys.clear();engine.pause();}else togglePause();
     return;

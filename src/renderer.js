@@ -1301,7 +1301,7 @@ export class RaceRenderer {
       this._mesh(this.magicMeshes['dumbledore:body'],magicBodyMatrix(caster));
       this._mesh(this.magicMeshes['dumbledore:arm'],magicArmMatrix(caster));
     }
-    if(this.magicBannerRange.count&&Math.hypot(this.houseState.banners[0].x-camera.eye[0],this.houseState.banners[0].z-camera.eye[2])<2000)
+    if(this.magicBannerRange.count&&Math.hypot(this.houseState.banners[0].x-camera.eye[0],this.houseState.banners[0].z-camera.eye[2])<3000)
       this._mesh({buffer:this.magicMeshes.effects.buffer,...this.magicBannerRange});
   }
   _magicSpells() {

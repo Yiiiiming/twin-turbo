@@ -2,9 +2,11 @@ import { TRACK, trackPoint, projectTrack } from './engine.js';
 import { magicWandPoint } from './london-magic-effects.js';
 import { HOUSE_BANNERS, houseCrestTriangles } from './london-house-banner-models.js';
 
-export const HOUSE_CEREMONY_LOCATION=Object.freeze({casterS:5750,casterLane:-105,bannerS:6500,width:64,height:100,top:290});
+export const HOUSE_CEREMONY_LOCATION=Object.freeze({casterS:5250,casterLane:-105,bannerS:6800,width:64,height:100,top:290});
+export const HOUSE_CEREMONY_TIMING=Object.freeze({triggerS:4200,release:.95,stagger:.22,descent:2.4});
 const LANES=[-126,-42,42,126],clamp=n=>Math.max(0,Math.min(1,n)),mix=(a,b,t)=>a+(b-a)*t;
 const smooth=n=>{const t=clamp(n);return t*t*(3-2*t);};
+const ease=n=>{const t=clamp(n);return t*t*t*(t*(t*6-15)+10);};
 const colors=new Map();
 const rgb=value=>{if(!colors.has(value))colors.set(value,[1,3,5].map(i=>parseInt(value.slice(i,i+2),16)/255));return colors.get(value);};
 
@@ -20,24 +22,30 @@ export class HouseCeremony {
   this.lastTime=time;
   if(engine.state==='racing')for(const car of engine.cars||[]){
    const road=projectTrack(car.x,car.y,car._lastTrackS,car.elevation),lap=car.lap||0;
-   if(road.s>=5100&&road.s<=6500&&road.distance<150&&Math.abs((car.elevation||0)-road.elevation)<80&&!this.laps.has(lap)){
+   if(road.s>=HOUSE_CEREMONY_TIMING.triggerS&&road.s<=HOUSE_CEREMONY_LOCATION.bannerS&&road.distance<150&&Math.abs((car.elevation||0)-road.elevation)<80&&!this.laps.has(lap)){
     this.startedAt=time;this.laps.add(lap);break;
    }
   }
   const elapsed=this.startedAt===null?null:Math.max(0,time-this.startedAt),
-   location=HOUSE_CEREMONY_LOCATION,p=trackPoint(location.casterS,location.casterLane),
-   raise=elapsed===null?0:smooth(elapsed/.28)*(1-smooth((elapsed-1.15)/.65)),
-   caster={kind:'dumbledore',x:p.x,y:p.elevation+3,z:p.y,angle:p.angle-Math.PI/2+.2,
-    bodyRoll:-.04*raise,armPitch:.12+raise*(1+.08*Math.sin((elapsed||0)*9))};
+   location=HOUSE_CEREMONY_LOCATION,p=trackPoint(location.casterS,location.casterLane),t=elapsed||0,
+   lift=elapsed===null?0:ease((t-.12)/.83),sweep=elapsed===null?0:ease((t-1.5)/1.2),
+   settle=elapsed===null?0:ease((t-3.2)/1.25),hold=1-settle,
+   caster={kind:'dumbledore',x:p.x,y:p.elevation+3,z:p.y,
+    angle:p.angle-Math.PI/2+.2+hold*(-.12*lift+.3*sweep),
+    bodyRoll:hold*(-.065*lift+.035*sweep),
+    armPitch:-.65+hold*(2.1*lift-.65*sweep),
+    armYaw:hold*(.85*sweep),armSpread:hold*(.35*lift+.18*sweep)};
   caster.wand=magicWandPoint(caster);
-  const origin=trackPoint(location.casterS,location.casterLane),banners=[];
+  const banners=[],timing=HOUSE_CEREMONY_TIMING;
   if(elapsed!==null)for(let index=0;index<4;index++){
-   const progress=clamp((elapsed-.14-index*.1)/1.15);if(progress<=0)continue;
-   const travel=smooth(progress),unfold=smooth((progress-.2)/.72),target=trackPoint(location.bannerS,LANES[index]);
+   const progress=clamp((elapsed-timing.release-index*timing.stagger)/timing.descent);if(progress<=0)continue;
+   const travel=ease(progress),unfold=ease((progress-.14)/.82),target=trackPoint(location.bannerS,LANES[index]);
+   // A suspended roll lowers straight from the ceiling of the sky, then opens
+   // downwards. Its top bar stays in the same column throughout the ceremony.
    banners.push({index,house:HOUSE_BANNERS[index],progress,unfold,time,
-    x:mix(origin.x,target.x,travel),z:mix(origin.y,target.y,travel),angle:target.angle,
-    y:mix(origin.elevation+70,target.elevation+location.top,travel)+100*Math.sin(Math.PI*travel),
-    flutter:time*2.5+index*1.7});
+    x:target.x,z:target.y,angle:target.angle,
+    y:target.elevation+location.top+230*(1-travel),
+    flutter:time*1.25+index*1.7});
   }
   return this.state={caster,banners,elapsed,time};
  }
@@ -47,7 +55,8 @@ export class HouseCeremony {
  * keep the heraldry ahead of the cloth, rather than flickering in its surface. */
 export function bannerPoint(banner,u,v,layer=0){
  const {width,height}=HOUSE_CEREMONY_LOCATION,unfold=banner.unfold,
-  x=(u-.5)*width*(.08+.92*unfold),drop=height*(.05+.95*unfold)*(v-.10*Math.abs(u*2-1)*v**6),
+  x=(u-.5)*width*(.86+.14*smooth(unfold*3)),shown=Math.min(v,.05+.95*unfold),
+  drop=height*(shown-.10*Math.abs(u*2-1)*shown**6),
   // The embroidered center moves as one gently tilting patch. Curl is confined
   // to the loose edges/tail, so differently triangulated crest layers cannot
   // cut through each other when the surrounding fabric ripples.
@@ -70,8 +79,10 @@ export function appendHouseBanners(pool,state){
  for(const banner of state.banners){
   const house=banner.house,normal=[-Math.cos(banner.angle),0,-Math.sin(banner.angle)],
    point=(u,v,layer=0)=>bannerPoint(banner,u,v,layer),us=[0,.045,.25,.5,.75,.955,1];
+  const reveal=.05+.95*banner.unfold;
   for(let col=0;col<6;col++)for(let row=0;row<8;row++){
-   const u=us[col],u1=us[col+1],v=row/8,v1=(row+1)/8,
+   if(row/8>=reveal)continue;
+   const u=us[col],u1=us[col+1],v=row/8,v1=Math.min((row+1)/8,reveal),
     color=col===0||col===5||row===0?house.trim:house.cloth;
    tri([point(u,v),point(u1,v),point(u1,v1)],color,normal);
    tri([point(u,v),point(u1,v1),point(u,v1)],color,normal);
@@ -79,13 +90,23 @@ export function appendHouseBanners(pool,state){
   // The slim top bar appears with the fabric, with no pole through the road.
   tri([point(-.045,-.025,1),point(1.045,-.025,1),point(1.045,0,1)],house.trim,normal,.8);
   tri([point(-.045,-.025,1),point(1.045,0,1),point(-.045,0,1)],house.trim,normal,.8);
-  for(const crest of houseCrestTriangles(house.id))
-   tri(crest.points.map(([u,v])=>point(u,v,1+crest.layer)),crest.color,normal,.72);
+  for(const crest of houseCrestTriangles(house.id)){
+   // Reveal the embroidered badge with the fabric instead of stretching its
+   // animal into a flattened shape while the bottom remains rolled up.
+   const polygon=[];
+   for(let i=0;i<3;i++){
+    const a=crest.points[i],b=crest.points[(i+1)%3],inside=a[1]<=reveal,next=b[1]<=reveal;
+    if(inside)polygon.push(a);
+    if(inside!==next){const t=(reveal-a[1])/(b[1]-a[1]);polygon.push([mix(a[0],b[0],t),reveal]);}
+   }
+   for(let i=1;i<polygon.length-1;i++)
+    tri([polygon[0],polygon[i],polygon[i+1]].map(([u,v])=>point(u,v,1+crest.layer)),crest.color,normal,.72);
+  }
   if(banner.progress<1){
-   // A few short warm sparks connect the wand gesture to the unfolding cloth.
+   // A few slow motes follow each lowering banner as the fabric unfurls.
    const strength=Math.sin(banner.progress*Math.PI),center=point(.5,.1,2);
    for(let j=0;j<4;j++){
-    const a=state.time*3+j*Math.PI/2+banner.index,r=12+20*strength,
+    const a=state.time*1.4+j*Math.PI/2+banner.index,r=12+20*strength,
      at=[center[0]+Math.cos(a)*r,center[1]+Math.sin(a)*r,center[2]-5],size=1.2+strength;
     tri([[at[0]-size,at[1],at[2]],[at[0],at[1]+size*2,at[2]],[at[0]+size,at[1],at[2]]],house.trim,normal,1);
    }
