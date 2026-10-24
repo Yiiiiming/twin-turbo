@@ -120,13 +120,40 @@ test('normal matching draws fresh random values while a completed roster never c
   }finally{Math.random=savedRandom;}
 });
 
-test('the ladder includes 800 and 1200 ms boundaries, rejects outside records and selects the nearest one-second target',()=>{
+test('human matching includes 500 and 1500 ms boundaries, rejects outside records and selects the nearest one-second target',()=>{
   const source=candidate('First',39000);
-  const values=[candidate('Early',39799),candidate('Lower',39800),candidate('Upper',40200),candidate('Late',40201)];
+  const values=[candidate('Early',39499),candidate('Lower',39500),candidate('Upper',40500),candidate('Late',40501)];
   assert.equal(createGhostChallenge([source,...values]).ghosts[1].entry.name,'Lower','equal offsets prefer the faster record');
   assert.equal(createGhostChallenge([source,values[0],values[2],values[3]]).ghosts[1].entry.name,'Upper');
   assert.equal(createGhostChallenge([source,values[0],values[3]]).ghosts[1].synthetic,true);
   assert.equal(createGhostChallenge([source,...values,candidate('Closest',40020)]).ghosts[1].entry.name,'Closest');
+});
+
+test('a wider human window accepts the Beijing 0.71 second gap and prefers a different driver over a closer same-name record',()=>{
+  const first=candidate('Emery',48830),same=candidate('Emery',49830),jy=candidate('jy',49540),later=candidate('Sam',50940);
+  const original=structuredClone([first,same,jy,later]);
+  const result=createGhostChallenge([first,same,jy,later],1,{random:()=>.5});
+  assert.deepEqual(result.ghosts.slice(0,3).map(g=>[g.entry.name,g.targetMs]),[['Emery',48830],['jy',49540],['Sam',50940]]);
+  assert.equal(result.humanCount,3);assert.equal(result.paceCount,3);
+  assert.deepEqual([first,same,jy,later],original,'human names, clocks and recordings remain exact');
+  for(let index=3;index<6;index++){
+    const gap=result.ghosts[index].targetMs-result.ghosts[index-1].targetMs;
+    assert.ok(gap>=800&&gap<=1200,'the wider human window does not widen machine pacing');
+  }
+});
+
+test('online matching validates expanded-window human replays before filling remaining slots with machines',async()=>{
+  const city='coast-beijing',version=ghostVersionForCity(city),values=[candidate('Emery',48830),candidate('jy',49540),candidate('Sam',50940)],details=[];
+  const result=await loadGhostChallenge({city,random:()=>.5,fetchImpl:async raw=>{
+    const url=new URL(raw),body={city,version};
+    if(url.pathname==='/api/laps')return{ok:true,json:async()=>({...body,entries:values.map(v=>v.entry)})};
+    if(url.pathname==='/api/ghosts')return{ok:true,json:async()=>({...body,entries:[]})};
+    const value=values.find(v=>url.pathname.endsWith('/'+v.entry.id));assert.ok(value);details.push(value.entry.id);
+    return{ok:true,json:async()=>({...body,...value})};
+  }});
+  assert.deepEqual(result.ghosts.slice(0,3).map(g=>g.entry.name),['Emery','jy','Sam']);
+  assert.equal(result.failedCount,0);assert.equal(result.humanCount,3);
+  assert.deepEqual(details,values.map(v=>v.entry.id),'all selected humans pass replay validation');
 });
 
 test('different humans take priority within the window; repeated real records receive display-only numbered names',()=>{

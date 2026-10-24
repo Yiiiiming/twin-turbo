@@ -18,7 +18,9 @@ export const PACE_PROFILES = Object.freeze([
   { delayMs: 3000, amplitude: .98, phase: Math.PI * 2 / 3 },
 ].map(profile => Object.freeze(profile)));
 export const PACE_SPEED_LIMIT = 517;
-const LADDER_GAP_MS = Object.freeze({ minimum: 800, target: 1000, maximum: 1200 });
+// Human records need a wider search window than generated pace targets.
+const HUMAN_GAP_MS = Object.freeze({ minimum: 500, target: 1000, maximum: 1500 });
+const PACE_GAP_MS = Object.freeze({ minimum: 800, maximum: 1200 });
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 const validDistance = laps => laps === 1 || laps === 3;
 const replayValid = (replay, laps) => laps === 3 ? validateRaceReplay(replay) : validateReplay(replay);
@@ -82,8 +84,8 @@ export function paceReplay(replay, durationMs, profileIndex = 0) {
 const compareEntries=(a,b)=>a.timeMs-b.timeMs||a.id.localeCompare(b.id);
 function ladderCandidates(entries,previous,usedNames){
   if(previous===undefined)return [...entries].sort(compareEntries);
-  const target=previous+LADDER_GAP_MS.target;
-  return entries.filter(entry=>entry.timeMs>=previous+LADDER_GAP_MS.minimum&&entry.timeMs<=previous+LADDER_GAP_MS.maximum)
+  const target=previous+HUMAN_GAP_MS.target;
+  return entries.filter(entry=>entry.timeMs>=previous+HUMAN_GAP_MS.minimum&&entry.timeMs<=previous+HUMAN_GAP_MS.maximum)
     .sort((a,b)=>Number(usedNames.has(leaderboardNameKey(a.name)))-Number(usedNames.has(leaderboardNameKey(b.name)))
       ||Math.abs(a.timeMs-target)-Math.abs(b.timeMs-target)||compareEntries(a,b));
 }
@@ -97,11 +99,11 @@ function challengeRoster(laps,random){
     },
     pace(){
       if(!ghosts.length)return false;
-      const roll=random(),range=LADDER_GAP_MS.maximum-LADDER_GAP_MS.minimum+1;
-      let gap=LADDER_GAP_MS.minimum+Math.min(range-1,Math.floor(Math.max(0,Number.isFinite(roll)?roll:.5)*range));
+      const roll=random(),range=PACE_GAP_MS.maximum-PACE_GAP_MS.minimum+1;
+      let gap=PACE_GAP_MS.minimum+Math.min(range-1,Math.floor(Math.max(0,Number.isFinite(roll)?roll:.5)*range));
       // Fresh matching chooses new clocks. Avoid visually identical neighboring
       // gaps even when random draws land close together; never alter live pace.
-      if(lastPaceGap!==null&&Math.abs(gap-lastPaceGap)<60)gap=LADDER_GAP_MS.minimum+(gap-LADDER_GAP_MS.minimum+173)%range;
+      if(lastPaceGap!==null&&Math.abs(gap-lastPaceGap)<60)gap=PACE_GAP_MS.minimum+(gap-PACE_GAP_MS.minimum+173)%range;
       lastPaceGap=gap;
       const source=ghosts[0],target=ghosts.at(-1).targetMs+gap;
       const replay=paceReplay(source.replay,target,paceCount%PACE_PROFILES.length);
