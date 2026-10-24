@@ -18,8 +18,9 @@ export const PACE_PROFILES = Object.freeze([
   { delayMs: 3000, amplitude: .98, phase: Math.PI * 2 / 3 },
 ].map(profile => Object.freeze(profile)));
 export const PACE_SPEED_LIMIT = 517;
-// Human records need a wider search window than generated pace targets.
-const HUMAN_GAP_MS = Object.freeze({ minimum: 500, target: 1000, maximum: 1500 });
+// Three human places may be close together, including equal millisecond clocks.
+const HUMAN_LIMIT = 3;
+const HUMAN_GAP_MAX_MS = 1500;
 const PACE_GAP_MS = Object.freeze({ minimum: 800, maximum: 1200 });
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 const validDistance = laps => laps === 1 || laps === 3;
@@ -82,20 +83,23 @@ export function paceReplay(replay, durationMs, profileIndex = 0) {
 }
 
 const compareEntries=(a,b)=>a.timeMs-b.timeMs||a.id.localeCompare(b.id);
-function ladderCandidates(entries,previous,usedNames){
-  if(previous===undefined)return [...entries].sort(compareEntries);
-  const target=previous+HUMAN_GAP_MS.target;
-  return entries.filter(entry=>entry.timeMs>=previous+HUMAN_GAP_MS.minimum&&entry.timeMs<=previous+HUMAN_GAP_MS.maximum)
+function ladderCandidates(entries,previous,usedNames,usedIds,firstTime){
+  const available=entries.filter(entry=>!usedIds.has(entry.id));
+  if(previous===undefined)return available.sort(compareEntries);
+  // Choosing a different driver must not discard a close earlier run that can
+  // fill the third human place. The finished roster is sorted by actual time.
+  return available.filter(entry=>entry.timeMs>=firstTime&&entry.timeMs<=previous+HUMAN_GAP_MAX_MS)
     .sort((a,b)=>Number(usedNames.has(leaderboardNameKey(a.name)))-Number(usedNames.has(leaderboardNameKey(b.name)))
-      ||Math.abs(a.timeMs-target)-Math.abs(b.timeMs-target)||compareEntries(a,b));
+      ||compareEntries(a,b));
 }
 function challengeRoster(laps,random){
-  const ghosts=[],usedNames=new Set();let humanCount=0,paceCount=0,lastPaceGap=null;
-  return {ghosts,usedNames,
+  const ghosts=[],usedNames=new Set(),usedIds=new Set();let humanCount=0,paceCount=0,lastPaceGap=null;
+  return {ghosts,usedNames,usedIds,get hasHumanPlace(){return humanCount<HUMAN_LIMIT;},
+    get latestTarget(){return ghosts.length?Math.max(...ghosts.map(ghost=>ghost.targetMs)):undefined;},
     human(value){
       ghosts.push({...CHALLENGE_COLORS[ghosts.length],entry:{...value.entry,name:normalizeName(value.entry.name)},
         replay:copyReplay(value.replay),synthetic:false,targetMs:value.entry.timeMs});
-      usedNames.add(leaderboardNameKey(value.entry.name));humanCount++;
+      usedNames.add(leaderboardNameKey(value.entry.name));usedIds.add(value.entry.id);humanCount++;
     },
     pace(){
       if(!ghosts.length)return false;
@@ -105,7 +109,7 @@ function challengeRoster(laps,random){
       // gaps even when random draws land close together; never alter live pace.
       if(lastPaceGap!==null&&Math.abs(gap-lastPaceGap)<60)gap=PACE_GAP_MS.minimum+(gap-PACE_GAP_MS.minimum+173)%range;
       lastPaceGap=gap;
-      const source=ghosts[0],target=ghosts.at(-1).targetMs+gap;
+      const source=ghosts[0],target=Math.max(...ghosts.map(ghost=>ghost.targetMs))+gap;
       const replay=paceReplay(source.replay,target,paceCount%PACE_PROFILES.length);
       if(!replay)return false;
       paceCount++;const targetMs=replay.durationMs;
@@ -115,6 +119,8 @@ function challengeRoster(laps,random){
       return true;
     },
     result(){
+      ghosts.sort((a,b)=>a.targetMs-b.targetMs||a.slotId-b.slotId);
+      ghosts.forEach((ghost,index)=>Object.assign(ghost,CHALLENGE_COLORS[index]));
       const families=new Map();
       for(const ghost of ghosts)if(!ghost.synthetic){
         const key=leaderboardNameKey(ghost.entry.name);
@@ -138,7 +144,7 @@ export function createGhostChallenge(candidates = [], laps = 1, {random=Math.ran
     &&value.entry.timeMs===value.replay.durationMs&&!humans.has(value.entry.id))humans.set(value.entry.id,value);
   const roster=challengeRoster(laps,random),entries=[...humans.values()].map(value=>value.entry);
   while(roster.ghosts.length<CHALLENGE_COLORS.length){
-    const [human]=ladderCandidates(entries,roster.ghosts.at(-1)?.targetMs,roster.usedNames);
+    const [human]=roster.hasHumanPlace?ladderCandidates(entries,roster.latestTarget,roster.usedNames,roster.usedIds,roster.ghosts[0]?.targetMs):[];
     if(human)roster.human(humans.get(human.id));
     else if(!roster.pace())break;
   }
@@ -191,8 +197,8 @@ export async function loadGhostChallenge({ city, laps = 1, fetchImpl = (...args)
     await Promise.all(Array.from({length:Math.min(4,historyNames.length)},loadHistory));
     const roster=challengeRoster(laps,random),failedIds=new Set();let detailReads=0;
     while(roster.ghosts.length<CHALLENGE_COLORS.length){
-      const candidates=ladderCandidates([...entries.values()].filter(entry=>!failedIds.has(entry.id)),
-        roster.ghosts.at(-1)?.targetMs,roster.usedNames);
+      const candidates=roster.hasHumanPlace?ladderCandidates([...entries.values()].filter(entry=>!failedIds.has(entry.id)),
+        roster.latestTarget,roster.usedNames,roster.usedIds,roster.ghosts[0]?.targetMs):[];
       let loaded=false;
       for(const entry of candidates.slice(0,Math.max(0,32-detailReads)))try{
         detailReads++;

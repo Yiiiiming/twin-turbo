@@ -2110,6 +2110,37 @@ test('automatic solo setup waits for matching, then starts three distinct human 
   assert.equal(ui.requests.filter(request=>request.method==='POST').length,0,'matching and pacing never submit records');
 });
 
+test('three close human records appear together before machine filling in the opening roster',async t=>{
+  const fixture=challengeFixture();
+  fixture.entries.forEach((entry,index)=>{entry.timeMs=[48830,48840,49540][index];});fixture.board=fixture.entries;
+  fixture.replay=entry=>{
+    const frames=[];for(let time=0;time<entry.timeMs;time+=100)frames.push([time,100+time/1000,200,0,0]);
+    frames.push([entry.timeMs,100+entry.timeMs/1000,200,0,0]);
+    return{version:1,durationMs:entry.timeMs,frames};
+  };
+  const ui=await loadCoastUI(t,{fetchImpl:challengeFetch(fixture)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();ui.click('start');await ui.flush();
+  const ghosts=ui.application.challengeSetup.ghosts;
+  assert.equal(ui.application.challengeSetup.humanCount,3);assert.equal(ui.application.challengeSetup.paceCount,3);
+  assert.deepEqual(ghosts.slice(0,3).map(ghost=>[ghost.entry.name,ghost.entry.timeMs]),[['Alice',48830],['Bob',48840],['Carol',49540]]);
+  assert.deepEqual(ui.nodes.get('challenge-roster').children.slice(0,3).map(row=>row.children[0].children[0].textContent),['Alice','Bob','Carol']);
+});
+
+test('a close earlier history fills the third human place after a different driver is selected',async t=>{
+  const fixture=challengeFixture();
+  fixture.entries=[{...fixture.entries[0],name:'Emery',timeMs:48826},
+    {...fixture.entries[1],name:'Emery',timeMs:48907},{...fixture.entries[2],name:'jy',timeMs:49543}];fixture.board=fixture.entries;
+  fixture.replay=entry=>{const frames=[];for(let time=0;time<entry.timeMs;time+=100)frames.push([time,100+time/1000,200,0,0]);frames.push([entry.timeMs,100+entry.timeMs/1000,200,0,0]);return{version:1,durationMs:entry.timeMs,frames};};
+  const ui=await loadCoastUI(t,{fetchImpl:challengeFetch(fixture)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();ui.click('start');await ui.flush();
+  const setup=ui.application.challengeSetup;
+  assert.equal(setup.humanCount,3);assert.equal(setup.paceCount,3);
+  assert.deepEqual(setup.ghosts.slice(0,3).map(ghost=>[ghost.displayName,ghost.entry.timeMs]),[['Emery1',48826],['Emery2',48907],['jy',49543]]);
+  assert.deepEqual(setup.ghosts.map(ghost=>ghost.slotId),[0,1,2,3,4,5]);
+  assert.deepEqual(ui.nodes.get('challenge-roster').children.slice(0,3).map(row=>row.children[0].children[0].textContent),['Emery1','Emery2','jy']);
+  assert.ok(setup.ghosts[3].targetMs>=49543+800,'machine clocks follow the slowest chosen human, not the last-loaded earlier record');
+});
+
 test('interleaved machines and repeated human runs keep correct bilingual names in setup, live roster and results',async t=>{
   const fixture=challengeFixture(1);
   fixture.entries=[fixture.entries[0],{...fixture.entries[0],id:'challenge-alice-second',timeMs:44000},
