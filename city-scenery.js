@@ -15,6 +15,7 @@ import { addAustinCampus } from './austin-campus.js';
 import { addAustinFootball } from './austin-football.js';
 import { AUSTIN_LANDMARKS, austinLandmarkPlacements, addAustinLandmark } from './austin-landmarks.js';
 import { SIXTH_STREET_VENUES, sixthStreetPlacements, addSixthStreetVenue } from './austin-sixth-street.js';
+import { HOLOGRAM_MATERIALS } from './hologram-theme.js';
 const TAU=Math.PI*2;
 const THEMES=new Set(['beijing','austin','rio','paris','shanghai']);
 export const isCityTheme=()=>THEMES.has(TRACK.theme);
@@ -440,14 +441,20 @@ export function addCityLandmarks(mesh){
  if(!isCityTheme())return;
  for(const item of cityLandmarkPlacements())addCityLandmark(mesh,item);
  if(TRACK.theme==='beijing')addBeijingGreatWall(mesh);
- if(TRACK.theme==='paris'){parisBridges(mesh);parisQuays(mesh);}
+ if(TRACK.theme==='paris'){
+  parisBridges(mesh);
+  const material=mesh.surfaceMode;mesh.surfaceMode=HOLOGRAM_MATERIALS.props;
+  parisQuays(mesh);mesh.surfaceMode=material;
+ }
  if(TRACK.theme==='austin'){
   archBridge(mesh);
+  const material=mesh.surfaceMode;mesh.surfaceMode=HOLOGRAM_MATERIALS.props;
   if(TRACK.river)for(const side of [-1,1])for(let x=-700;x<TRACK.width+700;x+=80){
    const z=TRACK.river.centerZ+side*(TRACK.river.halfWidth+8);if(projectTrack(x,z).distance<140)continue;
    mesh.box(x,7,z,80,14,12,'#a8a68c');mesh.box(x,15,z,80,3,15,'#c5bfa3');
    mesh.box(x,23,z,2.5,16,2.5,'#61776e');mesh.box(x,32,z,80,2,2,'#6c847b');
   }
+  mesh.surfaceMode=material;
  }
 }
 

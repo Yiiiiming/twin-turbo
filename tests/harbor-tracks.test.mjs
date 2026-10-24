@@ -82,8 +82,10 @@ function fakeGL(){
 test('uploaded road, car and shadow meshes follow elevation; rebuilding reuses vehicles and releases old road buffers',()=>{
  setTrack('coast');const gl=fakeGL(),renderer=new RaceRenderer({width:1280,height:720,getContext:()=>gl,addEventListener(){}});
  assert.equal(renderer.available,true,renderer.error);const carBuffer=renderer.meshes.cars[0].buffer;
+ const sceneBuffers=['terrain','road','water','props','ambientEdges'].map(key=>renderer.meshes[key].buffer);
  const engine=new RaceEngine();engine.selectTrack('coast-ridge');renderer.rebuild(engine);
- assert.equal(renderer.trackId,'coast-ridge');assert.equal(renderer.meshes.cars[0].buffer,carBuffer);assert.equal(gl.deletes.length,4);
+ assert.equal(renderer.trackId,'coast-ridge');assert.equal(renderer.meshes.cars[0].buffer,carBuffer);
+ assert.deepEqual(new Set(gl.deletes),new Set(sceneBuffers));assert.equal(gl.deletes.length,sceneBuffers.length);
  const road=gl.buffers.get(renderer.meshes.road.buffer);let high=0,low=Infinity;
  for(let i=0;i<road.length;i+=11){high=Math.max(high,road[i+1]);low=Math.min(low,road[i+1]);}
  assert.ok(high>=570.7&&low<1);assert.ok(renderer.obstacles.some(o=>o.minHeight>400&&o.maxHeight>o.minHeight));

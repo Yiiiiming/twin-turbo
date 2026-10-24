@@ -19,6 +19,8 @@ import { SPLIT_FRACTIONS } from './split-timing.js';
 import { CHALLENGE_COLORS } from './ghost-challenge.js';
 import { createEntryCameraPlan, entryCameraForProgress, entryMeshOcclusion } from './entry-cameras.js';
 import { addBeijingGreatWall } from './beijing-great-wall.js';
+import { HOLOGRAM_MATERIALS, HOLOGRAM_FRAGMENT, HOLOGRAM_SKY } from './hologram-theme.js';
+import { hologramEdges } from './hologram-edges.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
 
@@ -83,8 +85,10 @@ const rgba = (color, alpha = 1) => {
 };
 
 class MeshBuilder {
-  constructor(colliders=null) { this.data = [];this.colliders=colliders; }
-  vertex(v, normal, color, emission = 0) { this.data.push(...v, ...normal, ...rgba(color), emission); }
+  constructor(colliders=null, surfaceMode=HOLOGRAM_MATERIALS.landmark) { this.data = [];this.colliders=colliders;this.surfaceMode=surfaceMode; }
+  // Material identity shares the existing emission float; geometry, colors,
+  // collision shapes and the batched 44-byte vertex layout remain unchanged.
+  vertex(v, normal, color, emission = 0) { this.data.push(...v, ...normal, ...rgba(color), this.surfaceMode*4+emission); }
   triangle(a, b, c, color, emission = 0, normal) {
     normal ||= normalize(cross(b.map((n, i) => n - a[i]), c.map((n, i) => n - a[i])));
     this.vertex(a, normal, color, emission); this.vertex(b, normal, color, emission); this.vertex(c, normal, color, emission);
@@ -138,6 +142,7 @@ attribute vec4 aColor;
 attribute float aEmission;
 uniform mat4 uViewProjection;
 uniform mat4 uModel;
+uniform float uLineOffset;
 varying vec3 vPosition;
 varying vec3 vNormal;
 varying vec4 vColor;
@@ -149,6 +154,7 @@ void main() {
   vColor = aColor;
   vEmission = aEmission;
   gl_Position = uViewProjection * world;
+  gl_Position.z -= uLineOffset;
 }`;
 const FRAGMENT = `
 #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -168,16 +174,24 @@ uniform vec3 uSpellPositionA;
 uniform vec3 uSpellPositionB;
 uniform vec3 uSpellColorA;
 uniform vec3 uSpellColorB;
+${HOLOGRAM_FRAGMENT}
 void main() {
   vec3 n = normalize(vNormal);
+  float surfaceMode = floor((vEmission + .001) / 4.0);
+  float emission = clamp(vEmission - surfaceMode * 4.0, 0.0, 1.0);
   float sun = max(dot(n, normalize(vec3(-0.45, 0.86, 0.35))), 0.0);
   float hemisphere = 0.54 + 0.12 * n.y;
   vec3 daylight = vec3(hemisphere) + vec3(0.52,0.46,0.36)*sun;
   vec3 moonlight = vec3(.17,.23,.34) + vec3(.19,.24,.34)*sun + max(n.y,0.0)*vec3(.035,.045,.065);
-  vec3 color = vColor.rgb * mix(mix(daylight,moonlight,uMagic),vec3(1.17),vEmission);
+  vec3 color = vColor.rgb * mix(mix(daylight,moonlight,uMagic),vec3(1.17),emission);
   float a = max(0.0,1.0-length(vPosition-uSpellPositionA)/145.0);
   float b = max(0.0,1.0-length(vPosition-uSpellPositionB)/145.0);
-  color += vColor.rgb*(uSpellColorA*a*a+uSpellColorB*b*b)*(1.0-vEmission)*uMagic;
+  color += vColor.rgb*(uSpellColorA*a*a+uSpellColorB*b*b)*(1.0-emission)*uMagic;
+  if (surfaceMode > .5) {
+    color = hologramSurface(vColor.rgb, vPosition, n, uEye, emission, surfaceMode);
+    color *= mix(1.0, .8, uMagic);
+    color += (uSpellColorA*a*a+uSpellColorB*b*b)*uMagic*.22;
+  }
   float fog = smoothstep(uFogRange.x,uFogRange.y,length(vPosition-uEye));
   color = mix(color, uFog, fog*uFogRange.z);
   gl_FragColor = vec4(color, vColor.a);
@@ -199,6 +213,7 @@ uniform vec3 uZenith;
 uniform vec3 uHorizon;
 uniform float uLondon;
 uniform float uMagic;
+${HOLOGRAM_SKY}
 void main(){
   vec3 gradient = mix(uHorizon,uZenith,pow(clamp(vUV.y,0.0,1.0),0.7));
   // Gentle repeating parallax keeps the painted horizon stable through corners.
@@ -214,7 +229,7 @@ void main(){
   night+=vec3(.06,.08,.12)*luminance;
   image=mix(image,night,uMagic);
   float landscape = smoothstep(0.03,0.3,vUV.y);
-  gl_FragColor=vec4(mix(uHorizon,image,landscape),1.0);
+  gl_FragColor=vec4(hologramSky(vUV,uHeading,uAspect,uMagic),1.0);
 }`;
 
 const POSTER_VERTEX=`
@@ -321,7 +336,7 @@ export function stadiumBridgeSupports(distance,side) {
 }
 
 function buildRoad() {
-  const mesh = new MeshBuilder(), step = TRACK.length / Math.ceil(TRACK.length / 10), half = TRACK.roadWidth / 2;
+  const mesh = new MeshBuilder(null,HOLOGRAM_MATERIALS.road), step = TRACK.length / Math.ceil(TRACK.length / 10), half = TRACK.roadWidth / 2;
   const strip = (s, widthA, widthB, height, color, emission = 0) => {
     const p = trackPoint(s,widthA), q = trackPoint(s+step,widthA), r = trackPoint(s+step,widthB), t = trackPoint(s,widthB);
     mesh.quad([p.x,p.elevation+height,p.y],[q.x,q.elevation+height,q.y],[r.x,r.elevation+height,r.y],[t.x,t.elevation+height,t.y],color,emission,normalize([-p.slope*Math.cos(p.angle),1,-p.slope*Math.sin(p.angle)]));
@@ -663,12 +678,16 @@ function towerBridge(mesh) {
   }
 }
 function addLondonLandmarks(mesh) {
+  const source=mesh;
   mesh=londonDetailMesh(mesh);
   towerBridge(mesh);
   for(const item of londonLandmarkPlacements()){
     if(item.kind==='big-ben')bigBen(mesh,item);
     else if(item.kind==='london-eye')londonEye(mesh,item);
-    else if(item.kind==='london-bus')londonBus(mesh,item);
+    else if(item.kind==='london-bus'){
+      source.surfaceMode=HOLOGRAM_MATERIALS.props;londonBus(mesh,item);
+      source.surfaceMode=HOLOGRAM_MATERIALS.landmark;
+    }
     else if(WEST_END_LANDMARKS.some(landmark=>landmark.kind===item.kind))addWestEndLandmark(mesh,item);
     else if(ROYAL_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRoyalLandmark(mesh,item);
     else if(RIVERSIDE_LANDMARKS.some(landmark=>landmark.kind===item.kind))addRiversideLandmark(mesh,item);
@@ -678,6 +697,7 @@ function addLondonLandmarks(mesh) {
     else if(LONDON_THIRD_LANDMARKS.some(landmark=>landmark.kind===item.kind))addLondonThirdLandmark(mesh,item);
   }
   // River embankments stop outside every road approach, never across a bridge.
+  source.surfaceMode=HOLOGRAM_MATERIALS.props;
   for(const side of [-1,1])for(let x=-750;x<TRACK.width+750;x+=76){
     const z=TRACK.river.centerZ+side*(TRACK.river.halfWidth+8);
     if(projectTrack(x,z).distance<140)continue;
@@ -882,7 +902,9 @@ function addHarborLandmarks(mesh,shore) {
       mesh.box(x,28,z,120,56,82,'#8d6a48');mesh.cone(x,53,z,90,48,'#426254',6,0,Math.PI/6);
       for(const side of [-1,1])for(let k=-2;k<=2;k++)mesh.box(x+k*21,29,z+side*42,11,18,2,'#ffd59a',0,.25);
       mesh.box(x-57,41,z-26,13,82,16,'#9b9f8a');mesh.box(x,7,z+63,136,14,30,'#bdac83');
+      mesh.surfaceMode=HOLOGRAM_MATERIALS.props;
       for(const side of [-1,1])pine(mesh,x+side*120,z+28,1.8,rng);
+      mesh.surfaceMode=HOLOGRAM_MATERIALS.landmark;
     }else{
       mesh.box(x,21,z,140,42,74,'#dedbca');mesh.box(x,45,z,153,6,82,'#476979');
       for(let k=-3;k<=3;k++){mesh.box(x+k*18,24,z+38,13,25,1,'#436573');mesh.box(x+k*18,50,z+44,3,18,3,'#d1c09b');}
@@ -893,7 +915,7 @@ function addHarborLandmarks(mesh,shore) {
 }
 
 function buildWorld() {
-  const obstacles=[],terrain=new MeshBuilder(), props=new MeshBuilder(obstacles), water=new MeshBuilder();
+  const obstacles=[],terrain=new MeshBuilder(null,HOLOGRAM_MATERIALS.terrain), props=new MeshBuilder(obstacles,HOLOGRAM_MATERIALS.props), water=new MeshBuilder(null,HOLOGRAM_MATERIALS.water);
   const rng=random(90421), w=TRACK.width, h=TRACK.height;
   const shoreZ=shoreBoundary();
   const grid=130;
@@ -931,7 +953,9 @@ function buildWorld() {
     else if(item.kind==='building')building(props,item.x,item.z,item.width,item.depth,item.height,rng);
     else props.cone(item.x,0,item.z,item.radius,item.height,item.z>h*.66?'#a6ab96':'#788f7e',6,4,rng()*2);
   }
+  props.surfaceMode=HOLOGRAM_MATERIALS.landmark;
   addHarborLandmarks(props,shoreZ);
+  props.surfaceMode=HOLOGRAM_MATERIALS.props;
   // Waterside promenade, piers, cargo and moored little boats.
   for(let i=0;i<(london||themedCity?0:8);i++) {
     const x=140+i*(w-200)/8,z=shoreZ-10;
@@ -1034,7 +1058,7 @@ export function sceneEntryBoundary(){
 }
 
 function carMesh(color) {
-  const m=new MeshBuilder();
+  const m=new MeshBuilder(null,HOLOGRAM_MATERIALS.car);
   // X is the vehicle's forward axis; lamps and rear wing make orientation clear.
   m.box(0,6.5,0,43,9,22,'#172433');
   m.box(1,10,0,42,9,25,color);
@@ -1158,13 +1182,15 @@ export class RaceRenderer {
     this.posterMeshes=[];this.scoreboardCanvas=null;
     this.attributes={};this.uniforms={};
     for(const name of ['aPosition','aNormal','aColor','aEmission'])this.attributes[name]=gl.getAttribLocation(this.mainProgram,name);
-    for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange','uMagic','uSpellPositionA','uSpellPositionB','uSpellColorA','uSpellColorB'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
+    for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange','uMagic','uSpellPositionA','uSpellPositionB','uSpellColorA','uSpellColorB','uLineOffset'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
     this.skyAttributes={position:gl.getAttribLocation(this.skyProgram,'aPosition')};this.skyUniforms={};
     for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon','uLondon','uMagic'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
     this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
     const world=buildWorld();
     this.obstacles=world.obstacles;
     this.meshes={terrain:upload(gl,world.terrain),road:upload(gl,buildRoad()),water:upload(gl,world.water),props:upload(gl,world.props),magic:world.magic.data.length?upload(gl,world.magic):{count:0},cars:[upload(gl,carMesh('#57dbe6')),upload(gl,carMesh('#ff9870'))],ghost:upload(gl,ghostCarMesh()),ghostGold:upload(gl,ghostCarMesh('#ffd166')),flames:upload(gl,flameMesh(true)),flameIdle:upload(gl,flameMesh(false)),shadow:upload(gl,shadowMesh())};
+    this.meshes.ambientEdges=upload(gl,hologramEdges(world.props.data));
+    this.meshes.ambientEdges.lines=true;
     this.ghostMeshes = [this.meshes.ghost, this.meshes.ghostGold];
     this.trackId=TRACK.id;
     this.worldMatrix=identity();
@@ -1172,7 +1198,7 @@ export class RaceRenderer {
     for(const [name,url] of Object.entries(this.sceneUrls))this._loadTexture(name,url);
     this._buildPosters();
     this._buildMagicActors();
-    gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);gl.clearColor(.5,.68,.76,1);
+    gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);gl.clearColor(.018,.022,.06,1);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   }
   rebuild(engine) {
@@ -1182,6 +1208,9 @@ export class RaceRenderer {
     for(const [key,builder] of Object.entries({terrain:world.terrain,road:buildRoad(),water:world.water,props:world.props,magic:world.magic})) {
       const previous=this.meshes[key];this.meshes[key]=key==='magic'&&!builder.data.length?{count:0}:upload(gl,builder);if(previous?.buffer)gl.deleteBuffer?.(previous.buffer);
     }
+    gl.deleteBuffer?.(this.meshes.ambientEdges?.buffer);
+    this.meshes.ambientEdges=upload(gl,hologramEdges(world.props.data));
+    this.meshes.ambientEdges.lines=true;
     this.obstacles=world.obstacles;this.trackId=TRACK.id;this.ghostPoses=[];this._buildPosters();this._buildMagicActors();
     if(engine){engine.setObstacles(this.obstacles);this.resetCameras(engine);}else this.cameras=[null,null];
     return this;
@@ -1321,7 +1350,8 @@ export class RaceRenderer {
     for(const [name,size,offset]of[['aPosition',3,0],['aNormal',3,12],['aColor',4,24],['aEmission',1,40]]){
       gl.enableVertexAttribArray(a[name]);gl.vertexAttribPointer(a[name],size,gl.FLOAT,false,44,offset);
     }
-    gl.uniformMatrix4fv(this.uniforms.uModel,false,model);gl.drawArrays(gl.TRIANGLES,0,mesh.count);
+    gl.uniform1f(this.uniforms.uLineOffset,mesh.lines ? .002 : 0);
+    gl.uniformMatrix4fv(this.uniforms.uModel,false,model);gl.drawArrays(mesh.lines?gl.LINES:gl.TRIANGLES,0,mesh.count);
   }
   _sky(camera,weights,aspect,magic=0) {
     const gl=this.gl,u=this.skyUniforms;
@@ -1329,8 +1359,9 @@ export class RaceRenderer {
     // City skylines come from modeled landmarks; their sky must contain no buildings.
     // A pending/failed cloud texture keeps ready=0 and uses the plain shader gradient.
     const one=citySky?clouds:this.textures.coast,two=citySky?clouds:this.textures.alpine,three=citySky?clouds:this.textures.city;
-    const night={zenith:[.02,.035,.09],horizon:[.085,.12,.19],fog:[.075,.115,.17]};
-    const color=field=>[0,1,2].map(i=>mix(Object.entries(weights).reduce((sum,[name,w])=>sum+SCENES[name][field][i]*w,0),night[field][i],magic));
+    const night={zenith:[.009,.012,.035],horizon:[.035,.032,.075],fog:[.03,.027,.065]};
+    const projection={zenith:[.018,.022,.06],horizon:[.085,.065,.16],fog:[.058,.052,.115]};
+    const color=field=>projection[field].map((value,i)=>mix(value,night[field][i],magic));
     gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
     for(const loc of Object.values(this.attributes))gl.disableVertexAttribArray(loc);
     gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.enableVertexAttribArray(this.skyAttributes.position);gl.vertexAttribPointer(this.skyAttributes.position,2,gl.FLOAT,false,0,0);
@@ -1377,6 +1408,9 @@ export class RaceRenderer {
       gl.uniformMatrix4fv(this.uniforms.uViewProjection,false,viewProjection);
       gl.uniform3fv(this.uniforms.uEye,camera.eye);
       this._mesh(this.meshes.terrain);this._mesh(this.meshes.water);this._mesh(this.meshes.road);this._mesh(this.meshes.props);
+      // Only ordinary scenery receives projection contours. Depth testing keeps
+      // hidden edges behind buildings, with a tiny clip-space lift to avoid shimmer.
+      gl.depthMask(false);this._mesh(this.meshes.ambientEdges);gl.depthMask(true);
       this._mesh(this.meshes.magic);this._magicActors(camera);
       this._posters(viewProjection,camera);
       gl.enable(gl.BLEND);gl.depthMask(false);

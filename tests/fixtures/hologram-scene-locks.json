@@ -1,0 +1,1351 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Pre-hologram production scene, captured before the October 23 visual-only theme. Geometry, collisions and original vertex paint must remain unchanged. No automatic baseline-update switch.",
+  "sourceSha256": {
+    "renderer.js": "a811944e3d277ec2857829860f590d4769177a7630951a1bc9b26816f670aa9b",
+    "city-scenery.js": "b60d8dc144c62556d36fc3a1fa68444ba1178428a1c8ecf9ff7363d6071bd135"
+  },
+  "tracks": {
+    "coast-london": {
+      "obstacles": {
+        "count": 4712,
+        "sha256": "afcf2cc133e4be066f4ca216586a844d3883bf081d8e1b0771f14a5d30bbd671"
+      },
+      "landmarkVertices": [
+        122256,
+        682083
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 39150,
+          "stride": 11,
+          "positions": "7ffdf1a55520b3b551b1a348c1247c7c3d7f3f9151505125a096a5cd51bd8dac",
+          "normals": "39d2d070b50bc0b0c80d3a7920f877bd4fde1eeee455b2e1be5b5f6fff10b495",
+          "rgba": "9485fdac97a70ecb97ed64e3470858fdbff1e7a1fa8d89150288aaa8797c3480"
+        },
+        "road": {
+          "vertices": 83376,
+          "stride": 11,
+          "positions": "16a2fbba34c46363484ae011642159dad12cbaebacebbdacef8473d6711caced",
+          "normals": "318c09716f6269501d530531f7b3eb12da311cdf8a5fab5fcfc6f0b284823390",
+          "rgba": "22b61fb9c0430eae96d47db18a1a593dd15ba56a730dab5295a7d76dc1389b5e"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "dac9b11d0c7044b073582266a15fd68cb78337a835789e2c333c7e460ae4076b",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "d83171004f1ad05b2b07ccd35beb2029f0303671c0f83d6f2ec923a8041f5a48"
+        },
+        "props": {
+          "vertices": 739359,
+          "stride": 11,
+          "positions": "ae5179d3d71e1ed93600758f4fb01953193cae7d4a1c908077985399562d36e6",
+          "normals": "0fc8899519ab7cf0abcf328cd5bb0659513d0cac9b4ae814e15ec7cc2baf6711",
+          "rgba": "2ed2f19e8bdec22f6ee44664418ce98dbb8daeac4ebfc98f9566e3c2e9bc40a9"
+        },
+        "magic": {
+          "vertices": 6099,
+          "stride": 11,
+          "positions": "ced93276ecdc2fd0e2852df5cc3a294e7a48dc129024b63479342c33d0a1c7c6",
+          "normals": "82e5d6f320c0b23921677ab4351585ab4a66fa24421a1eb3eafc978deb29ade4",
+          "rgba": "b5e10a54f52e93e6924c09858d6efa77c8645d927b82c4eb3049e36fe87343d1",
+          "raw": "17d670b4df5d3c2357720554d591364a5a962f6e2cdfe7183f3bc6d92f6fd749"
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        },
+        "magicActors.harry:body": {
+          "vertices": 951,
+          "stride": 11,
+          "positions": "ab766dfdd5a50c45ed2cc3e5a193bef9fd2b759abfb651607f2a2b73009fd350",
+          "normals": "825863a338bb3cb091bd421d0cc6075f2d76fff3d48a1fade048069119b248ba",
+          "rgba": "c9c8de041925f03063b79fa3e08645c9c5735b23fcfc75846b8a9814a18cb9b4",
+          "raw": "02604ebc7527de8b025f697d10b8b5a1ef68d9d31d4cc6ca2869226592904650"
+        },
+        "magicActors.harry:arm": {
+          "vertices": 108,
+          "stride": 11,
+          "positions": "56daf58c2796bb2d032cfc8e11acfa8a91a77490079ff3a7a7b2d55db61eda29",
+          "normals": "04a0e144a1f3c596e57cf042a34181208deb0365039b6da6737b28dacc360b3a",
+          "rgba": "f6e3fce7a54a77448015796d8504578214d25a718eb28060d38144b1073bc143",
+          "raw": "5599b0ca783f10337dc953913620317bba708d0d53f1fe71b35a848824c54a3a"
+        },
+        "magicActors.voldemort:body": {
+          "vertices": 642,
+          "stride": 11,
+          "positions": "41442cc24c4b97b947efa6513a94adddf717581e8951cf75ecc6f8e864503b6a",
+          "normals": "4fcd49b07bbe0dc29d3cd576b228a48f96558cbb1c83b92f698e209d718a1d67",
+          "rgba": "152021ba2a9fd6507a64c6e71d099813d09fdbb30e30df377dd3a8363d51aba9",
+          "raw": "52884e207ef1c795a4a98efa54576f85ea2e35793ceb2bdfa9d6c86260a12b25"
+        },
+        "magicActors.voldemort:arm": {
+          "vertices": 108,
+          "stride": 11,
+          "positions": "56daf58c2796bb2d032cfc8e11acfa8a91a77490079ff3a7a7b2d55db61eda29",
+          "normals": "04a0e144a1f3c596e57cf042a34181208deb0365039b6da6737b28dacc360b3a",
+          "rgba": "7a07d5117331b07c643a5a484252ff5abc50b2a424d14b6ad8f1db885efe4e4f",
+          "raw": "1687a33ccb0bc2aa46a3e6c121788dff69c790e1810de21a7194d189b79caeea"
+        },
+        "magicActors.hermione:body": {
+          "vertices": 1206,
+          "stride": 11,
+          "positions": "8a6d21757be4b8fbede3ac7ac83da9d054a22ba58a96eb78695775997d063084",
+          "normals": "504d418fc6e73b0926ff68a7caec5b53781ecd78cb7e8ae763938090ba99a32e",
+          "rgba": "a4c6856bd1f2d2ddb00335aa84ebf85bd52f866840a5c5cbe730ad7272a2d9ce",
+          "raw": "ca62554e09f25512e9488d582379117d4de6a7f1d4f06a49e35f953b1105e8c7"
+        },
+        "magicActors.hermione:arm": {
+          "vertices": 108,
+          "stride": 11,
+          "positions": "56daf58c2796bb2d032cfc8e11acfa8a91a77490079ff3a7a7b2d55db61eda29",
+          "normals": "04a0e144a1f3c596e57cf042a34181208deb0365039b6da6737b28dacc360b3a",
+          "rgba": "a65986ddce23c045e2f9ed48301dcba16c74d47f8548854c8f9ee0a695c21067",
+          "raw": "af22699ee80d5287060c70e9bc42c0d0ea84e5e65854b629e20317f2fb1eaec4"
+        },
+        "magicActors.deathEater:body": {
+          "vertices": 654,
+          "stride": 11,
+          "positions": "93bfd74fbee2810d5413eccaa78d056f4f0919ef55038daebbc3856fb4614488",
+          "normals": "732a6a16d5ec46d0b3d05e9af5b28c6d3cb06e948137d65019cd373e61437d28",
+          "rgba": "47bfae5ed1089af6c931b5d1de4daef3ee15ffb44483c656a1361b1fa4f27b99",
+          "raw": "628148ae44209dfd9f03f8720e29644d390b08227495c8cb3d500dab67ac02a7"
+        },
+        "magicActors.deathEater:arm": {
+          "vertices": 108,
+          "stride": 11,
+          "positions": "56daf58c2796bb2d032cfc8e11acfa8a91a77490079ff3a7a7b2d55db61eda29",
+          "normals": "04a0e144a1f3c596e57cf042a34181208deb0365039b6da6737b28dacc360b3a",
+          "rgba": "c01149568fd774d52d3f41ff943c7df3f220cb4599ee1d532a4f1961284f0a40",
+          "raw": "a2afc77dffbaa61220d7df7b0ef7a156febde758a6d5e2203d7b09eca889a964"
+        },
+        "magicActors.car": {
+          "vertices": 1032,
+          "stride": 11,
+          "positions": "20bff476e79fdc4b6dc4dfbb9ea09e3557462328d02bc21d02d41a1d75ee3a83",
+          "normals": "eeba9bfbe05c5bbec7b1a4a5506673fb1a0137cc3b514ee7bc30a365f5c5b680",
+          "rgba": "2648e2c6b07b7679088fa683476962b91759fd1e7f7722ddb27e64b7945b35c8",
+          "raw": "4c56127006002e71e92988a1f35fba31a068145b6a710ae0a033a44dd35818c6"
+        },
+        "magicActors.effects": {
+          "vertices": 4096,
+          "stride": 11,
+          "positions": "2aae7dc846aaf25f1cadf55f1666862046c6db9d65d84bdc07fa039dac405606",
+          "normals": "2aae7dc846aaf25f1cadf55f1666862046c6db9d65d84bdc07fa039dac405606",
+          "rgba": "de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31",
+          "raw": "04db6bc901fd5824d01b77b0923abf5d0a1b25c8bc32dcf1d569f2b5dfe609e3"
+        },
+        "posters[0]": {
+          "vertices": 6,
+          "stride": 5,
+          "raw": "72ceffaecfa89ca2c1ca8f120a6a73cab67d7c275a11255790f3e45b86495485"
+        },
+        "posters[1]": {
+          "vertices": 6,
+          "stride": 5,
+          "raw": "004a940f6c64d9a0ada09fa192e28977337481bab505a0967b8a8df197bafa77"
+        },
+        "posters[2]": {
+          "vertices": 6,
+          "stride": 5,
+          "raw": "0549f6572bc3ec8de59662db4889d75c026e11078a0398342f31da0fefa1fcda"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-beijing": {
+      "obstacles": {
+        "count": 6413,
+        "sha256": "199143273f2613887e2bccdc6e300b7407fc53a4193bb881f09f78a2857d3b31"
+      },
+      "landmarkVertices": [
+        60120,
+        574392
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 57876,
+          "stride": 11,
+          "positions": "e6c1889391dc6f7f146266f4e3c3bb489920d288f5452909ed2ddd900a7debc6",
+          "normals": "0a8dff430f59589f0e1a30d93dc25d735b023679075a6ffd93fc841f195beb92",
+          "rgba": "6721596c80cf21896c9f6847b112aacca486a916d70e618a4ad1aabd83086be2"
+        },
+        "road": {
+          "vertices": 106404,
+          "stride": 11,
+          "positions": "fe588b3dea13c9685cf76aac57656115b1a87625932c4deff99ad054c6321734",
+          "normals": "c6b60c440ccaf0252ef024abc8048786df2bddd671145ffa46a2b8b7b07fb741",
+          "rgba": "b03aba22b70d26601d023d5651b3d408164099fe932c455f8a338696fa645833"
+        },
+        "water": {
+          "vertices": 0,
+          "stride": 11,
+          "positions": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "normals": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "rgba": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "props": {
+          "vertices": 683256,
+          "stride": 11,
+          "positions": "acc6c78fb4077d3da1b93461a3ae724276b5803d40f711abff377123b81555db",
+          "normals": "920ee36b76a5090e15e4fd6b95c0d55a88ca14c33d639c3cb3b9e3e4a2cac11f",
+          "rgba": "50a8d583eec94d30df752d2acc1fee9abd43af12ac9b8803659dbc2c265127de"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-shanghai": {
+      "obstacles": {
+        "count": 4995,
+        "sha256": "a2fe5a55f5b137c16b1c127a00518138d3df47df0429b08f9530f2d1b63d7ac9"
+      },
+      "landmarkVertices": [
+        64218,
+        510078
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 59280,
+          "stride": 11,
+          "positions": "5a4f1c1bb9cc2456d45639078798cc298a616c5e0237dfb635ff631d61bfda56",
+          "normals": "667167447fa726bc4f4d5c3537cafe86ed8d7e933b6158975be0ba4cb46a6b13",
+          "rgba": "dbe8d2e049989260cbf1c0b493f714538156c1b71161efb9979e0ed43fb9c663"
+        },
+        "road": {
+          "vertices": 129708,
+          "stride": 11,
+          "positions": "e461eace53d4bd55ee2a31591ca8ac34ff3679dc99e52f28245e8522166b7566",
+          "normals": "a07d8591d4c5ac7b6d52fa7b01d3fdaebe1b6d867580a26240df72d474497758",
+          "rgba": "869f02c322aad8db687d024bb5bb20d55981b4fb3e49058b185d74c9611f03b9"
+        },
+        "water": {
+          "vertices": 876,
+          "stride": 11,
+          "positions": "460d03c8790a0ea249f7f5b5d54c801c308be8120e8811d160847ed4de3d3e53",
+          "normals": "6b90320f1df2b430cdb3467efd3438a7aba6b6208a5e0a4093c67867646101ac",
+          "rgba": "cf99b07fe9e3e970a8310de6de038e16cae854fb8ca1ed09f11ab7f17d413c2c"
+        },
+        "props": {
+          "vertices": 624018,
+          "stride": 11,
+          "positions": "3c8063d214ff4065afaaf8cc583d17ece56dccdc07cd0605aba19b87f42d7aab",
+          "normals": "75a507c5628c511b8c9a82e3b97d485a79f3541ccd62ffb07b0774f9c5481818",
+          "rgba": "1b30256e13bd824dacc0e1e188366b8b76c491d542b109dd996bdbbb8b66474b"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-rio": {
+      "obstacles": {
+        "count": 5678,
+        "sha256": "6a573021acb371baa5eb15c83c3263b8e1e5072c8b080df26c3e6a5963d79a97"
+      },
+      "landmarkVertices": [
+        112716,
+        285633
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 79242,
+          "stride": 11,
+          "positions": "376d44d1689fe28bbaf59c05a60396c0515fa91b20b053f80e15734aec709ecf",
+          "normals": "5258a3d5fc4f7da4e2b2150e64fdcdcef1bd612ae8fbfd5e15d516c6d9faeb8e",
+          "rgba": "b65362c38d7322a8e18b3177951885608dd64722c95d1133e45bbb844b36ea08"
+        },
+        "road": {
+          "vertices": 87252,
+          "stride": 11,
+          "positions": "243e0ccc9756b847c7002b3edc4fd0f1b039510cc0c58427af1a0afae3482b1e",
+          "normals": "f2420ebc3287d30faaa1d0b8614edf09b7486ddef9a424e1905249660040ed55",
+          "rgba": "9dbac6e2a5aa68fa4735ce9478b3bf01a3dc28afc74fbcd507ad39e3bb481545"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "1790e8579a88a918c92aad626e0fb226d5d1da7e8d472382a65a394d8bc1bfb9",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "f049e29e4ccd342f5bdf64411f1b26a9ef3e36fc6acbd22f8581771e662fbcfb"
+        },
+        "props": {
+          "vertices": 354357,
+          "stride": 11,
+          "positions": "9972c8b41204b87808e5db1ca799b3bd8f2baf6cb3bcc004ec8ab1fd21fab90c",
+          "normals": "5e6e658af7c2bc8144b9112d02906c575e02f3d7a7a834a90a7b2fcd2a9f749d",
+          "rgba": "261c0e1e39ca1b3e2a51e2c4368f404eccfb7f3f2c7bb8ebd155385e75a68fd2"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-austin": {
+      "obstacles": {
+        "count": 7263,
+        "sha256": "14789d9517360cee874768dde9f88a02836624ebfd3ae9121923ad482acb0c84"
+      },
+      "landmarkVertices": [
+        161460,
+        504534
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 58608,
+          "stride": 11,
+          "positions": "b62eaf82c0ac79c606bd58bc611b578abbd4dcbf35f12756e17602a34de597c3",
+          "normals": "2fd8338ffc7eeaad6c432757082e2fce7f7d1274d9c12cac15192eead5a5a5cd",
+          "rgba": "6baaf5a5d8e9df953b3d018621bc9f34f4be7fb8c2eebea1aac83ef4705097d2"
+        },
+        "road": {
+          "vertices": 84018,
+          "stride": 11,
+          "positions": "59d21557c46390bb0f0092e2801980210ade4c5f1c6dff2fae08ecd4a9537374",
+          "normals": "3c9745d9e2e71d369175cd42b0bb3a4f0d7cb8ffb9401722a626bfd33d8549ea",
+          "rgba": "dcea2a9eda1e62cf06ca9ea3a7c401fefaf02a18d4b12a2af21b50f6a824a5e0"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "47c12e0e8a028931b10d29d3dd8f138882858dd7942671926637c1328a8a66fe",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "f049e29e4ccd342f5bdf64411f1b26a9ef3e36fc6acbd22f8581771e662fbcfb"
+        },
+        "props": {
+          "vertices": 560766,
+          "stride": 11,
+          "positions": "08d7f4142d762b949f42dcaf158e5319ac1d6547b44ac093f64f0b8bf3ec43e4",
+          "normals": "ad3dfc77f49c8636798a32bbb046c9e640e0ffdf3807f9e31436d634f05ba652",
+          "rgba": "a336afa433c52be784a9f7b24ff85b9de010e5f46df4170cc774a88f0033cbaa"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        },
+        "posters[0]": {
+          "vertices": 6,
+          "stride": 5,
+          "raw": "1f3becab3d7247ab9a421832f314c1d002fa8f2c38ded6dfff9e374cfef0bb53"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-paris": {
+      "obstacles": {
+        "count": 8181,
+        "sha256": "a33fd2506980fa4d8207c2aeb799bfd26feaf2b48db155b463061869ad660df5"
+      },
+      "landmarkVertices": [
+        190206,
+        400893
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 57420,
+          "stride": 11,
+          "positions": "ae84d3d91e57cdd8498ce66092c294feef88cd8fc62612b7520e0f8031eb97be",
+          "normals": "cf2ecb42fe9852a0c4e360b23034cd91946f206b207f9c2a382b46e40b409ffe",
+          "rgba": "c9bb7ca766ebc99b2e6d97c8f4be2e8488dde5670fb03a0a254302c400023405"
+        },
+        "road": {
+          "vertices": 82554,
+          "stride": 11,
+          "positions": "20824333fa8893d502062857c0f7c6c61cf6e290f72637a9746a7b86521e2807",
+          "normals": "367ee985724976db482f64bfc06ac0529b84751dabf4da14b584f2223ef00e2e",
+          "rgba": "59ab74928e9403d4b478b552f4e3bd0e401f47c6b0982016436eb9eedb1991ed"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "a49c2ed509f76caf75fa06c1cd1f496d791ae7cd7f3cbc12c6d31675acfc63f0",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "d83171004f1ad05b2b07ccd35beb2029f0303671c0f83d6f2ec923a8041f5a48"
+        },
+        "props": {
+          "vertices": 455109,
+          "stride": 11,
+          "positions": "0afc63905cbe90b88a2bee58302afc34b43714e0d8d72cc9013fabe1642b78a8",
+          "normals": "32d7ca7f3cea285a564691acdb550b252b3913f76b01b3e135125b558ee41e8a",
+          "rgba": "7a0d5ec6b16517a6761df89708e9fa698bd076992598c4353f155b9c507ea3ab"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast": {
+      "obstacles": {
+        "count": 2093,
+        "sha256": "b0bbf656d9ec1187b5b24a8d556c22a5793b94525ff6dde61ed915f7ffaac24d"
+      },
+      "landmarkVertices": [
+        143907,
+        143907
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 21528,
+          "stride": 11,
+          "positions": "2f9987ac7a0d028e2bd80828b0bcc761f8b30aaa39afc87a8154424c6524e2b0",
+          "normals": "b2977d527ff137a449a197815f5649d7830e5e3c950b5a4faf57ec396809fdf4",
+          "rgba": "0a22e02c5857feb30c5bcbbd62ce4f233f5c0e4fbcd9614bb37101b58f1e4531"
+        },
+        "road": {
+          "vertices": 72012,
+          "stride": 11,
+          "positions": "6211d95867061344030f133221ffda9ca2de9f7482b2f42d0c34efa24a420e58",
+          "normals": "eb5b2ec81afb299257aaec156b1b431f5e8867c20d58250c27869dcaba640eb4",
+          "rgba": "b2aa63afd141ac711fd32246b1362607ba09338dd7230f347b7a6ebaaef676fe"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "86bc326d30f7d5564992d6456eeb7680b46c47d0d49f049d47afd7195739e241",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "f049e29e4ccd342f5bdf64411f1b26a9ef3e36fc6acbd22f8581771e662fbcfb"
+        },
+        "props": {
+          "vertices": 184227,
+          "stride": 11,
+          "positions": "35cfe51da920dc090cc381dd8b11c60deee62535b4bc3bd5dd04a4f49afc6698",
+          "normals": "a73196422c7910b679bc86669e224dcd8cb2329b285421cdddeedfd0223e37f3",
+          "rgba": "e9c1d70426e70ce824f2d0ff11ca0e279fd223ad7edc615c22a025995d6bc941"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-bay": {
+      "obstacles": {
+        "count": 2176,
+        "sha256": "407b5d530591a1630b5e29b0bc719e8c8ff09d678ff930b2d91421f6590c259f"
+      },
+      "landmarkVertices": [
+        51810,
+        54444
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 25308,
+          "stride": 11,
+          "positions": "31c9761e8081278e39ec6cae81e1e6630819de62579a22bffa804f44c18a207d",
+          "normals": "586482d86555384e186e2c5427e55235806f14b993b750c2328f830c1bb530c2",
+          "rgba": "ac97cfc9e97e82d84c48cb99999b390cbd545750c76148c8fcc1729c3df7fc0d"
+        },
+        "road": {
+          "vertices": 77460,
+          "stride": 11,
+          "positions": "cb065e6a3f7fea28d9bad9d5c2382fe00498e509a533791358f117915beae148",
+          "normals": "3ab138c8bc2a1f9b5469c311005c31f4cf782484ac9d217be61988ddcf9a6848",
+          "rgba": "e18fef7dc2cdc3b48d5e65df22e13d2816e8660609f1581c064b264bff1d41f6"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "59eba725a05bc321051a9465d19a770a8fe549f9960be6c4596f65605b694743",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "f049e29e4ccd342f5bdf64411f1b26a9ef3e36fc6acbd22f8581771e662fbcfb"
+        },
+        "props": {
+          "vertices": 103296,
+          "stride": 11,
+          "positions": "850f940a1900073007d01ded635ef77f8d5f32435e77b2ff863a3126725adce9",
+          "normals": "383b3ce171c49d1ff5a546333ac5d9defd03249e3e4e1f486198727956e93f7e",
+          "rgba": "d87a540dd24c47525823bb244b1a097655939f368227c7a3c7e9aa290bc57d65"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-pines": {
+      "obstacles": {
+        "count": 5976,
+        "sha256": "65dffd46bb92083bc52f8e98c0e68f50673467a8cc5d88efce8b9591f572ad8d"
+      },
+      "landmarkVertices": [
+        98667,
+        99351
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 24528,
+          "stride": 11,
+          "positions": "a1b151578705f8f43580e2a5b0f0f8b1f8f4483b3285465fe189e598b5f74ae1",
+          "normals": "2809cb8ddaca7c7d1ad1a85164e3e2e4ecf813878a22753fa6cf4503e833d7c6",
+          "rgba": "8b651f066dbff39c2bfe17bfc06b55c13901b2c8167cab26cf74949970ed44b3"
+        },
+        "road": {
+          "vertices": 89592,
+          "stride": 11,
+          "positions": "21d2a81a851ed4e009b2b526c2e2eb8c9020df24a2c47365f7b5c8d86de246ba",
+          "normals": "0eeaa73321b24193e8ebb6d965d1462628af54970c532ddad8a0de9b84923587",
+          "rgba": "ebac4b577cde200ead7bea3fd5cdc707254147a96c4701678415a27c3617579b"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "12ac054b4ede3d037b0838ad349516bb95dc0d14b64f0b2998f06f23425fc0a0",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "f049e29e4ccd342f5bdf64411f1b26a9ef3e36fc6acbd22f8581771e662fbcfb"
+        },
+        "props": {
+          "vertices": 172323,
+          "stride": 11,
+          "positions": "23344137de2715a077fe506e137b67f78616f9ec07bc816b660e2c9c01785284",
+          "normals": "5dd804306c8e7a92f2e0e6b8b1f2b873a73fc2ec78d4ab891c4680b3e3bfb7ab",
+          "rgba": "4cc67ba7c5593ca20dc12bbd66382ddc2b83c1789ebc40a74c6328959a431bcf"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-neon": {
+      "obstacles": {
+        "count": 3345,
+        "sha256": "a55f5169261e303a6551ea1857e8b3606daca9470b083f329454bf591f539b27"
+      },
+      "landmarkVertices": [
+        293994,
+        296382
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 21528,
+          "stride": 11,
+          "positions": "2f9987ac7a0d028e2bd80828b0bcc761f8b30aaa39afc87a8154424c6524e2b0",
+          "normals": "b2977d527ff137a449a197815f5649d7830e5e3c950b5a4faf57ec396809fdf4",
+          "rgba": "d918d17afe2e5539772c3294817772ec1224bcbbe04c85f25fa9b75005bbc5ff"
+        },
+        "road": {
+          "vertices": 76518,
+          "stride": 11,
+          "positions": "abe7e98a4be0f813e931be80d8ec56a047c71867236ba07960e0315918b571ca",
+          "normals": "6e4ebe5113a9076e8f5f7364173950635cf7864aef7db7ffe564c4a8a3f793a3",
+          "rgba": "427a6cf6f24d372c2a53b0b87297a6adf7c6ca1638cd4cb95786e373cbefcaba"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "4a9f1eea3dee629599bc2d52e4c8dbef3136958a36d3303ea1ddbbb6649bf48b",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "f049e29e4ccd342f5bdf64411f1b26a9ef3e36fc6acbd22f8581771e662fbcfb"
+        },
+        "props": {
+          "vertices": 338970,
+          "stride": 11,
+          "positions": "2eedb146b94c020aa3c9be1e1c0f1de643ba0db08f82667d3738901fff100693",
+          "normals": "6faded6a10ca554a978545cca56249cb469921c3849730c33987c86b38d909b3",
+          "rgba": "771282b48b8dc7d61b84a22ca563254c736edbcfcaaac3ab931d1e7ff09a0c93"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-marina": {
+      "obstacles": {
+        "count": 2300,
+        "sha256": "727241705ba3d603102f17eb987d684a6189d7f32dbd0c095421c913098fc8d8"
+      },
+      "landmarkVertices": [
+        52266,
+        54900
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 24528,
+          "stride": 11,
+          "positions": "a1b151578705f8f43580e2a5b0f0f8b1f8f4483b3285465fe189e598b5f74ae1",
+          "normals": "2809cb8ddaca7c7d1ad1a85164e3e2e4ecf813878a22753fa6cf4503e833d7c6",
+          "rgba": "b2e9126a005d98c10242619d9aca189f313ed89541a7341fb0abfa7e642842e5"
+        },
+        "road": {
+          "vertices": 80034,
+          "stride": 11,
+          "positions": "bea9dabda3d3546de0feb9b246fbc5ab2b0695fee6e8c1f7c6d5ddc98f807e28",
+          "normals": "85bd7c1a7e939a5964c426c0f79a80c7bd5f0450a5e58d7ffcc9d454e2053472",
+          "rgba": "e6eeeca4986aabe628581606754a2ccc27f8c6c41abe03e9eeb1e9b6903adba3"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "cf7b87bee3a4008990c69747b93513ae1bed16c417610287e6e8a5f748ed3886",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "f049e29e4ccd342f5bdf64411f1b26a9ef3e36fc6acbd22f8581771e662fbcfb"
+        },
+        "props": {
+          "vertices": 107856,
+          "stride": 11,
+          "positions": "e8edbdc7887fa0d1bfbc402243d1cf55ad930b344ca90ad80f196e9429360468",
+          "normals": "11e97fa362989ace592b2c87d66db7171fb296c69c17fc79476dac3f87d758b5",
+          "rgba": "54086fe043a7b8fb35556b103271585d6a016d7440dd2afb28b60cadb1814305"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    },
+    "coast-ridge": {
+      "obstacles": {
+        "count": 6874,
+        "sha256": "b945fde4475c18e42189d681bec9fa8c03702aac11eb71b20c9213f7f283497c"
+      },
+      "landmarkVertices": [
+        92016,
+        97776
+      ],
+      "meshes": {
+        "terrain": {
+          "vertices": 14580,
+          "stride": 11,
+          "positions": "6b2f9abbef154b1cf39557252d97c7c29f33852ecb7a70859db67ce3a050ceb3",
+          "normals": "36b8c37b9f57ed197e9e28b5daee5acac42c6570980fb3e2ef11d058245a669d",
+          "rgba": "c70cb9ee048cf636762b544e09c91bb465599d8b077f4d939a86cad979a80470"
+        },
+        "road": {
+          "vertices": 112056,
+          "stride": 11,
+          "positions": "14b0df0d49c17c205866899901aee7a363de458223842df3a86866daafbe0a7b",
+          "normals": "2e4a41946fbc8e1470ae7919523e2f3dfd59eaec80a08ee0e01f9c23d9095fb7",
+          "rgba": "6a171813c0feb7f24024be48746984d0ece681c79d73b7d97c0d0a4caa1af14f"
+        },
+        "water": {
+          "vertices": 516,
+          "stride": 11,
+          "positions": "67192cf39b60542dff36fd01b64719a6bd4d19d7ab49e9c8f520d317188b1a4f",
+          "normals": "dc1306978d7d83480b422c5ebdb6a7fda5f912bac22586b4e85a9573e1182b88",
+          "rgba": "f049e29e4ccd342f5bdf64411f1b26a9ef3e36fc6acbd22f8581771e662fbcfb"
+        },
+        "props": {
+          "vertices": 214308,
+          "stride": 11,
+          "positions": "60f1c5aa443fbf131afebf98ad21e1b63806db0008f226cfd60ca3d0ce76ccce",
+          "normals": "3dd21f9e5fc2ce0970f9424119ddcd5061e716f685a4723f85746e87e5ae4974",
+          "rgba": "9e6141b4cfad5193b6cb79667ec7d0ec940c08c1554d656f2f3f488f782af6d5"
+        },
+        "magic": {
+          "vertices": 0
+        },
+        "cars[0]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "9d76362f8971efde7d483b4f4956843aa4e0fa928f1cb03b3fe3689dd6bbe7e2"
+        },
+        "cars[1]": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "543cc0f0568daae2b56d426462b57b04cba4e4b047c8f45cbc1a75988e0a5d41"
+        },
+        "ghost": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "2844e27cecf1f0c614e70e7851fdf63986d4bf99bd283a90b74f939104ddb490",
+          "raw": "847aae896eda22291d654c556cd4382e4d607f3a1bc483f8f7f9ac4820a29b87"
+        },
+        "ghostGold": {
+          "vertices": 1362,
+          "stride": 11,
+          "positions": "d553d8e158f87ca9f7a755c11116c025feda196bd21d1cc62fe3d6aae897735c",
+          "normals": "70180afa195edb89fc3c845c57b9127bd3f0d2f91b9886d6c5654a2027feb9d2",
+          "rgba": "f86d0245f2c25f17a71e5e27dbe37b235100e5e18b03de240498a563023c9a57",
+          "raw": "adcab0fa547d30a060ca1749d2b0a334280a02f356ae39f8ef32b0e72d59e0c9"
+        },
+        "flames": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "4f6cff5717ab8a7e8eafa913a2f8ed2ac69d9f9da10cd12c560a1a9024d9ee8b",
+          "normals": "9b8ad4c8d1898ecdf0d0106433d8a11144005ad63078a4cd59eaf42a0438337c",
+          "rgba": "df33e11fc910fed4e46eb8cb8ba081a0b4ddef9ab7b5ed08020b5570a5798405",
+          "raw": "d1c5af3de326a021661e44ebe429454a66b4887d09a95c580399e6c07bf939a6"
+        },
+        "flameIdle": {
+          "vertices": 840,
+          "stride": 11,
+          "positions": "c2d022b78c9e08e008f69067cc40cfcadd462fde03fd210f767223591de07a29",
+          "normals": "d389975f87cce9b0d25b665b760462791657707eccc0946ee8267e5831b091b4",
+          "rgba": "8902818df620d64cf7814762b1e91d6fea9f54ed7ce405cc7c7f948dbcde7e8a",
+          "raw": "b3ac6db96886644b5b1d5433052ce8908c90aa15d12e05b28201df63ba376d7b"
+        },
+        "shadow": {
+          "vertices": 60,
+          "stride": 11,
+          "positions": "e07ebcd7f0181a790a7af6f319808b40ae714e100d510fb68f5ae0a6c7b6f5fe",
+          "normals": "cee24537f84f770a7c38a6f9c32e1213624efead454122b8109fc3b2ac155290",
+          "rgba": "c493769cf266b5e4ba6ab24a6569c2f917499556cfdaa5852dbc3be11de9903c",
+          "raw": "b7b972041479d35e4411ac46952bb621473a857d6aac582acb83628304c40314"
+        }
+      },
+      "otherUploads": [
+        {
+          "floats": 12,
+          "raw": "97227b2196cd31b4c95f65380706d5784465c56d9a6882b7a61428e35db9617c"
+        }
+      ]
+    }
+  }
+}

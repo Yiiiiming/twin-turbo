@@ -206,6 +206,10 @@ function watchtower(mesh,item){
 export function addBeijingGreatWall(mesh){
   if(TRACK.theme!=='beijing')return;
   const {segments,towers}=beijingWallLayout(),cuts=beijingWallPassageCuts(),count=segments.length;
+  // The surrounding hillside belongs to the projection environment; the
+  // historic masonry and watchtowers below retain their original material.
+  const material=mesh.surfaceMode;
+  if(Number.isInteger(material))mesh.surfaceMode=3;
   for(const segment of segments){
     if(cuts.ridge.has(segment.index))continue;
     ridge(mesh,segment);
@@ -215,6 +219,7 @@ export function addBeijingGreatWall(mesh){
       for(let i=0;i<profile.length-1;i++){const a=p(profile[i]),b=p(profile[i+1]);mesh.quad(a,b,[b[0],0,b[2]],[a[0],0,a[2]],i%2?'#657051':'#59644b');}
     }
   }
+  mesh.surfaceMode=material;
   for(const segment of segments){
     if(cuts.wall.has(segment.index))continue;
     curtainWall(mesh,{...segment,cutBefore:cuts.wall.has((segment.index+count-1)%count),cutAfter:cuts.wall.has((segment.index+1)%count)});
