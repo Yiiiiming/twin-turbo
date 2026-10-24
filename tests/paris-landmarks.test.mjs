@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PARIS_LANDMARKS,addParisLandmark } from '../paris-landmarks.js';
-import { PARIS_MONUMENTS,parisKit } from '../paris-monuments.js';
-import { PARIS_PALACES } from '../paris-palaces.js';
-import { ObstacleWorld } from '../collisions.js';
+import { PARIS_LANDMARKS,addParisLandmark } from '../src/paris-landmarks.js';
+import { PARIS_MONUMENTS,parisKit } from '../src/paris-monuments.js';
+import { PARIS_PALACES } from '../src/paris-palaces.js';
+import { ObstacleWorld } from '../src/collisions.js';
 import { ParisMesh } from './helpers/paris-mesh.mjs';
 const make=(meta,angle=0)=>{const item={...meta,x:321,z:-789,angle,elevation:11},mesh=new ParisMesh(item);assert.equal(addParisLandmark(mesh,item),true);return mesh;};
 test('thirty distinct Paris additions keep complete immutable identities separate from the accepted three',()=>{

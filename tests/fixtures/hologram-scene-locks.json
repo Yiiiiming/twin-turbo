@@ -521,7 +521,7 @@
     "coast-austin": {
       "obstacles": {
         "count": 7263,
-        "sha256": "14789d9517360cee874768dde9f88a02836624ebfd3ae9121923ad482acb0c84"
+        "sha256": "c62af491c0e1f18018c8a90bb709edced4f973e9d19f21a90f71d3cfbbfdf41b"
       },
       "landmarkVertices": [
         161460,
@@ -552,8 +552,8 @@
         "props": {
           "vertices": 560766,
           "stride": 11,
-          "positions": "08d7f4142d762b949f42dcaf158e5319ac1d6547b44ac093f64f0b8bf3ec43e4",
-          "normals": "ad3dfc77f49c8636798a32bbb046c9e640e0ffdf3807f9e31436d634f05ba652",
+          "positions": "f345b7de533c321e1c5dc6a876759a1c606494470286caf83ac0da73c1ce1523",
+          "normals": "2d86a888ab0f8598a1e56f7be9ec6047b504886d455037cf2d228ebf1a1baeaf",
           "rgba": "a336afa433c52be784a9f7b24ff85b9de010e5f46df4170cc774a88f0033cbaa"
         },
         "magic": {
@@ -1347,5 +1347,13 @@
         }
       ]
     }
-  }
+  },
+  "authorizedChanges": [
+    {
+      "date": "2026-10-24",
+      "track": "coast-austin",
+      "request": "austin的有一个checkpoint的右边的排名挡住ou still sucks了 把哪个checkpoint挪走",
+      "change": "Move the first decorative split timing gate from 25% to physical progress gate 30/68, after the stadium scoreboard. Only Austin props positions/normals and obstacles hashes change. The road and all 68 physical racing checkpoints remain unchanged."
+    }
+  ]
 }

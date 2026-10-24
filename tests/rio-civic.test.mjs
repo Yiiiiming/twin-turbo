@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {RIO_CIVIC_LANDMARKS,addRioCivic} from '../rio-civic.js';
-import {ObstacleWorld} from '../collisions.js';
+import {RIO_CIVIC_LANDMARKS,addRioCivic} from '../src/rio-civic.js';
+import {ObstacleWorld} from '../src/collisions.js';
 
 // Independent model collector follows production box/cone vertex semantics.
 class ModelMesh {

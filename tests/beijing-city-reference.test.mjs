@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {TRACK,setTrack,projectTrack} from '../engine.js';
-import {beijingReferenceTrack,beijingReferencePoint} from '../beijing-reference.js';
-import {beijingStadiumClearance} from '../beijing-stadium.js';
-import {beijingWallClearance} from '../beijing-great-wall.js';
-import {cityLandmarkPlacements} from '../city-scenery.js';
+import {TRACK,setTrack,projectTrack} from '../src/engine.js';
+import {beijingReferenceTrack,beijingReferencePoint} from '../src/beijing-reference.js';
+import {beijingStadiumClearance} from '../src/beijing-stadium.js';
+import {beijingWallClearance} from '../src/beijing-great-wall.js';
+import {cityLandmarkPlacements} from '../src/city-scenery.js';
 import {routeDigest,routeDefinition,routeDrivingSamples} from './helpers/route-snapshot.mjs';
 const before=JSON.parse(readFileSync(new URL('./fixtures/beijing-pre-stadium-plots.json',import.meta.url),'utf8'));
 test.afterEach(()=>setTrack('coast'));

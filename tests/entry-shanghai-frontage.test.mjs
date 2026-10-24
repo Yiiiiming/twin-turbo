@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TRACK,setTrack,RaceEngine} from '../engine.js';
-import {RaceRenderer,harborLandmarkPlacements,roadsideLamps,updateChaseCamera} from '../renderer.js';
-import {createEntryCameraPlan,entryCameraForProgress,entrySegmentBlocked} from '../entry-cameras.js';
+import {TRACK,setTrack,RaceEngine} from '../src/engine.js';
+import {RaceRenderer,harborLandmarkPlacements,roadsideLamps,updateChaseCamera} from '../src/renderer.js';
+import {createEntryCameraPlan,entryCameraForProgress,entrySegmentBlocked} from '../src/entry-cameras.js';
 import {parisFakeGL,ParisMesh} from './helpers/paris-mesh.mjs';
-import {addCityLandmark} from '../city-scenery.js';
+import {addCityLandmark} from '../src/city-scenery.js';
 
 test.afterEach(()=>setTrack('coast'));
 // Independent ray casts of the uploaded production triangles include street

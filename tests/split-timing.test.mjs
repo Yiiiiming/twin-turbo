@@ -1,23 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, TRACK, trackPoint, mod, setTrack } from '../engine.js';
-import { RaceAI } from '../ai.js';
-import { sceneObstacles } from '../renderer.js';
-import { GhostRecorder } from '../ghost-replay.js';
-import { SplitTiming, SPLIT_FRACTIONS, ghostSplitTimes } from '../split-timing.js';
+import { RaceEngine, TRACK, trackPoint, mod, setTrack } from '../src/engine.js';
+import { RaceAI } from '../src/ai.js';
+import { sceneObstacles, timingGateGeometry, updateChaseCamera } from '../src/renderer.js';
+import { GhostRecorder } from '../src/ghost-replay.js';
+import { SplitTiming, SPLIT_FRACTIONS, splitFractionsForTrack, ghostSplitTimes } from '../src/split-timing.js';
+import { cityLandmarkPlacements } from '../src/city-scenery.js';
+import { austinScoreboardSurface } from '../src/austin-football.js';
 
 const signed = (from,to) => mod(to-from+TRACK.length/2,TRACK.length)-TRACK.length/2;
-function realRun(hz=60,{laps=3,secondDelay=0}={}) {
+function realRun(hz=60,{laps=3,secondDelay=0,gateNumbers=[8,16,24,32]}={}) {
   const engine=new RaceEngine({laps,obstacles:sceneObstacles()}).start();
   const drivers=[new RaceAI({carId:1}),new RaceAI({carId:2})],timing=new SplitTiming(),recorder=new GhostRecorder();
   const events=[],actual=[],originalAdvance=engine._advance.bind(engine);
   engine._advance=(car,dt)=>{
-    const oldS=car._lastTrackS,oldEarned=car._started?car.lap*32+car._nextCheckpoint-1:-1;
+    const oldS=car._lastTrackS,oldEarned=car._started?car.lap*TRACK.checkpoints+car._nextCheckpoint-1:-1;
     originalAdvance(car,dt);
-    const earned=car._started?car.lap*32+car._nextCheckpoint-1:-1;
-    if(earned>0&&earned>oldEarned&&earned%8===0) {
-      const index=((earned/8-1)%4)+1,lap=Math.floor((earned/8-1)/4)+1;
-      const delta=signed(oldS,car._lastTrackS),distance=mod(TRACK.startDistance+index*TRACK.length/4-oldS,TRACK.length);
+    const earned=car._started?car.lap*TRACK.checkpoints+car._nextCheckpoint-1:-1;
+    const physicalGate=earned%TRACK.checkpoints||TRACK.checkpoints;
+    if(earned>0&&earned>oldEarned&&gateNumbers.includes(physicalGate)) {
+      const index=gateNumbers.indexOf(physicalGate)+1,lap=Math.floor((earned-1)/TRACK.checkpoints)+1;
+      const delta=signed(oldS,car._lastTrackS),distance=mod(TRACK.startDistance+physicalGate*TRACK.length/TRACK.checkpoints-oldS,TRACK.length);
       const time=index===4?car._lapStartTime:engine.time-dt+dt*Math.max(0,Math.min(1,distance/delta));
       actual.push({playerId:car.id,lap,index,timeMs:Math.round(time*1000)});
     }
@@ -181,6 +184,66 @@ test('three-lap ghost projection retains the correct elevation throughout the ri
     for(let lap=0;lap<3;lap++)for(let quarter=0;quarter<4;quarter++) {
       const expected=2000+lap*50000+(quarter+1)*12500;
       assert.ok(Math.abs(times[lap*4+quarter]-expected)<=2,`ridge lap ${lap+1} cp ${quarter+1} stayed on its road level`);
+    }
+  } finally {setTrack('coast');}
+});
+
+test('Austin moves only its first split to earned gate 30, sharing the passage with both drivers, ghosts and the timing sign',()=>{
+  try {
+    setTrack('coast-austin');
+    assert.equal(TRACK.checkpoints,68,'physical progress gates remain unchanged');
+    assert.deepEqual(splitFractionsForTrack(),[30/68,.5,.75,1]);
+    assert.deepEqual(timingGateGeometry().map(gate=>Math.round(gate.fraction*68)),[30,34,51,68]);
+    const {events,actual,recorder}=realRun(60,{laps:1,gateNumbers:[30,34,51,68]});
+    assert.equal(events.length,8);assert.equal(actual.length,8);
+    for(const id of [1,2]){
+      const replay=recorder.bestReplay(id),ghosts=ghostSplitTimes(replay);
+      assert.ok(ghosts.every(Number.isFinite));
+      for(const event of events.filter(event=>event.playerId===id)){
+        const physical=actual.find(item=>item.playerId===id&&item.index===event.index);
+        assert.ok(Math.abs(event.timeMs-physical.timeMs)<=2,'live split must use the actual earned physics gate');
+        assert.ok(Math.abs(event.lapTimeMs-ghosts[event.index-1])<=4,'replayed rivals are measured at exactly the same relocated split');
+      }
+    }
+    assert.deepEqual(splitFractionsForTrack({id:'coast-london'}),SPLIT_FRACTIONS,'other maps retain their quarter passages');
+  } finally {setTrack('coast');}
+});
+
+test('Austin has no ranking popup at the old first split and still requires earned progress at the moved point',()=>{
+  try {
+    setTrack('coast-austin');const timing=new SplitTiming();
+    const old=TRACK.startDistance+TRACK.length/4,moved=TRACK.startDistance+TRACK.length*30/68;
+    timing.sample(engineAt(10,snapshot(10,{s:old-2,next:17})));
+    assert.deepEqual(timing.sample(engineAt(10.02,snapshot(10.02,{s:old+2,next:18}))),[]);
+    assert.equal(timing.latest(1),null,'the scoreboard approach is clear of an earlier persistent split panel');
+    timing.sample(engineAt(30,snapshot(30,{s:moved-2,next:30})));
+    assert.deepEqual(timing.sample(engineAt(30.02,snapshot(30.02,{s:moved+2,next:30}))),[],'a shortcut without gate 30 cannot earn the moved split');
+    timing.sample(engineAt(30.04,snapshot(30.04,{s:moved-2,next:30})));
+    const events=timing.sample(engineAt(30.06,snapshot(30.06,{s:moved+2,next:31})));
+    assert.equal(events.length,1);assert.equal(events[0].index,1);assert.equal(events[0].timeMs,30050);
+    timing.sample(engineAt(30.08,snapshot(30.08,{s:moved-2,next:31})));
+    assert.deepEqual(timing.sample(engineAt(30.10,snapshot(30.10,{s:moved+2,next:31}))),[],'recrossing never duplicates a split');
+  } finally {setTrack('coast');}
+});
+
+test('the moved Austin split appears only after the complete football scoreboard is outside the chase-camera view',()=>{
+  try {
+    setTrack('coast-austin');const plot=cityLandmarkPlacements().find(item=>item.kind==='football-team');
+    const vertices=austinScoreboardSurface(plot).vertices,s=timingGateGeometry()[0].s;
+    const unit=v=>{const length=Math.hypot(...v);return v.map(x=>x/length);};
+    const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+    const dot=(a,b)=>a.reduce((sum,value,index)=>sum+value*b[index],0);
+    for(const speed of [100,363,517])for(const lane of [-35,0,35])for(const aspect of [8/9,16/9,21/9]){
+      let camera;
+      for(let station=s-1200;station<s;station+=speed/60)camera=updateChaseCamera({...trackPoint(station,lane),speed,boosting:speed===517},camera);
+      camera=updateChaseCamera({...trackPoint(s,lane),speed,boosting:speed===517},camera);
+      const forward=unit(camera.target.map((value,index)=>value-camera.eye[index])),right=unit(cross(forward,[0,1,0]));
+      for(let i=0;i<vertices.length;i+=5){
+        const delta=[0,1,2].map(axis=>vertices[i+axis]-camera.eye[axis]),depth=dot(delta,forward);
+        if(depth<=0)continue;
+        const screenX=dot(delta,right)/(depth*Math.tan(camera.fov/2)*aspect);
+        assert.ok(screenX>1.05,`scoreboard is still on screen at ${speed} speed, ${lane} lane, ${aspect} aspect: ${screenX}`);
+      }
     }
   } finally {setTrack('coast');}
 });

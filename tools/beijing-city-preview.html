@@ -2,10 +2,10 @@
 <style>body{margin:0;background:#172d31;color:#eceddf;font:14px system-ui}header{padding:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}select,button,input{font:inherit;padding:8px;background:#29454a;color:#e9e9d9;border:1px solid #6d8582;border-radius:6px}canvas{display:block;width:100%;height:calc(100vh - 74px)}#status{color:#cce08f}</style>
 <header><b>北京 · 街区布局验收</b><select id="landmark" aria-label="北京地标"></select><button id="detail">建筑细节</button><button id="drive">实际驾驶视角</button><button id="closer">近看立面</button><select id="route" aria-label="沿途位置"><option value="">沿途位置…</option></select><button id="tour">整圈巡游</button><span id="status"></span></header><canvas id="view"></canvas>
 <script type="module">
-import{TRACK,setTrack,RaceEngine,trackPoint}from'../engine.js';
-import{RaceRenderer}from'../renderer.js';
-import{cityLandmarkPlacements}from'../city-scenery.js';
-import{BEIJING_LANDMARKS,BEIJING_REFINEMENTS}from'../beijing-city-landmarks.js';
+import{TRACK,setTrack,RaceEngine,trackPoint}from'../src/engine.js';
+import{RaceRenderer}from'../src/renderer.js';
+import{cityLandmarkPlacements}from'../src/city-scenery.js';
+import{BEIJING_LANDMARKS,BEIJING_REFINEMENTS}from'../src/beijing-city-landmarks.js';
 setTrack('coast-beijing');const canvas=document.getElementById('view'),select=document.getElementById('landmark'),status=document.getElementById('status');
 const engine=new RaceEngine(),renderer=new RaceRenderer(canvas,{sceneUrls:{coast:'../assets/coast.png',alpine:'../assets/alpine.png',city:'../assets/city.png',clouds:'../assets/cloud-sky.jpg'}});renderer.setSinglePlayer(true);if(!renderer.available){status.textContent=renderer.error;throw new Error(renderer.error);}
 const models=[...BEIJING_REFINEMENTS,...BEIJING_LANDMARKS],meshes=[...renderer.meshes.cars,renderer.meshes.shadow],counts=meshes.map(m=>m.count);let mode='drive',tour=false,tourS=0,last=0;

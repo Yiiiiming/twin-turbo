@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { londonDetailMesh } from '../london-detail-mesh.js';
+import { londonDetailMesh } from '../src/london-detail-mesh.js';
 
 test('London surface optimization never removes a solid collision body',()=>{
  const calls=[],hulls=[],mesh={colliders:hulls,box(...args){calls.push(args);this.colliders?.push(args);}};

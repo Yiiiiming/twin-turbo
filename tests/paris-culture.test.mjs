@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PARIS_CULTURE,addParisCulture} from '../paris-culture.js';
-import {ObstacleWorld} from '../collisions.js';
+import {PARIS_CULTURE,addParisCulture} from '../src/paris-culture.js';
+import {ObstacleWorld} from '../src/collisions.js';
 
 // Independent model collector follows production box/cone vertex semantics.
 class ModelMesh {

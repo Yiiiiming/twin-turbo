@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {setTrack,TRACK,RaceEngine,trackPoint,projectTrack} from '../engine.js';
-import {RaceRenderer,sceneObstacles,updateChaseCamera} from '../renderer.js';
-import {cityLandmarkPlacements} from '../city-scenery.js';
-import {AUSTIN_FOOTBALL_PLAYERS,AUSTIN_FOOTBALL_RADIUS,AUSTIN_SCOREBOARD,footballPlayerPose,footballFrame,addAustinFootball,austinScoreboardText,paintAustinScoreboard,austinScoreboardSurface} from '../austin-football.js';
+import {setTrack,TRACK,RaceEngine,trackPoint,projectTrack} from '../src/engine.js';
+import {RaceRenderer,sceneObstacles,updateChaseCamera} from '../src/renderer.js';
+import {cityLandmarkPlacements} from '../src/city-scenery.js';
+import {AUSTIN_FOOTBALL_PLAYERS,AUSTIN_FOOTBALL_RADIUS,AUSTIN_SCOREBOARD,footballPlayerPose,footballFrame,addAustinFootball,austinScoreboardText,paintAustinScoreboard,austinScoreboardSurface} from '../src/austin-football.js';
 test.afterEach(()=>setTrack('coast'));
 
 class ModelProbe{

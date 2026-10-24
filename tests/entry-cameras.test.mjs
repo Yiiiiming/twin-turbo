@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TRACK,TRACKS,setTrack,RaceEngine} from '../engine.js';
-import {RaceRenderer,harborLandmarkPlacements,sceneObstacles,sceneEntryBoundary,updateChaseCamera,roadsideLamps} from '../renderer.js';
-import {createEntryCameraPlan,entryCameraForProgress,entrySegmentBlocked,ENTRY_CAMERA_CUTS} from '../entry-cameras.js';
+import {TRACK,TRACKS,setTrack,RaceEngine} from '../src/engine.js';
+import {RaceRenderer,harborLandmarkPlacements,sceneObstacles,sceneEntryBoundary,updateChaseCamera,roadsideLamps} from '../src/renderer.js';
+import {createEntryCameraPlan,entryCameraForProgress,entrySegmentBlocked,ENTRY_CAMERA_CUTS} from '../src/entry-cameras.js';
 
 test.afterEach(()=>setTrack('coast'));
 const mainKinds=['london-eye','palace-gate','oriental-pearl','christ-redeemer','texas-capitol','eiffel-tower'];

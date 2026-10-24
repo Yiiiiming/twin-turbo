@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, TRACKS, setTrack, trackPoint } from '../engine.js';
-import { GhostRecorder, validateReplay } from '../ghost-replay.js';
-import { RaceAI } from '../ai.js';
+import { RaceEngine, TRACKS, setTrack, trackPoint } from '../src/engine.js';
+import { GhostRecorder, validateReplay } from '../src/ghost-replay.js';
+import { RaceAI } from '../src/ai.js';
 
 const dt = 1 / 120;
 const forward = new Set(['KeyW', 'ShiftLeft']);

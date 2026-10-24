@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { COLOR_THEMES, normalizeColorTheme, themeForTrack, remapHologramColor, themeCssColor } from '../color-themes.js';
-import { RaceEngine, TRACKS, setTrack } from '../engine.js';
-import { RaceRenderer } from '../renderer.js';
+import { COLOR_THEMES, normalizeColorTheme, themeForTrack, remapHologramColor, themeCssColor } from '../src/color-themes.js';
+import { RaceEngine, TRACKS, setTrack } from '../src/engine.js';
+import { RaceRenderer } from '../src/renderer.js';
 
 const CITIES = {
   'coast-london': 'purple', 'coast-paris': 'purple', 'coast-beijing': 'red',

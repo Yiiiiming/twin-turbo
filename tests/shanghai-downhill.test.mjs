@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack } from '../engine.js';
-import { RaceRenderer, updateChaseCamera, sceneObstacles } from '../renderer.js';
-import { citySceneryPlacements, cityLandmarkPlacements } from '../city-scenery.js';
-import { shanghaiLandmarkPlacements } from '../shanghai-landmarks.js';
-import { shanghaiCityLandmarkPlacements, shanghaiLayoutDistricts } from '../shanghai-layout.js';
-import { pudongSkylinePlacements, shanghaiRiverClearance } from '../shanghai-riverfront.js';
-import { SHANGHAI_DOWNHILL_LANDMARKS, shanghaiDownhillPlacements, addShanghaiDownhillLandmark, addShanghaiDownhillCourts } from '../shanghai-downhill.js';
-import { ObstacleWorld } from '../collisions.js';
+import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack } from '../src/engine.js';
+import { RaceRenderer, updateChaseCamera, sceneObstacles } from '../src/renderer.js';
+import { citySceneryPlacements, cityLandmarkPlacements } from '../src/city-scenery.js';
+import { shanghaiLandmarkPlacements } from '../src/shanghai-landmarks.js';
+import { shanghaiCityLandmarkPlacements, shanghaiLayoutDistricts } from '../src/shanghai-layout.js';
+import { pudongSkylinePlacements, shanghaiRiverClearance } from '../src/shanghai-riverfront.js';
+import { SHANGHAI_DOWNHILL_LANDMARKS, shanghaiDownhillPlacements, addShanghaiDownhillLandmark, addShanghaiDownhillCourts } from '../src/shanghai-downhill.js';
+import { ObstacleWorld } from '../src/collisions.js';
 
 class ArchitecturalAudit {
   constructor(item){this.item=item;this.colliders=[];this.radius=0;this.halfWidth=0;this.halfDepth=0;this.low=Infinity;this.high=-Infinity;this.triangles=0;this.colors=new Set();this.hash=createHash('sha256');}

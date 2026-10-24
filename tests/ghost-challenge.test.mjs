@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHALLENGE_COLORS, PACE_PROFILES, PACE_SPEED_LIMIT, paceReplay, createGhostChallenge, loadGhostChallenge } from '../ghost-challenge.js';
-import { validateReplay, validateRaceReplay, sampleReplay, ghostVersionForCity, GhostRecorder, GHOST_LIMITS } from '../ghost-replay.js';
-import { ghostSplitTimes } from '../split-timing.js';
-import { RaceEngine, TRACK, setTrack, trackPoint, projectTrack, mod } from '../engine.js';
-import { RaceAI } from '../ai.js';
-import { RaceRenderer } from '../renderer.js';
+import { CHALLENGE_COLORS, PACE_PROFILES, PACE_SPEED_LIMIT, paceReplay, createGhostChallenge, loadGhostChallenge } from '../src/ghost-challenge.js';
+import { validateReplay, validateRaceReplay, sampleReplay, ghostVersionForCity, GhostRecorder, GHOST_LIMITS } from '../src/ghost-replay.js';
+import { ghostSplitTimes } from '../src/split-timing.js';
+import { RaceEngine, TRACK, setTrack, trackPoint, projectTrack, mod } from '../src/engine.js';
+import { RaceAI } from '../src/ai.js';
+import { RaceRenderer } from '../src/renderer.js';
 
 function replay(timeMs = 39000, laps = 1) {
   const frames = [];

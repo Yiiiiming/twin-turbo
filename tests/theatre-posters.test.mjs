@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setTrack, trackPoint, RaceEngine } from '../engine.js';
-import { THEATRE_POSTERS, LONDON_THEATRE_ADS, LONDON_THEATRES, theatrePosterSurfaces, addLondonTheatre } from '../london-theatres.js';
-import { RaceRenderer, londonLandmarkPlacements, lookAt, multiply, perspective, updateChaseCamera } from '../renderer.js';
+import { setTrack, trackPoint, RaceEngine } from '../src/engine.js';
+import { THEATRE_POSTERS, LONDON_THEATRE_ADS, LONDON_THEATRES, theatrePosterSurfaces, addLondonTheatre } from '../src/london-theatres.js';
+import { RaceRenderer, londonLandmarkPlacements, lookAt, multiply, perspective, updateChaseCamera } from '../src/renderer.js';
 
 function mockGL(){
  const calls=[],gl={calls};let id=0,activeProgram,boundBuffer;

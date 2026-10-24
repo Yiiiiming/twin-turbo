@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, TRACK, registerTrack, setTrack, trackPoint } from '../engine.js';
+import { RaceEngine, TRACK, registerTrack, setTrack, trackPoint } from '../src/engine.js';
 
 const original = TRACK;
 const segments = [

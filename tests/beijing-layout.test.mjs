@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, setTrack, trackPoint } from '../engine.js';
-import { beijingReferenceTrack } from '../beijing-reference.js';
-import { cityLandmarkPlacements, citySceneryPlacements } from '../city-scenery.js';
+import { TRACK, setTrack, trackPoint } from '../src/engine.js';
+import { beijingReferenceTrack } from '../src/beijing-reference.js';
+import { cityLandmarkPlacements, citySceneryPlacements } from '../src/city-scenery.js';
 
 test.afterEach(() => setTrack('coast'));
 

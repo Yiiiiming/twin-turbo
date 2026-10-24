@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { UnifiedRecordsClient } from '../unified-records.js';
-import { LEADERBOARD_VERSION, leaderboardVersionForCity } from '../leaderboard.js';
-import { GHOST_VERSION, RACE_GHOST_VERSION } from '../ghost-replay.js';
+import { UnifiedRecordsClient } from '../src/unified-records.js';
+import { LEADERBOARD_VERSION, leaderboardVersionForCity } from '../src/leaderboard.js';
+import { GHOST_VERSION, RACE_GHOST_VERSION } from '../src/ghost-replay.js';
 
 class Node {
   constructor(tag, document) {

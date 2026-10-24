@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { TRACKS, setTrack, trackPoint } from '../engine.js';
-import { beijingReferencePoint } from '../beijing-reference.js';
+import { TRACKS, setTrack, trackPoint } from '../src/engine.js';
+import { beijingReferencePoint } from '../src/beijing-reference.js';
 import { routeDefinition, routeDrivingSamples, routeDigest } from './helpers/route-snapshot.mjs';
 
 const manifestText=readFileSync(new URL('./fixtures/route-locks.json',import.meta.url),'utf8');

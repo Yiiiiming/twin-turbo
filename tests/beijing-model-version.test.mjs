@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { setTrack } from '../engine.js';
-import { addCityLandmark, cityLandmarkPlacements } from '../city-scenery.js';
+import { setTrack } from '../src/engine.js';
+import { addCityLandmark, cityLandmarkPlacements } from '../src/city-scenery.js';
 
 // Accepted source: twin-turbo-beijing-plus20-release-20261012, published as
 // commit 81ed7d6fb06b5285d651480b45d0975ecbfbaf01. Its release manifest pins

@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LONDON_THIRD_LANDMARKS, addLondonThirdLandmark } from '../london-third-landmarks.js';
-import { LONDON_SECOND_LANDMARKS } from '../london-second-landmarks.js';
-import { LONDON_NEW_LANDMARKS } from '../london-new-landmarks.js';
-import { LONDON_THEATRES } from '../london-theatres.js';
-import { WEST_END_LANDMARKS } from '../london-west-end.js';
-import { ROYAL_LANDMARKS } from '../london-royal-landmarks.js';
-import { RIVERSIDE_LANDMARKS } from '../london-riverside-landmarks.js';
-import { ObstacleWorld } from '../collisions.js';
+import { LONDON_THIRD_LANDMARKS, addLondonThirdLandmark } from '../src/london-third-landmarks.js';
+import { LONDON_SECOND_LANDMARKS } from '../src/london-second-landmarks.js';
+import { LONDON_NEW_LANDMARKS } from '../src/london-new-landmarks.js';
+import { LONDON_THEATRES } from '../src/london-theatres.js';
+import { WEST_END_LANDMARKS } from '../src/london-west-end.js';
+import { ROYAL_LANDMARKS } from '../src/london-royal-landmarks.js';
+import { RIVERSIDE_LANDMARKS } from '../src/london-riverside-landmarks.js';
+import { ObstacleWorld } from '../src/collisions.js';
 
 // Inspect generated vertices and real body hulls independently of metadata, so
 // a decorative overhang cannot silently intrude into the reserved roadside gap.

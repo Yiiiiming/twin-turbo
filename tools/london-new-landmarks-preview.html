@@ -2,15 +2,15 @@
 <style>body{margin:0;background:#16282f;color:#e8eee6;font:14px system-ui}header{display:flex;flex-wrap:wrap;gap:14px;padding:14px;align-items:center}select,button{font:inherit;padding:8px;background:#253e49;color:#e8eee6;border:1px solid #647c80;border-radius:5px}canvas{display:block;width:100%;height:calc(100vh - 110px)}#status{margin-left:auto;color:#bbd79e}</style>
 <header><strong>伦敦建筑 · 新地标与精修</strong><select id="landmark" aria-label="地标"></select><button id="detail">建筑细节</button><button id="drive">驾驶视角</button><button id="angle">另一侧</button><button id="forward">前移 100</button><button id="back">后移 100</button><button id="next">下一座 →</button><span id="status"></span></header><canvas id="view"></canvas>
 <script type="module">
-import {RaceEngine,setTrack,trackPoint,projectTrack} from '../engine.js';
-import {RaceRenderer,londonLandmarkPlacements} from '../renderer.js';
-import {LONDON_NEW_LANDMARKS} from '../london-new-landmarks.js';
-import {LONDON_SECOND_LANDMARKS} from '../london-second-landmarks.js';
-import {LONDON_THIRD_LANDMARKS} from '../london-third-landmarks.js';
-import {WEST_END_LANDMARKS} from '../london-west-end.js';
-import {ROYAL_LANDMARKS} from '../london-royal-landmarks.js';
-import {LONDON_THEATRES} from '../london-theatres.js';
-import {RIVERSIDE_LANDMARKS} from '../london-riverside-landmarks.js';
+import {RaceEngine,setTrack,trackPoint,projectTrack} from '../src/engine.js';
+import {RaceRenderer,londonLandmarkPlacements} from '../src/renderer.js';
+import {LONDON_NEW_LANDMARKS} from '../src/london-new-landmarks.js';
+import {LONDON_SECOND_LANDMARKS} from '../src/london-second-landmarks.js';
+import {LONDON_THIRD_LANDMARKS} from '../src/london-third-landmarks.js';
+import {WEST_END_LANDMARKS} from '../src/london-west-end.js';
+import {ROYAL_LANDMARKS} from '../src/london-royal-landmarks.js';
+import {LONDON_THEATRES} from '../src/london-theatres.js';
+import {RIVERSIDE_LANDMARKS} from '../src/london-riverside-landmarks.js';
 globalThis.__TWIN_TURBO_POSTERS__={mormon:'../assets/posters/book-of-mormon.jpg',wrong:'../assets/posters/play-that-goes-wrong.jpg',lion:'../assets/posters/lion-king.jpg'};
 setTrack('coast-london');const canvas=document.getElementById('view'),engine=new RaceEngine(),renderer=new RaceRenderer(canvas,{sceneUrls:{coast:'../assets/coast.png',alpine:'../assets/alpine.png',city:'../assets/city.png',clouds:'../assets/cloud-sky.jpg'}});
 renderer.setSinglePlayer(true);const carMeshes=[...renderer.meshes.cars,renderer.meshes.shadow];const carCounts=carMeshes.map(mesh=>mesh.count);const select=document.getElementById('landmark');

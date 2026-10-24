@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {setTrack} from '../engine.js';
-import {addCityLandmark,cityLandmarkPlacements} from '../city-scenery.js';
+import {setTrack} from '../src/engine.js';
+import {addCityLandmark,cityLandmarkPlacements} from '../src/city-scenery.js';
 
 // Independent triangle collector includes all six solid faces, so the depth
 // checks also cover strings, neck, tuners and the support behind the body.

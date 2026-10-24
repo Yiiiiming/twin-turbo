@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, trackPoint, projectTrack, RaceEngine } from '../engine.js';
-import { RaceRenderer, updateChaseCamera, perspective, lookAt, multiply, sampleRoadRibbon, sceneWeights, cornerMarkers, sceneryPlacements, lampGeometry, roadsideLamps, cornerMarkerGeometry, CAR_CLEARANCE_HEIGHT, timingGateGeometry } from '../renderer.js';
+import { TRACK, trackPoint, projectTrack, RaceEngine } from '../src/engine.js';
+import { RaceRenderer, updateChaseCamera, perspective, lookAt, multiply, sampleRoadRibbon, sceneWeights, cornerMarkers, sceneryPlacements, lampGeometry, roadsideLamps, cornerMarkerGeometry, CAR_CLEARANCE_HEIGHT, timingGateGeometry } from '../src/renderer.js';
 
 const project = (matrix, p) => {
   const v = [...p, 1], out = [0, 0, 0, 0];

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SHANGHAI_HERITAGE_LANDMARKS, addShanghaiHeritage } from '../shanghai-downhill-heritage.js';
-import { SHANGHAI_LANDMARKS } from '../shanghai-landmarks.js';
-import { ObstacleWorld } from '../collisions.js';
+import { SHANGHAI_HERITAGE_LANDMARKS, addShanghaiHeritage } from '../src/shanghai-downhill-heritage.js';
+import { SHANGHAI_LANDMARKS } from '../src/shanghai-landmarks.js';
+import { ObstacleWorld } from '../src/collisions.js';
 // Inspect generated vertices and real body hulls independently of metadata, so
 // a decorative overhang cannot silently intrude into the reserved roadside gap.
 class ModelMesh {

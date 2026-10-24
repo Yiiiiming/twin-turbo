@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { TRACK, RaceEngine, setTrack, trackPoint, projectTrack } from '../engine.js';
-import { ObstacleWorld } from '../collisions.js';
-import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../renderer.js';
-import { WEST_END_LANDMARKS, addWestEndLandmark } from '../london-west-end.js';
+import { TRACK, RaceEngine, setTrack, trackPoint, projectTrack } from '../src/engine.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../src/renderer.js';
+import { WEST_END_LANDMARKS, addWestEndLandmark } from '../src/london-west-end.js';
 
 const originalRouteHash = '757fc0db6fe66dd89f80d116da07f7eb284f5e3962c84564f039517b9c679096';
 const westEndKinds = new Set(WEST_END_LANDMARKS.map(item => item.kind));

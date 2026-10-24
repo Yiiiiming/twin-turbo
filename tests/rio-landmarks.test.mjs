@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RIO_LANDMARKS,addRioLandmark } from '../rio-landmarks.js';
-import { RIO_HERITAGE_LANDMARKS } from '../rio-heritage.js';
-import { RIO_CIVIC_LANDMARKS } from '../rio-civic.js';
-import { RIO_CULTURE_LANDMARKS } from '../rio-culture.js';
-import { ObstacleWorld } from '../collisions.js';
+import { RIO_LANDMARKS,addRioLandmark } from '../src/rio-landmarks.js';
+import { RIO_HERITAGE_LANDMARKS } from '../src/rio-heritage.js';
+import { RIO_CIVIC_LANDMARKS } from '../src/rio-civic.js';
+import { RIO_CULTURE_LANDMARKS } from '../src/rio-culture.js';
+import { ObstacleWorld } from '../src/collisions.js';
 import { ParisMesh as ModelMesh } from './helpers/paris-mesh.mjs';
 const make=(meta,angle=0,elevation=0)=>{const item={...meta,x:0,z:0,angle,elevation},mesh=new ModelMesh(item);assert.equal(addRioLandmark(mesh,item),true);return mesh;};
 

@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { TRACK,setTrack,trackPoint,projectTrack } from '../engine.js';
-import { cityLandmarkPlacements,citySceneryPlacements } from '../city-scenery.js';
-import { PARIS_LANDMARKS,addParisLandmark } from '../paris-landmarks.js';
-import { parisLandmarkPlacements } from '../paris-layout.js';
-import { RaceRenderer,updateChaseCamera } from '../renderer.js';
-import { ObstacleWorld } from '../collisions.js';
+import { TRACK,setTrack,trackPoint,projectTrack } from '../src/engine.js';
+import { cityLandmarkPlacements,citySceneryPlacements } from '../src/city-scenery.js';
+import { PARIS_LANDMARKS,addParisLandmark } from '../src/paris-landmarks.js';
+import { parisLandmarkPlacements } from '../src/paris-layout.js';
+import { RaceRenderer,updateChaseCamera } from '../src/renderer.js';
+import { ObstacleWorld } from '../src/collisions.js';
 import { ParisMesh,parisFakeGL } from './helpers/paris-mesh.mjs';
 const kinds=new Set(PARIS_LANDMARKS.map(p=>p.kind)),oldPlots=()=>cityLandmarkPlacements().filter(p=>!kinds.has(p.kind)),newPlots=()=>cityLandmarkPlacements().filter(p=>kinds.has(p.kind));
 const probe=item=>{const mesh=new ParisMesh(item);addParisLandmark(mesh,item);return mesh;};

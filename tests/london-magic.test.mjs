@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, setTrack, trackPoint, projectTrack, RaceEngine } from '../engine.js';
-import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../renderer.js';
-import { LONDON_MAGIC_ZONE, londonMagicPlacements, londonMagicBlend, magicLocal } from '../london-magic-layout.js';
-import { addLondonMagicScenery, addMagicCharacter } from '../london-magic-models.js';
-import { londonMagicState, magicBodyMatrix, magicArmMatrix, magicWandPoint, MagicEffects, MAGIC_EFFECT_VERTICES, MAGIC_DUEL_CYCLE } from '../london-magic-effects.js';
-import { ObstacleWorld } from '../collisions.js';
+import { TRACK, setTrack, trackPoint, projectTrack, RaceEngine } from '../src/engine.js';
+import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../src/renderer.js';
+import { LONDON_MAGIC_ZONE, londonMagicPlacements, londonMagicBlend, magicLocal } from '../src/london-magic-layout.js';
+import { addLondonMagicScenery, addMagicCharacter } from '../src/london-magic-models.js';
+import { londonMagicState, magicBodyMatrix, magicArmMatrix, magicWandPoint, MagicEffects, MAGIC_EFFECT_VERTICES, MAGIC_DUEL_CYCLE } from '../src/london-magic-effects.js';
+import { ObstacleWorld } from '../src/collisions.js';
 
 test.afterEach(()=>setTrack('coast'));
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];

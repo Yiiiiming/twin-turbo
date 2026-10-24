@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ObstacleWorld } from '../collisions.js';
-import { RaceEngine, TRACK, trackPoint, projectTrack, mod } from '../engine.js';
-import { sceneObstacles, sceneryPlacements, roadsideLamps, cornerMarkers } from '../renderer.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { RaceEngine, TRACK, trackPoint, projectTrack, mod } from '../src/engine.js';
+import { sceneObstacles, sceneryPlacements, roadsideLamps, cornerMarkers } from '../src/renderer.js';
 
 const near = (actual, expected, tolerance = 1e-6) =>
   assert.ok(Math.abs(actual - expected) < tolerance, `${actual} differs from ${expected}`);

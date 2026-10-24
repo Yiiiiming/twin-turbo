@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Twin Turbo 海岸专用发布版",
+  "description": "Twin Turbo — six-city arcade racer with ghost challenges, local split screen and a tutorial",
   "scripts": {
     "start": "python3 -m http.server 8765 --bind 127.0.0.1",
     "build": "python3 build.py",

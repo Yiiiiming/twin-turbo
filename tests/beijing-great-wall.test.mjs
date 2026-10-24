@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { TRACK,setTrack,trackPoint,projectTrack } from '../engine.js';
-import { beijingReferenceTrack, beijingReferencePoint, beijingReferenceProjection } from '../beijing-reference.js';
-import { ObstacleWorld } from '../collisions.js';
-import { updateChaseCamera } from '../renderer.js';
-import { cityLandmarkPlacements,citySceneryPlacements } from '../city-scenery.js';
-import { beijingWallLayout,beijingWallClearance,beijingWallPassageCuts,addBeijingGreatWall } from '../beijing-great-wall.js';
+import { TRACK,setTrack,trackPoint,projectTrack } from '../src/engine.js';
+import { beijingReferenceTrack, beijingReferencePoint, beijingReferenceProjection } from '../src/beijing-reference.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { updateChaseCamera } from '../src/renderer.js';
+import { cityLandmarkPlacements,citySceneryPlacements } from '../src/city-scenery.js';
+import { beijingWallLayout,beijingWallClearance,beijingWallPassageCuts,addBeijingGreatWall } from '../src/beijing-great-wall.js';
 test.afterEach(()=>setTrack('coast'));
 class Mesh {
   constructor(){this.colliders=[];this.triangles=0;this.vertices=[];this.colors=new Set();}

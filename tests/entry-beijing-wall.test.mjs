@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TRACK,setTrack,RaceEngine} from '../engine.js';
-import {RaceRenderer,harborLandmarkPlacements,sceneEntryBoundary,roadsideLamps} from '../renderer.js';
-import {beijingWallLayout} from '../beijing-great-wall.js';
-import {createEntryCameraPlan,entryCameraForProgress} from '../entry-cameras.js';
+import {TRACK,setTrack,RaceEngine} from '../src/engine.js';
+import {RaceRenderer,harborLandmarkPlacements,sceneEntryBoundary,roadsideLamps} from '../src/renderer.js';
+import {beijingWallLayout} from '../src/beijing-great-wall.js';
+import {createEntryCameraPlan,entryCameraForProgress} from '../src/entry-cameras.js';
 
 test.afterEach(()=>setTrack('coast'));
 function fakeGL(){

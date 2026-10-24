@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRaceEntry } from '../race-entry.js';
-import { TRACK, TRACKS } from '../engine.js';
-import { ENTRY_CAMERA_CUTS } from '../entry-cameras.js';
-import { themeForTrack, themeCssColor } from '../color-themes.js';
-import { landmarkHologramGeometry, paintLandmarkHologram } from '../landmark-hologram.js';
+import { createRaceEntry } from '../src/race-entry.js';
+import { TRACK, TRACKS } from '../src/engine.js';
+import { ENTRY_CAMERA_CUTS } from '../src/entry-cameras.js';
+import { themeForTrack, themeCssColor } from '../src/color-themes.js';
+import { landmarkHologramGeometry, paintLandmarkHologram } from '../src/landmark-hologram.js';
 
 function fixture({ reduced = false, unavailableCanvas = false, captureStrokes = false } = {}) {
   const stats = { canvases: 0, textureDraws: 0, activeObservers: 0 };
@@ -148,7 +148,7 @@ test('the train covers its first frame with opaque purple and the world stays hi
   f.advance(.25);
   assert.ok(Math.abs(Number(f.stage.style.values.get('--entry-preview-opacity'))-.5)<1e-9);
   f.entry.cancel();f.clean();
-  const css = readFileSync(new URL('../race-entry.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../src/race-entry.css', import.meta.url), 'utf8');
   assert.match(css, /\.race-entry-active\[data-entry-phase="train"\] :is\(#game,#city-game\)\s*\{\s*visibility:\s*hidden\s*!important/);
   assert.doesNotMatch(css, /:is\(#game,#city-game\)\s*\{[^}]*display\s*:/, 'canvas layout remains available to the renderer');
   assert.match(css, /\.race-entry-active\[data-entry-phase="train"\] #menu\s*\{\s*display:\s*flex\s*!important/, 'the temporary selector overrides the normal menu hidden class');

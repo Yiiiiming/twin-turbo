@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addRiversideLandmark } from '../london-riverside-landmarks.js';
+import { addRiversideLandmark } from '../src/london-riverside-landmarks.js';
 class Faces {
  constructor(){this.faces=[];this.boxes=[];this.colliders=[];}
  triangle(a,b,c,color){this.faces.push({points:[a,b,c],color});}

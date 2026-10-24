@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LEADERBOARD_VERSION, LEADERBOARD_LIMIT, LEADERBOARD_CITIES, normalizeCity, normalizeName,
-  normalizeEntries, qualifyingRank, insertRecord, leaderboardNameKey } from '../leaderboard.js';
+  normalizeEntries, qualifyingRank, insertRecord, leaderboardNameKey } from '../src/leaderboard.js';
 
 const record = (id, timeMs, options = {}) => ({ id, timeMs, name: `车手${id}`,
   laps: 3, city: 'coast', playerId: 1, mode: 'local', createdAt: 1000, ...options });

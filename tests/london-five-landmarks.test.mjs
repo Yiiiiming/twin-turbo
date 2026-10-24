@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { TRACK, setTrack, trackPoint, projectTrack } from '../engine.js';
-import { ObstacleWorld } from '../collisions.js';
-import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../renderer.js';
-import { ROYAL_LANDMARKS, addRoyalLandmark } from '../london-royal-landmarks.js';
-import { RIVERSIDE_LANDMARKS, addRiversideLandmark } from '../london-riverside-landmarks.js';
+import { TRACK, setTrack, trackPoint, projectTrack } from '../src/engine.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../src/renderer.js';
+import { ROYAL_LANDMARKS, addRoyalLandmark } from '../src/london-royal-landmarks.js';
+import { RIVERSIDE_LANDMARKS, addRiversideLandmark } from '../src/london-riverside-landmarks.js';
 
 const additions = [...ROYAL_LANDMARKS, ...RIVERSIDE_LANDMARKS];
 const kinds = new Set(additions.map(item => item.kind));

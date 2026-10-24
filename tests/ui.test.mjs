@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { TRACK, TRACKS, setTrack, trackPoint, projectTrack, mod } from '../engine.js';
-import { RaceAI } from '../ai.js';
-import { GHOST_VERSION } from '../ghost-client.js';
-import { validateReplay, RACE_GHOST_VERSION, ghostVersionForCity } from '../ghost-replay.js';
-import { LEADERBOARD_VERSION } from '../leaderboard.js';
+import { TRACK, TRACKS, setTrack, trackPoint, projectTrack, mod } from '../src/engine.js';
+import { RaceAI } from '../src/ai.js';
+import { GHOST_VERSION } from '../src/ghost-client.js';
+import { validateReplay, RACE_GHOST_VERSION, ghostVersionForCity } from '../src/ghost-replay.js';
+import { LEADERBOARD_VERSION } from '../src/leaderboard.js';
 
-const sourceURL = new URL('../main.js', import.meta.url);
-const engineURL = new URL('../engine.js', import.meta.url);
+const sourceURL = new URL('../src/main.js', import.meta.url);
+const engineURL = new URL('../src/engine.js', import.meta.url);
 let instance = 0;
 
 class MockClassList {
@@ -128,7 +128,7 @@ function canvasContext() {
   });
 }
 
-async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=coast', language = 'zh', configureRace = false, fullCatalog = false, initialTrack = 'coast', fullscreenAtLoad = false, entryDuration = 0 } = {}) {
+async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=coast', language = 'zh', configureRace = false, fullCatalog = false, initialTrack = 'coast', fullscreenAtLoad = false, entryDuration = 0, storageValues = {} } = {}) {
   setTrack(initialTrack); t.after(() => setTrack('coast'));
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const document = new MockTarget();
@@ -178,7 +178,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     return requestFullscreen();
   };
   const window = new MockTarget(); window.devicePixelRatio = 1;
-  const stored = new Map(); window.localStorage = { getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,String(value)),removeItem:key=>stored.delete(key) };
+  const stored = new Map(Object.entries(storageValues)); window.localStorage = { getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,String(value)),removeItem:key=>stored.delete(key) };
   let clock = 0;
   const frames = [], delayed = [];
   const globals = { document, window, localStorage: window.localStorage, location: {search}, Element: MockNode, HTMLElement: MockNode,
@@ -239,28 +239,28 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
   // ordinary UI loads exercise the exact shipped six-city visibility policy.
   const visibilityURL = fullCatalog
     ? `data:text/javascript;base64,${Buffer.from("export const DEFAULT_TRACK_ID='coast-london';export function getVisibleTracks(tracks){return Object.values(tracks)}export function isTrackSelectable(id,tracks){return Object.hasOwn(tracks,id)}").toString('base64')}`
-    : new URL('../track-visibility.js', import.meta.url).href;
+    : new URL('../src/track-visibility.js', import.meta.url).href;
   const source = (await readFile(sourceURL, 'utf8'))
     // Decorative pointer animation is independent of the deterministic race loop.
     .replace("import './ui-effects.js';", "import 'data:text/javascript,export{}';")
     .replace("from './race-entry.js'", `from '${entryURL}'`)
-    .replace("from './driving-tutorial.js'", `from '${new URL('../driving-tutorial.js', import.meta.url).href}'`)
-    .replace("from './i18n.js'", `from '${new URL('../i18n.js', import.meta.url).href}'`)
+    .replace("from './driving-tutorial.js'", `from '${new URL('../src/driving-tutorial.js', import.meta.url).href}'`)
+    .replace("from './i18n.js'", `from '${new URL('../src/i18n.js', import.meta.url).href}'`)
     .replace("from './track-visibility.js'", `from '${visibilityURL}'`)
-    .replace("from './color-theme-ui.js'", `from '${new URL('../color-theme-ui.js', import.meta.url).href}'`)
-    .replace("from './color-themes.js'", `from '${new URL('../color-themes.js', import.meta.url).href}'`)
-    .replace("from './race-hud.js'", `from '${new URL('../race-hud.js', import.meta.url).href}'`)
-    .replace("from './controls.js'", `from '${new URL('../controls.js', import.meta.url).href}'`)
-    .replace("from './split-timing.js'", `from '${new URL('../split-timing.js', import.meta.url).href}'`)
-    .replace("from './ghost-challenge.js'", `from '${new URL('../ghost-challenge.js', import.meta.url).href}'`)
-    .replace("from './ghost-client.js'", `from '${new URL('../ghost-client.js', import.meta.url).href}'`)
-    .replace("from './ghost-replay.js'", `from '${new URL('../ghost-replay.js', import.meta.url).href}'`)
+    .replace("from './color-theme-ui.js'", `from '${new URL('../src/color-theme-ui.js', import.meta.url).href}'`)
+    .replace("from './color-themes.js'", `from '${new URL('../src/color-themes.js', import.meta.url).href}'`)
+    .replace("from './race-hud.js'", `from '${new URL('../src/race-hud.js', import.meta.url).href}'`)
+    .replace("from './controls.js'", `from '${new URL('../src/controls.js', import.meta.url).href}'`)
+    .replace("from './split-timing.js'", `from '${new URL('../src/split-timing.js', import.meta.url).href}'`)
+    .replace("from './ghost-challenge.js'", `from '${new URL('../src/ghost-challenge.js', import.meta.url).href}'`)
+    .replace("from './ghost-client.js'", `from '${new URL('../src/ghost-client.js', import.meta.url).href}'`)
+    .replace("from './ghost-replay.js'", `from '${new URL('../src/ghost-replay.js', import.meta.url).href}'`)
     .replace("from './engine.js'", `from '${engineURL.href}'`)
     .replace("from './renderer.js'", `from '${rendererURL}'`)
     .replace("from './city-renderer.js'", `from '${new URL('../city-renderer.js', import.meta.url).href}'`)
-    .replace("from './ai.js'", `from '${new URL('../ai.js', import.meta.url).href}'`)
-    .replace("from './unified-records.js'", `from '${new URL('../unified-records.js', import.meta.url).href}'`)
-    .replace("from './leaderboard-client.js'", `from '${new URL('../leaderboard-client.js', import.meta.url).href}'`);
+    .replace("from './ai.js'", `from '${new URL('../src/ai.js', import.meta.url).href}'`)
+    .replace("from './unified-records.js'", `from '${new URL('../src/unified-records.js', import.meta.url).href}'`)
+    .replace("from './leaderboard-client.js'", `from '${new URL('../src/leaderboard-client.js', import.meta.url).href}'`);
   // Load shipped application source unmodified except dependency resolution and
   // read-only test exports. No duplicated event handlers or production hooks.
   const entry = `${source}\nexport { engine, keys, renderer, bindings, leaderboard, ghostClient, ghostRecorder, splitTiming, i18n, trackCards, activeGhosts, challengeSetup, raceEntry, drivingTutorial, selectCircuit };\n// test instance ${++instance}`;
@@ -463,15 +463,23 @@ test('P pauses and resumes without changing fullscreen, while the resume button 
   ui.keyup('KeyP');ui.key('KeyP');assert.equal(ui.engine.state,'paused');
   ui.click('resume');assert.equal(stage.fullscreenAttempts,attempts+1,'request runs inside the trusted button handler before an await');
   assert.equal(ui.document.fullscreenElement,stage);assert.equal(ui.engine.state,'racing');assert.equal(ui.keys.size,0);
+  let helpParts=ui.nodes.get('pause-help-text').children;
+  assert.deepEqual(helpParts.filter(node=>node.tagName==='KBD').map(node=>node.textContent),['Esc']);
+  assert.match(helpParts.map(node=>node.textContent).join(''),/Esc 退出全屏会自动暂停/);
   ui.click('language-en');assert.equal(ui.nodes.get('pause-shortcut').textContent,'P');
-  assert.match(ui.nodes.get('pause-help-text').textContent,/without leaving fullscreen/);
+  helpParts=ui.nodes.get('pause-help-text').children;
+  assert.match(helpParts.map(node=>node.textContent).join(''),/without leaving fullscreen/);
+  assert.deepEqual(helpParts.filter(node=>node.tagName==='KBD').map(node=>node.textContent),['Esc']);
 });
 
 test('a custom P driving binding retains its action and changes pause hints to Escape',async t=>{
   const ui=await loadCoastUI(t),bind=ui.document.querySelectorAll('[data-bind-player][data-bind-action]').find(button=>button.dataset.bindPlayer==='2'&&button.dataset.bindAction==='accelerate');
   ui.click('open-bindings');bind.click();ui.key('KeyP');ui.click('bindings-done');
   assert.equal(ui.bindings.code(2,'accelerate'),'KeyP');assert.match(ui.nodes.get('pause').innerHTML,/<kbd>Esc<\/kbd>/);
-  assert.equal(ui.nodes.get('pause-shortcut').textContent,'Esc');assert.match(ui.nodes.get('pause-help-text').textContent,/P 已用于/);
+  assert.equal(ui.nodes.get('pause-shortcut').textContent,'Esc');
+  const helpParts=ui.nodes.get('pause-help-text').children;
+  assert.match(helpParts.map(node=>node.textContent).join(''),/P 已用于/);
+  assert.deepEqual(helpParts.filter(node=>node.tagName==='KBD').map(node=>node.textContent),['P']);
   assert.equal(JSON.parse(ui.window.localStorage.getItem('twin-turbo-controls-v1'))[1].accelerate,'KeyP');
   ui.launch();ui.advance(3.1);ui.key('KeyP');ui.advance(.4);
   assert.equal(ui.engine.state,'racing');assert.ok(ui.engine.cars[1].speed>70,'P still accelerates the selected player');
@@ -877,6 +885,14 @@ test('tutorial advances through five real driving actions with no ghosts, qualif
   assert.equal(ui.document.activeElement,ui.drivingTutorial.element.children.at(-1));
   assert.deepEqual([recordings,splits,results,newRaces,ghostStarts],[0,0,0,0,0]);
   assert.equal(ui.requests.length,beforeRequests,'practice performs no ghost matching, qualification or upload');
+  assert.equal(ui.drivingTutorial.element.children[2].textContent,'');
+  assert.equal(ui.drivingTutorial.element.children[2].hidden,true);
+  assert.equal(ui.drivingTutorial.element.children[1].textContent,'准备好出发了');
+  ui.click('language-en');
+  assert.equal(ui.drivingTutorial.element.children[2].textContent,'');
+  assert.equal(ui.drivingTutorial.element.children[2].hidden,true);
+  assert.equal(ui.drivingTutorial.element.children[1].textContent,'Ready to race');
+  assert.equal(ui.drivingTutorial.element.children.at(-1).textContent,'Back to menu');
   ui.drivingTutorial.element.children.at(-1).click();ui.frame();
   assert.equal(ui.engine.state,'menu');assert.equal(ui.drivingTutorial.element.hidden,true);assert.equal(results,0);
 });
@@ -990,7 +1006,7 @@ test('custom bindings reject conflicts and reserved keys, then drive the real pl
   assert.ok(ui.engine.cars[0].speed > 70);
 });
 
-test('settings can select an orange single-player car with both control layouts, centered grid and no physical AI', async t => {
+test('the fixed cyan single-player car supports both control layouts, centered grid and no physical AI', async t => {
   const ui = await loadCoastUI(t);
   ui.click('open-bindings');
   const p2Accelerate = ui.document.querySelectorAll('[data-bind-player][data-bind-action]')
@@ -998,16 +1014,15 @@ test('settings can select an orange single-player car with both control layouts,
   p2Accelerate.click(); ui.key('KeyK'); ui.click('bindings-done');
   ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
   ui.click('menu-settings');
-  const orange=ui.document.querySelectorAll('[data-player-color]').find(button=>button.dataset.playerColor==='orange');
-  orange.click();assert.equal(orange.getAttribute('aria-pressed'),'true');
-  assert.match(ui.nodes.get('player1-name').textContent, /橙色风暴/);
+  assert.deepEqual(ui.document.querySelectorAll('[data-player-color]'),[]);
+  assert.match(ui.nodes.get('player1-name').textContent, /青色闪电/);
   ui.click('close-settings');
   assert.equal(ui.engine.cars.length, 1);
   await ui.launchPrepared(); ui.advance(3.1);
-  assert.equal(ui.engine.cars[0].id, 1); assert.equal(ui.engine.cars[0].colorIndex, 1);
+  assert.equal(ui.engine.cars[0].id, 1); assert.equal(ui.engine.cars[0].colorIndex, 0);
   assert.equal(ui.engine.cars[0]._lane, 0);
   ui.key('KeyW'); ui.advance(.4);
-  assert.ok(ui.engine.cars[0].speed > 70, 'P1 driving controls still drive the human orange car');
+  assert.ok(ui.engine.cars[0].speed > 70, 'P1 driving controls still drive the cyan car');
   ui.keyup('KeyW'); ui.key('KeyK'); ui.advance(.2);
   assert.ok(ui.engine.cars[0].speed > 100, 'remapped alternate acceleration also drives the human');
   assert.equal(ui.engine.cars.length, 1, 'no hidden physical opponent can collide or finish');
@@ -1631,15 +1646,15 @@ test('all six solo split rivals follow actual checkpoint crossing order without 
 });
 
 
-test('Ghost Challenge accepts either steering layout for the color chosen in settings', async t => {
+test('Ghost Challenge accepts either steering layout for its cyan car', async t => {
   const ui = await loadCoastUI(t);
   ui.modeButtons.find(button => button.dataset.mode === 'ai').click();
   ui.click('menu-settings');
-  ui.document.querySelectorAll('[data-player-color]').find(button=>button.dataset.playerColor==='orange').click();
+  assert.deepEqual(ui.document.querySelectorAll('[data-player-color]'),[]);
   ui.click('close-settings');
   await ui.launchPrepared(); ui.advance(3.1); ui.key('ArrowUp'); ui.advance(.4);
-  assert.ok(ui.engine.cars[0].speed > 70, 'up arrow accelerates the human orange car');
-  assert.equal(ui.engine.cars[0].colorIndex,1);
+  assert.ok(ui.engine.cars[0].speed > 70, 'up arrow accelerates the cyan car');
+  assert.equal(ui.engine.cars[0].colorIndex,0);
   assert.equal(ui.engine.cars.length, 1, 'all steering input affects only the human');
   ui.key('ArrowRight'); ui.frame(); assert.ok(ui.engine.cars[0].steer > 0);
   ui.keyup('ArrowRight'); ui.key('ArrowLeft'); ui.advance(.2); assert.ok(ui.engine.cars[0].steer < 0);
@@ -1869,8 +1884,7 @@ test('fresh product defaults to London, Ghost Challenge sprint and the fastest-l
   assert.equal(ui.trackCards.get('coast-london').button.getAttribute('aria-pressed'),'true');
   assert.equal(ui.modeButtons.find(button=>button.dataset.mode==='ai').getAttribute('aria-pressed'),'true');
   assert.deepEqual(ui.lapButtons,[]);
-  for(const id of ['mode-description','player-color-description'])assert.equal(ui.nodes.has(id),false);
-  assert.equal(ui.nodes.get('player-color-select').classList.contains('hidden'),false);
+  for(const id of ['mode-description','player-color-description','player-color-select'])assert.equal(ui.nodes.has(id),false);
   assert.equal(ui.engine.cars[0].colorIndex,0);
   assert.equal(ui.leaderboard.category,'lap');
   assert.equal(ui.nodes.get('records-tab-lap').getAttribute('aria-selected'),'true');
@@ -1883,38 +1897,38 @@ test('fresh product defaults to London, Ghost Challenge sprint and the fastest-l
   }
   assert.doesNotMatch(ui.nodes.get('ai-control-note').textContent,/WASD|方向键|Arrow|Enter|Shift/,'AI note no longer attributes human controls to the opponent');
   ui.modeButtons.find(button=>button.dataset.mode==='local').click();assert.equal(alternative.classList.contains('hidden'),true);
-  assert.equal(ui.nodes.get('player-color-select').classList.contains('hidden'),true);
   ui.modeButtons.find(button=>button.dataset.mode==='ai').click();assert.equal(alternative.classList.contains('hidden'),false);
-  assert.equal(ui.nodes.get('player-color-select').classList.contains('hidden'),false);
   await ui.launchPrepared();ui.advance(3.1);assert.equal(ui.engine.laps,1);assert.equal(ui.engine.state,'racing');
   ui.key('ArrowUp');ui.advance(.3);assert.equal(ui.engine.cars.length,1);assert.ok(ui.engine.cars[0].speed>50);
 });
 
-test('settings color choice keeps the full solo HUD and centered car, while local mode restores both views and colors',async t=>{
- const ui=await loadUI(t,{configureRace:false});
+test('stale orange preferences cannot change cyan solo/tutorial identity, while local mode keeps both views and colors',async t=>{
+ const ui=await loadUI(t,{configureRace:false,storageValues:{'twin-turbo-player-color':'orange','twin-turbo-car-color':'orange'}});
  assert.equal(ui.renderer.singlePlayer,true);assert.equal(ui.document.body.classList.contains('solo-mode'),true);
  const context=ui.nodes.get('hud').context;let before=context.counts.get('scale')||0;context.calls.length=0;ui.frame();
  assert.equal(context.counts.get('scale')-before,1,'only the human minimap is drawn');
  assert.ok(context.calls.some(call=>call[0]==='translate'&&call[1]===1018&&call[2]===577));
  assert.ok(!context.calls.some(call=>call[0]==='fillText'&&call[1]==='VS'));
  assert.ok(!context.calls.some(call=>call[0]==='fillRect'&&call[1]===597));
- ui.click('menu-settings');ui.allNodes.find(node=>node.dataset.playerColor==='orange').click();ui.click('close-settings');
+ ui.click('menu-settings');assert.equal(ui.nodes.has('player-color-select'),false);ui.click('close-settings');
  await ui.launchPrepared();ui.advance(3.1);
- assert.equal(ui.engine.cars[0].colorIndex,1);assert.equal(ui.engine.cars[0]._lane,0);
- assert.equal(ui.renderer.singlePlayer,true,'orange human uses the first camera');
+ assert.equal(ui.engine.cars[0].colorIndex,0);assert.equal(ui.engine.cars[0]._lane,0);
+ assert.equal(ui.renderer.singlePlayer,true,'cyan human uses the first camera');
  ui.key('Escape');ui.frame();ui.click('pause-settings');
- ui.allNodes.find(node=>node.dataset.playerColor==='cyan').click();
- assert.equal(ui.engine.cars[0].colorIndex,1,'a paused race retains its original color');
+ assert.deepEqual(ui.document.querySelectorAll('[data-player-color]'),[]);
+ assert.equal(ui.engine.cars[0].colorIndex,0,'a paused race retains its cyan identity');
  ui.click('close-settings');ui.click('pause-menu');ui.frame();
  ui.modeButtons.find(button=>button.dataset.mode==='local').click();before=context.counts.get('scale');context.calls.length=0;ui.frame();
  assert.equal(ui.renderer.singlePlayer,false);assert.equal(ui.document.body.classList.contains('solo-mode'),false);
  assert.equal(ui.engine.cars.length,2,'returning to local mode restores the second physical human car');
  assert.deepEqual(ui.engine.cars.map(car=>car.colorIndex),[0,1]);
  assert.equal(context.counts.get('scale')-before,2);assert.ok(context.calls.some(call=>call[0]==='fillText'&&call[1]==='VS'));
- assert.equal(ui.nodes.get('player-color-select').classList.contains('hidden'),true);
  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();
- assert.equal(ui.nodes.get('player-color-select').classList.contains('hidden'),false);
- assert.equal(ui.engine.cars[0].colorIndex,1,'returning to solo remembers the selected color');
+ assert.equal(ui.engine.cars[0].colorIndex,0,'returning to solo remains cyan');
+ ui.modeButtons.find(button=>button.dataset.mode==='tutorial').click();ui.launch();ui.advance(3.1);
+ assert.equal(ui.engine.cars.length,1);assert.equal(ui.engine.cars[0].colorIndex,0);assert.equal(ui.engine.cars[0]._lane,0);
+ assert.equal(ui.renderer.singlePlayer,true);assert.equal(ui.drivingTutorial.active,true);
+ assert.equal(ui.window.localStorage.getItem('twin-turbo-player-color'),'orange','obsolete preferences are ignored, not erased');
 });
 
 function challengeFixture(laps = 1) {

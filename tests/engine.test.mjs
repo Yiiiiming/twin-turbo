@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, TRACK, trackPoint, projectTrack, mod, OFFROAD_GRACE_SECONDS } from '../engine.js';
+import { RaceEngine, TRACK, trackPoint, projectTrack, mod, OFFROAD_GRACE_SECONDS } from '../src/engine.js';
 
 const near = (actual, expected, tolerance = 1e-7) =>
   assert.ok(Math.abs(actual - expected) < tolerance, `${actual} ≠ ${expected}`);

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, setTrack, trackPoint } from '../engine.js';
-import { updateChaseCamera, lookAt, multiply, perspective } from '../renderer.js';
-import { cityLandmarkPlacements } from '../city-scenery.js';
-import { addBeijingCityLandmark } from '../beijing-city-landmarks.js';
+import { TRACK, setTrack, trackPoint } from '../src/engine.js';
+import { updateChaseCamera, lookAt, multiply, perspective } from '../src/renderer.js';
+import { cityLandmarkPlacements } from '../src/city-scenery.js';
+import { addBeijingCityLandmark } from '../src/beijing-city-landmarks.js';
 
 test.afterEach(()=>setTrack('coast'));
 

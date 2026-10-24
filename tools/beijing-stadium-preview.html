@@ -2,8 +2,8 @@
 <style>*{box-sizing:border-box}body{margin:0;background:#182e31;color:#e9e9da;font:14px system-ui}header{min-height:76px;padding:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}button,select,input{font:inherit;padding:8px;background:#29484b;color:#f0ebd9;border:1px solid #758780;border-radius:6px}button:active{background:#45605b}canvas{display:block;width:100%;height:calc(100vh - 106px)}output{display:block;padding:5px 12px;color:#c4d9ad;font-size:12px}#along{width:180px}</style>
 <header><strong>北京 · 鸟巢场内一圈</strong><button data-point="approach">入场前</button><button data-point="entry">进入跑道</button><button data-point="quarter">第一弯</button><button data-point="half">场内直道</button><button data-point="last">末段弯道</button><button data-point="exit">回到街道</button><button id="overview">鸟瞰</button><button id="interior">球场细节</button><button id="tour">自动巡游</button><select id="lane" aria-label="车道"><option value="0">中央车道</option><option value="-48">左侧车道</option><option value="48">右侧车道</option></select><input id="along" type="range" min="0" max="1000" value="0" aria-label="场馆赛程"></header><canvas id="view"></canvas><output id="status">正在加载…</output>
 <script type="module">
-import{TRACK,setTrack,RaceEngine,trackPoint}from'../engine.js';
-import{RaceRenderer}from'../renderer.js';
+import{TRACK,setTrack,RaceEngine,trackPoint}from'../src/engine.js';
+import{RaceRenderer}from'../src/renderer.js';
 setTrack('coast-beijing');const canvas=document.getElementById('view'),status=document.getElementById('status'),stadium=TRACK.stadium;
 const engine=new RaceEngine(),renderer=new RaceRenderer(canvas,{sceneUrls:{coast:'../assets/coast.png',alpine:'../assets/alpine.png',city:'../assets/city.png',clouds:'../assets/cloud-sky.jpg'}});renderer.setSinglePlayer(true);
 if(!renderer.available){status.textContent=renderer.error;throw new Error(renderer.error);}

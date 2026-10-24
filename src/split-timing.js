@@ -2,17 +2,24 @@ import { TRACK, projectTrack, mod } from './engine.js';
 import { validateReplay, validateRaceReplay, sampleReplay } from './ghost-replay.js';
 
 export const SPLIT_FRACTIONS = Object.freeze([.25, .5, .75, 1]);
+// Austin's first result panel appears after the football scoreboard has passed.
+// This reuses physical gate 30 of 68; the road and its progression gates do not move.
+const AUSTIN_SPLIT_FRACTIONS = Object.freeze([30 / 68, .5, .75, 1]);
+export function splitFractionsForTrack(track = TRACK) {
+  return track.id === 'coast-austin' ? AUSTIN_SPLIT_FRACTIONS : SPLIT_FRACTIONS;
+}
 const signedDistance = (from, to) => mod(to - from + TRACK.length / 2, TRACK.length) - TRACK.length / 2;
 const keyFor = (lap, index) => `${lap}:${index}`;
 const milliseconds = seconds => Math.round(seconds * 1000);
 
-/** Quarter passages use lap clocks for a single lap and the GO clock for a whole race. */
+/** Same-position passages use lap clocks for a single lap and GO for a whole race. */
 export function ghostSplitTimes(replay) {
   const wholeRace = replay?.kind === 'race', count = wholeRace ? 12 : 4;
   const times = Array(count).fill(null);
   if (!(wholeRace ? validateRaceReplay(replay) : validateReplay(replay))) return times;
   const ends = wholeRace ? replay.lapEndsMs : [replay.durationMs];
   const limit = TRACK.roadWidth / 2 + TRACK.checkpointMargin;
+  const fractions = splitFractionsForTrack();
   // Exact finish samples may fall between the recorder's 100 ms samples.
   // Inject them so each lap is evaluated only inside its actual boundaries.
   const byTime = new Map(replay.frames.map(frame => [frame[0], frame]));
@@ -29,7 +36,7 @@ export function ghostSplitTimes(replay) {
     const projection = projectTrack(frame[1], frame[2], previous?.projection.s ?? TRACK.startDistance, frame[4]);
     if (previous && next < 3) {
       const delta = signedDistance(previous.projection.s, projection.s);
-      const gate = mod(TRACK.startDistance + SPLIT_FRACTIONS[next] * TRACK.length, TRACK.length);
+      const gate = mod(TRACK.startDistance + fractions[next] * TRACK.length, TRACK.length);
       const until = mod(gate - previous.projection.s, TRACK.length);
       const elapsed = frame[0] - previous.frame[0];
       if (delta > 0 && delta < Math.min(TRACK.length / 8, elapsed * .7 + 2)
@@ -93,11 +100,14 @@ export class SplitTiming {
       racer.previous = current;
       if (!previous || previous.finished || current.rescue || current.time <= previous.time
         || current.time - previous.time > .25 || current.earned <= previous.earned) continue;
-      const interval = TRACK.checkpoints / 4;
-      if (!Number.isInteger(interval)) continue;
-      for (let gate = Math.max(interval, Math.ceil((previous.earned + 1) / interval) * interval);
-        gate <= current.earned; gate += interval) {
-        const index = ((gate / interval - 1) % 4) + 1, lap = Math.floor((gate / interval - 1) / 4) + 1;
+      const fractions = splitFractionsForTrack(), gates = fractions.map(fraction => fraction * TRACK.checkpoints);
+      if (!gates.every(gate => Math.abs(gate - Math.round(gate)) < 1e-7)) continue;
+      const firstLap = Math.floor(Math.max(0, previous.earned) / TRACK.checkpoints) + 1;
+      const lastLap = Math.floor(current.earned / TRACK.checkpoints) + 1;
+      for (let lap = firstLap; lap <= lastLap; lap++) for (let offset = 0; offset < gates.length; offset++) {
+        const gate = (lap - 1) * TRACK.checkpoints + Math.round(gates[offset]);
+        if (gate <= previous.earned || gate > current.earned) continue;
+        const index = offset + 1;
         const key = keyFor(lap, index);
         if (racer.records.has(key)) continue;
         const start = racer.starts.get(lap) ?? (previous.lap + 1 === lap ? previous.lapStart : null);
@@ -106,7 +116,7 @@ export class SplitTiming {
         if (index === 4 && current.lap === previous.lap + 1) time = current.lapStart;
         else {
           const delta = signedDistance(previous.s, current.s);
-          const distance = mod(TRACK.startDistance + SPLIT_FRACTIONS[index - 1] * TRACK.length - previous.s, TRACK.length);
+          const distance = mod(TRACK.startDistance + fractions[index - 1] * TRACK.length - previous.s, TRACK.length);
           if (!(delta > 0 && delta < Math.min(TRACK.length / 8, (current.time - previous.time) * 700 + 2))
             || distance > delta + 1e-6) continue;
           time = previous.time + (current.time - previous.time) * Math.max(0, Math.min(1, distance / delta));

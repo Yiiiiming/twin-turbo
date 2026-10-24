@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TRACK,setTrack,RaceEngine} from '../engine.js';
-import {harborLandmarkPlacements,sceneObstacles,sceneEntryBoundary,roadsideLamps,updateChaseCamera,londonEye} from '../renderer.js';
-import {addCityLandmark} from '../city-scenery.js';
-import {createEntryCameraPlan,entryCameraForProgress} from '../entry-cameras.js';
+import {TRACK,setTrack,RaceEngine} from '../src/engine.js';
+import {harborLandmarkPlacements,sceneObstacles,sceneEntryBoundary,roadsideLamps,updateChaseCamera,londonEye} from '../src/renderer.js';
+import {addCityLandmark} from '../src/city-scenery.js';
+import {createEntryCameraPlan,entryCameraForProgress} from '../src/entry-cameras.js';
 
 test.afterEach(()=>setTrack('coast'));
 const dot=(a,b)=>a.reduce((sum,v,k)=>sum+v*b[k],0);

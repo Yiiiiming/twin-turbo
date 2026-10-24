@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, setTrack, trackPoint, projectTrack } from '../engine.js';
-import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../renderer.js';
-import { LONDON_SECOND_LANDMARKS, addLondonSecondLandmark } from '../london-second-landmarks.js';
-import { londonSecondLandmarkPlacements } from '../london-second-layout.js';
-import { ObstacleWorld } from '../collisions.js';
+import { TRACK, setTrack, trackPoint, projectTrack } from '../src/engine.js';
+import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../src/renderer.js';
+import { LONDON_SECOND_LANDMARKS, addLondonSecondLandmark } from '../src/london-second-landmarks.js';
+import { londonSecondLandmarkPlacements } from '../src/london-second-layout.js';
+import { ObstacleWorld } from '../src/collisions.js';
 const kinds=new Set(LONDON_SECOND_LANDMARKS.map(item=>item.kind));
 const additions=()=>londonLandmarkPlacements().filter(item=>kinds.has(item.kind));
 test.afterEach(()=>setTrack('coast'));

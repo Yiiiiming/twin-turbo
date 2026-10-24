@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createI18n, translateText } from '../i18n.js';
+import { createI18n, translateText } from '../src/i18n.js';
 
 class Element {
   constructor(tag='div') { this.nodeType=1;this.tagName=tag;this.childNodes=[];this.attrs=new Map();this.listeners=new Map();this.open=false; }
@@ -165,7 +165,7 @@ test('ghost challenge setup and results translate fully without exposing AI mode
     '最快的三位不同车手，加上三位配速幽灵。',
     '配速目标约比最慢的人类幽灵多 1、2、3 秒，不参与排行榜。',
     '幽灵均不碰撞；你完赛后立即结算。','选择你喜欢的车色。',
-    '镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶，完赛后结算。',
+    '镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶。',
     '你驾驶青色赛车，与人类纪录和配速幽灵较量。WASD 或方向键均可驾驶。',
     '你驾驶橙色赛车，与人类纪录和配速幽灵较量。WASD 或方向键均可驾驶。',
   ])assert.doesNotMatch(translateText(source),/[\u3400-\u9fff]/,source);

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { setTrack } from '../engine.js';
-import { cityLandmarkPlacements,addCityLandmark } from '../city-scenery.js';
+import { setTrack } from '../src/engine.js';
+import { cityLandmarkPlacements,addCityLandmark } from '../src/city-scenery.js';
 import { ParisMesh } from './helpers/paris-mesh.mjs';
 
 class SugarloafMesh extends ParisMesh {

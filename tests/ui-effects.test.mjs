@@ -22,7 +22,7 @@ async function load(t,{fine=true,reduced=false}={}){
   const previous=new Map(Object.keys(globals).map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]));
   for(const[k,v]of Object.entries(globals))Object.defineProperty(globalThis,k,{value:v,configurable:true});
   t.after(()=>{for(const[k,v]of previous)v?Object.defineProperty(globalThis,k,v):delete globalThis[k];});
-  const source=(await readFile(new URL('../ui-effects.js',import.meta.url),'utf8'))
+  const source=(await readFile(new URL('../src/ui-effects.js',import.meta.url),'utf8'))
     .replace("from './track-select.js'","from 'data:text/javascript,export function enhanceTrackSelect(){}'")
     .replace("from './landmark-hologram.js'","from 'data:text/javascript,export function initLandmarkHologram(){}'");
   await import(`data:text/javascript;base64,${Buffer.from(source+`\n// ${++sequence}`).toString('base64')}`);
@@ -63,7 +63,7 @@ test('reduced motion uses immediate concentric rings without replacing them with
   assert.equal(ui.frames.size,0,'no continued smoothing or motion after the pointer stops');
 });
 test('root, descendants and modal/pseudo surfaces use a genuinely transparent native cursor with a none fallback',async()=>{
-  const css=await readFile(new URL('../style.css',import.meta.url),'utf8');
+  const css=await readFile(new URL('../src/style.css',import.meta.url),'utf8');
   const rule=css.match(/(html\.orbit-cursor[^{}]+)\{\s*cursor:url\("data:image\/png;base64,([^"]+)"\) 0 0,none!important;/);
   assert.ok(rule);for(const selector of ['html.orbit-cursor','html.orbit-cursor *','html.orbit-cursor *::before','html.orbit-cursor *::after','html.orbit-cursor ::backdrop'])assert.ok(rule[1].split(',').map(s=>s.trim()).includes(selector));
   const png=Buffer.from(rule[2],'base64'),chunks=[];

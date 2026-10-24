@@ -5,9 +5,9 @@
 <header><strong>上海下坡 · 地标巡览</strong><select id="landmark" aria-label="选择名胜地标"></select><button id="detail" aria-pressed="false">建筑细节</button><button id="drive" aria-pressed="true">实际驾驶视角</button><button id="next">下一座</button><label>赛道位置<input id="station" type="number" value="9200" step="100"></label><button id="position">定位</button><button id="play" aria-pressed="false">播放下坡</button></header>
 <div id="status" role="status" aria-live="polite">正在准备上海地标…</div><canvas id="view" aria-label="上海下坡建筑预览"></canvas>
 <script type="module">
-import {RaceEngine,TRACK,setTrack,trackPoint} from '../engine.js';
-import {RaceRenderer} from '../renderer.js';
-import {shanghaiDownhillPlacements,addShanghaiDownhillLandmark} from '../shanghai-downhill.js';
+import {RaceEngine,TRACK,setTrack,trackPoint} from '../src/engine.js';
+import {RaceRenderer} from '../src/renderer.js';
+import {shanghaiDownhillPlacements,addShanghaiDownhillLandmark} from '../src/shanghai-downhill.js';
 import {previewMesh} from './landmark-preview-mesh.js';
 setTrack('coast-shanghai');
 const $=id=>document.getElementById(id),canvas=$('view'),plots=shanghaiDownhillPlacements();

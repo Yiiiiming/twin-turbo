@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK,setTrack,trackPoint } from '../engine.js';
-import { ObstacleWorld } from '../collisions.js';
-import { RaceRenderer,updateChaseCamera } from '../renderer.js';
+import { TRACK,setTrack,trackPoint } from '../src/engine.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { RaceRenderer,updateChaseCamera } from '../src/renderer.js';
 
 test.afterEach(()=>setTrack('coast'));
 function fakeGL(){

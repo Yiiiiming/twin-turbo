@@ -1,4 +1,5 @@
 import { magicLocal } from './london-magic-layout.js';
+import { londonMagicFlight } from './london-magic-flight.js';
 
 const TAU=Math.PI*2,clamp=n=>Math.max(0,Math.min(1,n));
 const mix=(a,b,t)=>a.map((n,i)=>n+(b[i]-n)*t);
@@ -32,14 +33,9 @@ export function londonMagicState(items,time=0){
   return {item,t,phase:attackProgress<.18?'cast':attackProgress<.72?'clash':'counter',
    attackSide,attackProgress,release:1,impact,strike,counter,actors,clash,index};
  });
- const castle=items.find(item=>item.kind==='hogwarts-castle'),phase=time*.36;
- const local=[Math.cos(phase)*390,208+Math.sin(phase*1.6)*57,Math.sin(phase)*220-45];
- const pos=magicLocal(castle,...local),vx=-Math.sin(phase)*390,vz=Math.cos(phase)*220,
-  tangent=castle.angle+Math.atan2(vz,vx);
  const lights=duels.map(duel=>({position:duel.clash,color:duel.index?[.28,.53,1]:[1,.42,.19],
   strength:.55+duel.impact*.55}));
- return {actors:duels.flatMap(duel=>duel.actors),duels,car:{x:pos[0],y:pos[1],z:pos[2],angle:tangent,
-  roll:-.17*Math.sin(phase+.45),pitch:.12*Math.cos(phase*1.6)},lights};
+ return {actors:duels.flatMap(duel=>duel.actors),duels,car:londonMagicFlight(time),lights};
 }
 
 export function magicBodyMatrix(actor){

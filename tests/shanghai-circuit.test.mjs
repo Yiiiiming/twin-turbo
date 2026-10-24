@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, setTrack, trackPoint, projectTrack, RaceEngine, mod } from '../engine.js';
-import { RaceAI } from '../ai.js';
-import { ObstacleWorld } from '../collisions.js';
-import { SHANGHAI_LANDMARKS, shanghaiLandmarkPlacements, addShanghaiLandmark } from '../shanghai-landmarks.js';
-import { updateChaseCamera, sceneObstacles } from '../renderer.js';
-import { citySceneryPlacements } from '../city-scenery.js';
-import { pudongSkylinePlacements, shanghaiRiverClearance } from '../shanghai-riverfront.js';
+import { TRACK, setTrack, trackPoint, projectTrack, RaceEngine, mod } from '../src/engine.js';
+import { RaceAI } from '../src/ai.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { SHANGHAI_LANDMARKS, shanghaiLandmarkPlacements, addShanghaiLandmark } from '../src/shanghai-landmarks.js';
+import { updateChaseCamera, sceneObstacles } from '../src/renderer.js';
+import { citySceneryPlacements } from '../src/city-scenery.js';
+import { pudongSkylinePlacements, shanghaiRiverClearance } from '../src/shanghai-riverfront.js';
 
 class AuditMesh {
  constructor(item){this.item=item;this.colliders=[];this.radius=0;this.low=Infinity;this.high=-Infinity;this.triangles=0;this.colors=new Set();}
@@ -109,7 +109,7 @@ test('Shanghai production supports, lifted timing gates and lamps clear all chas
 });
 
 test('Huangpu has two finite banks, a raised crossing and a sustained Bund-to-Pearl driving view',async()=>{
- const {shanghaiRiverContains,shanghaiRiverClearance}=await import('../shanghai-riverfront.js');setTrack('coast-shanghai');
+ const {shanghaiRiverContains,shanghaiRiverClearance}=await import('../src/shanghai-riverfront.js');setTrack('coast-shanghai');
  assert.ok(TRACK.bund.length>=2800&&TRACK.bund.length<=3400,'Bund should offer at least eight seconds of riverfront driving at cruising speed');
  let entries=0,insideBefore=false;
  for(let s=0;s<TRACK.length;s+=9){const p=trackPoint(s),inside=shanghaiRiverContains(p.x,p.y);

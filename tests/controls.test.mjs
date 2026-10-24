@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIONS, DEFAULT_BINDINGS, ControlBindings, allowedKey, keyLabel } from '../controls.js';
+import { ACTIONS, DEFAULT_BINDINGS, ControlBindings, allowedKey, keyLabel } from '../src/controls.js';
 
 const memoryStorage = initial => {
   const values = new Map(initial === undefined ? [] : [['twin-turbo-controls-v1', initial]]);

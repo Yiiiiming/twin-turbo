@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceAI } from '../ai.js';
-import { RaceEngine, TRACK, trackPoint, projectTrack, mod } from '../engine.js';
-import { sceneObstacles } from '../renderer.js';
+import { RaceAI } from '../src/ai.js';
+import { RaceEngine, TRACK, trackPoint, projectTrack, mod } from '../src/engine.js';
+import { sceneObstacles } from '../src/renderer.js';
 
 const obstacles=sceneObstacles();
 const allowed=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter']);

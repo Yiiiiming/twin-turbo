@@ -243,10 +243,11 @@ dialog::backdrop { background: #080617bb; backdrop-filter: blur(8px); }
 #settings-dialog .control-player > div { flex: 1; min-width: 0; }
 #settings-dialog .control-player strong { color: var(--accent, #cfbaf3); font-size: 13px; font-weight: 400; }
 #settings-dialog .player-chip { flex: none; color: var(--accent, #cfbaf3); font-size: 10px; padding-top: 4px; }
-#settings-dialog .key-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin-top: 10px; color: #afa0c5; font-size: 11px; line-height: 1.8; }
-#settings-dialog .key-group { display: inline-flex; flex-wrap: wrap; gap: 0; }
-#settings-dialog .rescue-key { white-space: nowrap; }
-#settings-dialog .alternate-label { margin-right: 4px; color: #a496b7; font-size: 10px; }
+#settings-dialog .control-key-grid { display: grid; grid-template-columns: minmax(0, max-content) max-content max-content max-content max-content max-content; align-items: center; gap: 10px 6px; margin-top: 10px; color: #afa0c5; font-size: 11px; line-height: 1.8; }
+#settings-dialog .key-row, #settings-dialog .rescue-key { display: contents; }
+#settings-dialog .key-group { display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; }
+#settings-dialog .control-key-grid kbd { margin: 0; justify-self: start; }
+#settings-dialog .key-row > span:not(.key-group), #settings-dialog .rescue-key > span { white-space: nowrap; }
 #settings-dialog .race-tip { display: none; }
 #help-dialog .help-players { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 28px 0; }
 #help-dialog .help-players strong { font-size: 14px; font-weight: 450; color: var(--accent, #d6c9ef); }

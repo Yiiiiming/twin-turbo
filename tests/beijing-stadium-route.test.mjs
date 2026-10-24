@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TRACK, TRACKS, setTrack, trackPoint, projectTrack, RaceEngine, mod } from '../engine.js';
-import { pointOnTrack } from '../tracks.js';
-import { legacyToStadiumDistance } from '../beijing-stadium-route.js';
-import { RaceAI } from '../ai.js';
-import { sceneObstacles } from '../renderer.js';
+import { TRACK, TRACKS, setTrack, trackPoint, projectTrack, RaceEngine, mod } from '../src/engine.js';
+import { pointOnTrack } from '../src/tracks.js';
+import { legacyToStadiumDistance } from '../src/beijing-stadium-route.js';
+import { RaceAI } from '../src/ai.js';
+import { sceneObstacles } from '../src/renderer.js';
 import { routeDefinition, routeDigest, routeDrivingSamples } from './helpers/route-snapshot.mjs';
 
 const locks=JSON.parse(readFileSync(new URL('./fixtures/route-locks.json',import.meta.url),'utf8'));

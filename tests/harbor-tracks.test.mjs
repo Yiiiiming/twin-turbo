@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack, mod } from '../engine.js';
-import { RaceAI } from '../ai.js';
-import { SplitTiming } from '../split-timing.js';
-import { sceneObstacles, sampleRoadRibbon, updateChaseCamera, RaceRenderer, harborLandmarkPlacements, TERRAIN_PALETTES, sceneryPlacements } from '../renderer.js';
+import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack, mod } from '../src/engine.js';
+import { RaceAI } from '../src/ai.js';
+import { SplitTiming } from '../src/split-timing.js';
+import { sceneObstacles, sampleRoadRibbon, updateChaseCamera, RaceRenderer, harborLandmarkPlacements, TERRAIN_PALETTES, sceneryPlacements } from '../src/renderer.js';
 const tracks=Object.values(TRACKS).filter(track=>track.id.startsWith('coast-'));
 const angleDifference=(a,b)=>Math.abs(mod(a-b+Math.PI,Math.PI*2)-Math.PI);
 

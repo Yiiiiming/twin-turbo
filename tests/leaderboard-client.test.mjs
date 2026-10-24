@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LeaderboardClient } from '../leaderboard-client.js';
-import { LEADERBOARD_VERSION } from '../leaderboard.js';
+import { LeaderboardClient } from '../src/leaderboard-client.js';
+import { LEADERBOARD_VERSION } from '../src/leaderboard.js';
 
 class Classes {
   constructor() { this.names = new Set(); }

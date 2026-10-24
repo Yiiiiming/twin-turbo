@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK,setTrack,trackPoint,projectTrack } from '../engine.js';
-import { AUSTIN_LANDMARKS,addAustinLandmark } from '../austin-landmarks.js';
-import { SIXTH_STREET_VENUES } from '../austin-sixth-street.js';
-import { cityLandmarkPlacements,citySceneryPlacements } from '../city-scenery.js';
+import { TRACK,setTrack,trackPoint,projectTrack } from '../src/engine.js';
+import { AUSTIN_LANDMARKS,addAustinLandmark } from '../src/austin-landmarks.js';
+import { SIXTH_STREET_VENUES } from '../src/austin-sixth-street.js';
+import { cityLandmarkPlacements,citySceneryPlacements } from '../src/city-scenery.js';
 test.afterEach(()=>setTrack('coast'));
 class GeometryProbe {
   constructor(center) { this.center = center; this.radius = 0; this.minY = Infinity; this.maxY = -Infinity; this.vertices = 0; this.colors = new Set(); this.colliders = []; }

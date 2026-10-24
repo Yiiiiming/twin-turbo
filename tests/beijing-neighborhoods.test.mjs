@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, setTrack, trackPoint, projectTrack } from '../engine.js';
-import { ObstacleWorld } from '../collisions.js';
-import { updateChaseCamera } from '../renderer.js';
-import { cityLandmarkPlacements } from '../city-scenery.js';
-import { beijingReferencePoint } from '../beijing-reference.js';
-import { beijingStadiumClearance } from '../beijing-stadium.js';
-import { beijingWallClearance } from '../beijing-great-wall.js';
-import { beijingNeighborhoodPlacements, addBeijingNeighborhood } from '../beijing-neighborhoods.js';
+import { TRACK, setTrack, trackPoint, projectTrack } from '../src/engine.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { updateChaseCamera } from '../src/renderer.js';
+import { cityLandmarkPlacements } from '../src/city-scenery.js';
+import { beijingReferencePoint } from '../src/beijing-reference.js';
+import { beijingStadiumClearance } from '../src/beijing-stadium.js';
+import { beijingWallClearance } from '../src/beijing-great-wall.js';
+import { beijingNeighborhoodPlacements, addBeijingNeighborhood } from '../src/beijing-neighborhoods.js';
 
 test.afterEach(()=>setTrack('coast'));
 class Probe{

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, setTrack } from '../engine.js';
-import { RaceRenderer } from '../renderer.js';
+import { RaceEngine, setTrack } from '../src/engine.js';
+import { RaceRenderer } from '../src/renderer.js';
 
 const TAU = Math.PI * 2;
 const originalMatchMedia = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');

@@ -48,6 +48,8 @@ const PHRASES = [
 ];
 PHRASES.push(
 ['暂停 / 继续，保持全屏 · Esc 退出全屏会自动暂停。','Pause / resume without leaving fullscreen. Esc exits fullscreen and pauses.'],
+['暂停 / 继续，保持全屏 ·','Pause / resume without leaving fullscreen.'],
+['退出全屏会自动暂停。','exits fullscreen and pauses.'],
 ['暂停 / 继续 · 退出全屏会自动暂停。P 已用于自定义驾驶。','Pause / resume. Leaving fullscreen pauses the race. P is assigned to driving.'],
 ['离开游戏窗口会自动暂停。','Switching away automatically pauses the race.'],
 ['沿着风景，一路较量。','Race through the scenery.'],
@@ -115,7 +117,7 @@ PHRASES.push(
 ["目标用时", "Target time"],
 ["幽灵均不碰撞；你完赛后立即结算。", "Ghosts have no collisions. Results appear as soon as you finish."],
 ["选择你喜欢的车色。", "Choose your favorite car color."],
-["镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶，完赛后结算。", "The full view follows your car as you challenge this circuit’s fastest player ghosts and three pace ghosts. Use either keyboard layout; results appear when you finish."]
+["镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶。", "The full view follows your car as you challenge this circuit’s fastest player ghosts and three pace ghosts. Use either keyboard layout."]
 );
 PHRASES.push(['回到路面即可取消倒计时','Return to the road to cancel the countdown'],['离开赛道满 7 秒 · 已自动复位','7 seconds off-road · Automatically recovered']);
 const exact = new Map(PHRASES);

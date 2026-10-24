@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { TRACK, RaceEngine, setTrack, trackPoint, projectTrack } from '../engine.js';
-import { ObstacleWorld } from '../collisions.js';
-import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../renderer.js';
-import { LONDON_THEATRES, addLondonTheatre } from '../london-theatres.js';
+import { TRACK, RaceEngine, setTrack, trackPoint, projectTrack } from '../src/engine.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { RaceRenderer, londonLandmarkPlacements, sceneryPlacements, updateChaseCamera } from '../src/renderer.js';
+import { LONDON_THEATRES, addLondonTheatre } from '../src/london-theatres.js';
 test.afterEach(()=>setTrack('coast'));
 
 // Inspect actual primitive extents, not just declared model envelopes. Catch

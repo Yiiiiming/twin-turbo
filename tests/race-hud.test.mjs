@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, mod } from '../engine.js';
-import { RaceAI } from '../ai.js';
-import { GhostRecorder } from '../ghost-replay.js';
-import { updateChaseCamera, perspective, lookAt, multiply } from '../renderer.js';
-import { ghostProgressTimeline, progressAt, liveGhostPosition, carNitroAnchor } from '../race-hud.js';
+import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, mod } from '../src/engine.js';
+import { RaceAI } from '../src/ai.js';
+import { GhostRecorder } from '../src/ghost-replay.js';
+import { updateChaseCamera, perspective, lookAt, multiply } from '../src/renderer.js';
+import { ghostProgressTimeline, progressAt, liveGhostPosition, carNitroAnchor } from '../src/race-hud.js';
 
 const near = (actual, expected, tolerance = 1e-7, label = '') =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} != ${expected} (±${tolerance})`);

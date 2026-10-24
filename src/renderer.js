@@ -15,7 +15,7 @@ import { londonThirdLandmarkPlacements } from './london-third-layout.js';
 import { londonMagicPlacements, londonMagicBlend } from './london-magic-layout.js';
 import { addLondonMagicScenery, addMagicCharacter, addMagicFlyingCar } from './london-magic-models.js';
 import { londonMagicState, magicBodyMatrix, magicArmMatrix, MagicEffects } from './london-magic-effects.js';
-import { SPLIT_FRACTIONS } from './split-timing.js';
+import { splitFractionsForTrack } from './split-timing.js';
 import { CHALLENGE_COLORS } from './ghost-challenge.js';
 import { createEntryCameraPlan, entryCameraForProgress, entryMeshOcclusion } from './entry-cameras.js';
 import { addBeijingGreatWall } from './beijing-great-wall.js';
@@ -831,9 +831,9 @@ export function cornerMarkerGeometry(marker) {
   return {normal,chevrons};
 }
 
-/** Timing points share the physics gate spacing. Posts leave full racing width. */
+/** Timing points reuse earned physics gates. Posts leave full racing width. */
 export function timingGateGeometry() {
-  return SPLIT_FRACTIONS.map((fraction,index) => {
+  return splitFractionsForTrack().map((fraction,index) => {
     const s = TRACK.startDistance + TRACK.length * fraction, center = trackPoint(s);
     const halfSpan = TRACK.roadWidth / 2 + (TRACK.theme==='beijing'?75:30);
     return { index:index+1, fraction, s, center, halfSpan, finish:index===3,

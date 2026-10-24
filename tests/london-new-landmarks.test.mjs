@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { TRACK,setTrack,trackPoint,projectTrack,RaceEngine } from '../engine.js';
-import { RaceAI } from '../ai.js';
-import { RaceRenderer,londonLandmarkPlacements,sceneryPlacements,roadsideLamps,updateChaseCamera } from '../renderer.js';
-import { ObstacleWorld } from '../collisions.js';
-import { LONDON_NEW_LANDMARKS,londonNewLandmarkPlacements,addLondonNewLandmark } from '../london-new-landmarks.js';
+import { TRACK,setTrack,trackPoint,projectTrack,RaceEngine } from '../src/engine.js';
+import { RaceAI } from '../src/ai.js';
+import { RaceRenderer,londonLandmarkPlacements,sceneryPlacements,roadsideLamps,updateChaseCamera } from '../src/renderer.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { LONDON_NEW_LANDMARKS,londonNewLandmarkPlacements,addLondonNewLandmark } from '../src/london-new-landmarks.js';
 const kinds=new Set(LONDON_NEW_LANDMARKS.map(item=>item.kind));
 const basePlots=()=>londonLandmarkPlacements().filter(item=>!kinds.has(item.kind));
 const additions=()=>londonNewLandmarkPlacements(basePlots());

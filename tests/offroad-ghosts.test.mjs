@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RaceEngine, TRACK, setTrack, trackPoint, projectTrack, mod } from '../engine.js';
-import { GhostRecorder, validateReplay, validateRaceReplay, ghostVersionForCity } from '../ghost-replay.js';
-import { UnifiedRecordsClient } from '../unified-records.js';
-import { LEADERBOARD_VERSION } from '../leaderboard.js';
+import { RaceEngine, TRACK, setTrack, trackPoint, projectTrack, mod } from '../src/engine.js';
+import { GhostRecorder, validateReplay, validateRaceReplay, ghostVersionForCity } from '../src/ghost-replay.js';
+import { UnifiedRecordsClient } from '../src/unified-records.js';
+import { LEADERBOARD_VERSION } from '../src/leaderboard.js';
 
 test.afterEach(()=>setTrack('coast'));
 const dt=1/60;

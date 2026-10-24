@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GhostClient, GHOST_VERSION, validGhostReplay } from '../ghost-client.js';
-import { RACE_GHOST_VERSION, ghostVersionForCity } from '../ghost-replay.js';
+import { GhostClient, GHOST_VERSION, validGhostReplay } from '../src/ghost-client.js';
+import { RACE_GHOST_VERSION, ghostVersionForCity } from '../src/ghost-replay.js';
 
 class Classes {
   constructor() { this.names = new Set(); }
@@ -70,6 +70,8 @@ function setup(timeoutMs = 20000) {
   const document = { htmlWrites: [], getElementById: id => nodes.get(id), createElement: tag => new Node(tag, document),
     createTextNode: text => ({ textContent: text }) };
   for (const id of IDS) { const node = new Node('div', document); node.id = id; nodes.set(id, node); }
+  const pickerState = new Node('div', document);
+  pickerState.append(nodes.get('ghost-picker-status'), nodes.get('ghost-picker-retry'));
   const client = new GhostClient({ document, origin: 'https://example.test', timeoutMs,
     storage: { getItem: id => memory.get(id), setItem: (id, value) => memory.set(id, value) },
     fetchImpl: async (url, options) => {
@@ -258,7 +260,8 @@ test('pre-race board selects each nickname’s fastest replay while preserving b
   assert.match(h.requests[0].url, /coast-ghost-v1/);
   assert.equal(h.get('ghost-picker-list').children.length, 2); assert.equal(h.client.pickerButtons.length, 4);
   assert.equal(h.client.pickerButtons[0].entry.name, '<b>最快</b>'); assert.equal(h.document.htmlWrites.length, 0);
-  assert.match(h.get('ghost-picker-status').textContent, /最快单圈/);
+  assert.equal(h.get('ghost-picker-status').textContent, '');
+  assert.equal(h.get('ghost-picker-status').parentElement.hidden, true);
   h.queue.push(response({ entry: entry('<b>最快</b>', 'fast', 40000), replay: replay(40000) }));
   await h.client.pickerButtons[0].button.dispatch('click');
   h.queue.push(response({ entry: entry('较慢', 'slow', 44000), replay: replay(44000) }));
@@ -272,10 +275,14 @@ test('pre-race board selects each nickname’s fastest replay while preserving b
 
 test('ranked board failure can retry to an empty board without preventing a race', async () => {
   const h = setup(); h.client.recordsManaged = true; await h.client.init();
+  h.client.renderPickerBoard([entry()]);
+  assert.equal(h.get('ghost-picker-status').parentElement.hidden, true);
   h.queue.push(new Error('offline')); await h.client.openPicker(1);
+  assert.equal(h.get('ghost-picker-status').parentElement.hidden, false);
   assert.equal(h.get('ghost-picker-retry').hidden, false); assert.match(h.get('ghost-picker-status').textContent, /直接出发/);
   h.queue.push(response({ entries: [] })); await h.get('ghost-picker-retry').dispatch('click');
   assert.equal(h.get('ghost-picker-retry').hidden, true); assert.match(h.get('ghost-picker-status').textContent, /还没有/);
+  assert.equal(h.get('ghost-picker-status').parentElement.hidden, false);
   assert.deepEqual(h.client.startRace(), []);
 });
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GhostRecorder, sampleReplay, validateReplay, validateRaceReplay, RACE_GHOST_VERSION, GHOST_VERSION, GHOST_LIMITS } from '../ghost-replay.js';
+import { GhostRecorder, sampleReplay, validateReplay, validateRaceReplay, RACE_GHOST_VERSION, GHOST_VERSION, GHOST_LIMITS } from '../src/ghost-replay.js';
 
 const start = 1.037;
 const pose = time => ({ x: 200 + time * 2, y: -75 + time * 3, angle: .2 + time / 100, elevation: 4 + time / 10 });

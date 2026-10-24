@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { TRACK,setTrack,trackPoint,projectTrack } from '../engine.js';
-import { cityLandmarkPlacements,citySceneryPlacements } from '../city-scenery.js';
-import { SIXTH_STREET_VENUES,sixthStreetPlacements } from '../austin-sixth-street.js';
+import { TRACK,setTrack,trackPoint,projectTrack } from '../src/engine.js';
+import { cityLandmarkPlacements,citySceneryPlacements } from '../src/city-scenery.js';
+import { SIXTH_STREET_VENUES,sixthStreetPlacements } from '../src/austin-sixth-street.js';
 test.afterEach(()=>setTrack('coast'));
 test('Sixth Street preserves the Austin route, elevation, start grid and ghost coordinates',()=>{
  setTrack('coast-austin');assert.equal(createHash('sha256').update(JSON.stringify({track:TRACK,samples:Array.from({length:1681},(_,i)=>trackPoint(i*10))})).digest('hex'),'b880108622e1b109edf5afcb45a85d8d0f2a3733e8d0d616fb2dab46e9ab12de');

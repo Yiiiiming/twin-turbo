@@ -29,8 +29,9 @@ export function createDrivingTutorial(document, { bindings, language = () => 'zh
     title.textContent=completed?(en?'Ready to race':'准备好出发了'):item.title[index];
     instruction.textContent=completed
       ?reason==='lap'?(en?'Practice lap complete. Try a race whenever you are ready.':'已完成一圈练习，准备好就去参加比赛吧。')
-        :(en?'You have tried all five controls. This practice does not save a result.':'五项操作都试过了，本次练习不会保存成绩。')
+        :''
       :item.text[index];
+    instruction.hidden=completed&&reason!=='lap';
     exit.textContent=completed?(en?'Back to menu':'返回主菜单'):(en?'End practice':'结束练习');
     hints.replaceChildren();
     if(!completed)for(const action of item.actions){

@@ -140,7 +140,6 @@ const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
 const selectedLaps = 1;
 let selectedMode = 'ai', raceMode = 'local', lastRescueCounts = [0, 0];
-let selectedColor = 'cyan';
 let lastTime = performance.now(), lastState = '', lastCount = 0;
 let soundEnabled = false, audio = null, audioNodes = [];
 let lastLaps = [0, 0], notices = ['', ''], noticeUntil = [0, 0], toastTime = 0;
@@ -563,8 +562,8 @@ function selectLaps() {
 }
 
 function applyPlayerColors() {
-  const flipped = selectedMode !== 'local' && selectedColor === 'orange';
-  const indices = flipped ? [1,0] : [0,1];
+  // Driver identity is fixed: the solo driver/P1 is cyan; local P2 is orange.
+  const indices = [0,1];
   const palette = ['#51dfe5','#ff9870'], labels = ['青色闪电','橙色风暴'];
   engine.cars.forEach((car,i)=>{car.colorIndex=indices[i];colors[i]=palette[indices[i]];names[i]=labels[indices[i]];});
   document.querySelectorAll('.player-card').forEach((node,i)=>{node.classList.toggle('cyan',indices[i]===0);node.classList.toggle('orange',indices[i]===1);});
@@ -600,16 +599,13 @@ function updateMode() {
   $('race-arena').setAttribute('aria-label',solo?'单人赛道，镜头跟随你的赛车':'左右分屏赛道，左侧玩家一，右侧玩家二');
   $('player2-label').textContent=solo?'GHOST CHALLENGE':'PLAYER 02'; $('control-player2-chip').textContent=solo?'GHOST':'P2';
   $('mode-label').textContent=selectedMode==='tutorial'?'新手教程':solo?'幽灵挑战':'双人分屏'; $('mode-english').textContent=solo?'SINGLE PLAYER':'LOCAL MULTIPLAYER';
-  $('player-color-select').classList.toggle('hidden',!solo);
   $('player1-alternate-controls').classList.toggle('hidden',!solo);
   $('player2-controls').classList.toggle('hidden',solo); $('ai-control-note').classList.toggle('hidden',!solo);
-  $('help-mode-description').textContent=selectedMode==='tutorial'?'跟着提示练习加速、转向、刹车、氮气与复位。练习不记录成绩。':solo?'镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶，完赛后结算。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
+  $('help-mode-description').textContent=selectedMode==='tutorial'?'跟着提示练习加速、转向、刹车、氮气与复位。练习不记录成绩。':solo?'镜头全屏跟随你的赛车，挑战本图最快的人类幽灵和三位配速幽灵。两套键位都可驾驶。':'两位玩家共用键盘，各占半个屏幕。先完成全部圈数的玩家获胜；另一位可继续跑完，双方完赛后一起结算。';
   document.querySelectorAll('[data-mode]').forEach(button=>{const active=button.dataset.mode===selectedMode;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
-  document.querySelectorAll('[data-player-color]').forEach(button=>{const active=button.dataset.playerColor===selectedColor;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
   refreshBindings();
 }
 document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{if(engine.state!=='menu')return;selectedMode=['ai','tutorial'].includes(button.dataset.mode)?button.dataset.mode:'local';updateMode();}));
-document.querySelectorAll('[data-player-color]').forEach(button=>button.addEventListener('click',()=>{if(engine.state!=='menu')return;selectedColor=button.dataset.playerColor==='orange'?'orange':'cyan';updateMode();}));
 function openBindings() {
   engine.pause(); keys.clear(); bindingCapture=null; refreshBindings();
   $('bindings-message').textContent='点击要修改的动作，再按一个新键。重复键会提示；Esc 取消选键。';
@@ -644,7 +640,10 @@ function refreshPauseUI() {
   $('pause').innerHTML=`${i18n.t(engine.state==='paused'?'继续':'暂停')} <kbd>${shortcut}</kbd>`;
   $('pause').setAttribute('aria-label',i18n.t(engine.state==='paused'?'继续比赛':'暂停比赛'));
   $('pause-shortcut').textContent=shortcut;
-  $('pause-help-text').textContent=i18n.t(customP?'暂停 / 继续 · 退出全屏会自动暂停。P 已用于自定义驾驶。':'暂停 / 继续，保持全屏 · Esc 退出全屏会自动暂停。');
+  const help=i18n.t(customP?'暂停 / 继续 · 退出全屏会自动暂停。P 已用于自定义驾驶。':'暂停 / 继续，保持全屏 · Esc 退出全屏会自动暂停。');
+  $('pause-help-text').replaceChildren(...help.split(/\b(Esc|P)\b/).filter(Boolean).map(text=>{
+    const part=document.createElement(text==='Esc'||text==='P'?'kbd':'span');part.textContent=text;return part;
+  }));
 }
 function refreshFullscreenUI() {
   const label=i18n.t(document.fullscreenElement?'退出全屏':'全屏');

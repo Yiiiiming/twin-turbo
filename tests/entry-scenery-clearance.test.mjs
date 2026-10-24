@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TRACK,RaceEngine,setTrack} from '../engine.js';
-import {RaceRenderer,harborLandmarkPlacements,roadsideLamps,sceneEntryBoundary,updateChaseCamera} from '../renderer.js';
-import {createEntryCameraPlan,entryCameraForProgress,entryMeshOcclusion,entrySegmentBlocked,ENTRY_CAMERA_CUTS} from '../entry-cameras.js';
+import {TRACK,RaceEngine,setTrack} from '../src/engine.js';
+import {RaceRenderer,harborLandmarkPlacements,roadsideLamps,sceneEntryBoundary,updateChaseCamera} from '../src/renderer.js';
+import {createEntryCameraPlan,entryCameraForProgress,entryMeshOcclusion,entrySegmentBlocked,ENTRY_CAMERA_CUTS} from '../src/entry-cameras.js';
 import {parisFakeGL} from './helpers/paris-mesh.mjs';
 
 test.afterEach(()=>setTrack('coast'));

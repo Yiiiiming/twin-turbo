@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { TRACKS, RaceEngine, setTrack, trackPoint } from '../engine.js';
-import { RaceRenderer, harborLandmarkPlacements } from '../renderer.js';
-import { hologramEdges } from '../hologram-edges.js';
+import { TRACKS, RaceEngine, setTrack, trackPoint } from '../src/engine.js';
+import { RaceRenderer, harborLandmarkPlacements } from '../src/renderer.js';
+import { hologramEdges } from '../src/hologram-edges.js';
 
 // Captured from the actual production uploads before the visual-only change,
 // not generated from the themed implementation. This is not a route baseline

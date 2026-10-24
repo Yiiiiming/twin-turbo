@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {RaceEngine,setTrack} from '../engine.js';
-import {RaceRenderer,nitroFlameState,nitroFlameModel} from '../renderer.js';
+import {RaceEngine,setTrack} from '../src/engine.js';
+import {RaceRenderer,nitroFlameState,nitroFlameModel} from '../src/renderer.js';
 
 test.afterEach(()=>setTrack('coast'));
 const identity=()=>new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);

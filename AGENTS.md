@@ -71,3 +71,11 @@ The user explicitly requested “给北京能不能加一个项目 就是能开�
 ## Single-player grid authorization implemented, 2026-10-22
 
 The user explicitly requested “单人比赛在中间起步就可以了”. A one-car race now starts at lateral lane 0 for both colors, and its pre-line recovery returns there. The longitudinal grid station, local two-player slots, driving surface, finish line and checkpoints remain unchanged. This narrow exception does not authorize any other route or grid changes.
+
+## Repository organization, 2026-10-24
+
+The user requested GitHub cleanup, explicit current-versus-archive labels and grouping loose files. Current JavaScript/CSS lives in `src/`; development `index.html` stays at the root. `docs/` is the GitHub Pages publication, not prose documentation. Current explanatory docs live in `documentation/`; old notes and fixed-commit history pointers live in `archive/`. Never classify currently imported city batches or the six temporarily hidden maps as retired just because of their filenames. Local `work/`, generated offline HTML and logs are not release inputs.
+
+## Austin split timing authorization implemented, 2026-10-24
+
+The user asked “austin的有一个checkpoint的右边的排名挡住ou still sucks了 把哪个checkpoint挪走”. Austin's first visible split timing gate and player/ghost split measurement now use existing progress gate 30/68 rather than 25%, after the scoreboard view. The physical road, all 68 racing progression checkpoints, and the frozen route baseline remain identical. Only the three authorized Austin scenery hashes are updated in the hologram scene fixture, with the exact request recorded there.

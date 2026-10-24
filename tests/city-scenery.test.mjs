@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack } from '../engine.js';
-import { beijingStadiumClearance } from '../beijing-stadium.js';
-import { RaceAI } from '../ai.js';
-import { RaceRenderer, sceneObstacles, updateChaseCamera, TERRAIN_PALETTES } from '../renderer.js';
-import { cityLandmarkPlacements, citySceneryPlacements, addCityLandmark, addCityStreetScenery } from '../city-scenery.js';
+import { TRACK, TRACKS, RaceEngine, setTrack, trackPoint, projectTrack } from '../src/engine.js';
+import { beijingStadiumClearance } from '../src/beijing-stadium.js';
+import { RaceAI } from '../src/ai.js';
+import { RaceRenderer, sceneObstacles, updateChaseCamera, TERRAIN_PALETTES } from '../src/renderer.js';
+import { cityLandmarkPlacements, citySceneryPlacements, addCityLandmark, addCityStreetScenery } from '../src/city-scenery.js';
 const cities=['coast-beijing','coast-austin','coast-rio','coast-paris'];
 test.afterEach(()=>setTrack('coast'));
 

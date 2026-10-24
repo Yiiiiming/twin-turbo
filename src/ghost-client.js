@@ -296,9 +296,11 @@ export class GhostClient {
       }
       row.appendChild(actions); list.appendChild(row);
     }
-    this.node('ghost-picker-status').textContent = clean.length
-      ? `最快单圈前五 · 点颜色加入，再点一次取消。已选颜色可替换。`
+    const status = this.node('ghost-picker-status');
+    status.textContent = clean.length
+      ? ''
       : `还没有单圈幽灵上榜。可以直接出发，完赛后保存自己的幽灵。`;
+    if (status.parentElement) status.parentElement.hidden = clean.length > 0;
     this.node('ghost-picker-retry').hidden = true;
     this.controls();
   }
@@ -307,6 +309,7 @@ export class GhostClient {
     const request = ++this.pickerRequest;
     const title = this.node('ghost-picker-title'); if (title) title.textContent = (isNewGhostCircuit(this.city) ? '新地图 · ' : '') + '最快单圈幽灵榜';
     this.node('ghost-picker-status').textContent = `正在读取可挑战的单圈记录…`;
+    if (this.node('ghost-picker-status').parentElement) this.node('ghost-picker-status').parentElement.hidden = false;
     this.node('ghost-picker-retry').hidden = true;
     try {
       const data = await this.request(`/api/laps?${this.query()}`);

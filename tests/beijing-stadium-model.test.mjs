@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACK,setTrack,trackPoint } from '../engine.js';
-import { ObstacleWorld } from '../collisions.js';
-import { updateChaseCamera } from '../renderer.js';
-import { addBeijingStadium,beijingStadiumClearance,beijingStadiumModelLayout } from '../beijing-stadium.js';
+import { TRACK,setTrack,trackPoint } from '../src/engine.js';
+import { ObstacleWorld } from '../src/collisions.js';
+import { updateChaseCamera } from '../src/renderer.js';
+import { addBeijingStadium,beijingStadiumClearance,beijingStadiumModelLayout } from '../src/beijing-stadium.js';
 
 test.afterEach(()=>setTrack('coast'));
 class Mesh {
