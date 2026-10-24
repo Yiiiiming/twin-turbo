@@ -12,6 +12,7 @@ import { hologramEdges } from '../hologram-edges.js';
 const locks = JSON.parse(readFileSync(new URL('./fixtures/hologram-scene-locks.json', import.meta.url), 'utf8'));
 const WORLD = ['terrain', 'water', 'road', 'props', 'magic'];
 const MODES = { terrain: 1, water: 2, road: 4, 'cars[0]': 5, 'cars[1]': 5 };
+const VISIBLE_CITIES = ['coast-london','coast-beijing','coast-shanghai','coast-rio','coast-austin','coast-paris'];
 const sha = data => createHash('sha256').update(data).digest('hex');
 const floatHash = data => sha(Buffer.from(data.buffer, data.byteOffset, data.byteLength));
 
@@ -98,14 +99,14 @@ function assertModes(data, name, expected, landmarkRange) {
       else assert.equal(mode, triangleMode, `${name}: a triangle may not interpolate between material classes`);
       if (name === 'props') {
         const inLandmark = vertex >= landmarkRange[0] && vertex < landmarkRange[1];
-        assert.ok(mode === 3 || (mode === 0 && inLandmark),
-          `props vertex ${vertex}: only protected landmark geometry can retain mode 0`);
+        assert.ok(mode === 3 || (mode === 0 && inLandmark) || (mode === 6 && !inLandmark),
+          `props vertex ${vertex}: landmark mode 0 is protected and building mode 6 must stay outside its range`);
       } else assert.equal(mode, expected, `${name}: every vertex receives its complete material classification`);
       seen.add(mode);
     }
   }
   if (name === 'props') {
-    assert.ok(seen.has(3), 'ordinary buildings, trees, lamps and barriers must enter the environment theme');
+    assert.ok(seen.has(3), 'trees, lamps and barriers must retain the ordinary prop theme');
     assert.equal(seen.has(0), landmarkRange[1] > landmarkRange[0], 'named landmarks remain exempt on each themed map');
   }
 }
@@ -169,7 +170,7 @@ test('environment outlines ignore landmarks, remove flat diagonals and retain re
   assert.deepEqual(flat, before, 'edge extraction never changes the actual solid scene');
   for (const mode of [0, 1, 2, 4, 5]) {
     assert.equal(hologramEdges(Float32Array.from(surfaceQuad([a, b, c, d], mode))).data.length, 0,
-      `material ${mode}: only ordinary props receive this extra edge pass`);
+      `material ${mode}: only ordinary props and buildings receive this extra edge pass`);
   }
   const mixed = Float32Array.from([...flat, ...surfaceQuad([a, b, c, d], 0)]);
   assert.deepEqual(hologramEdges(mixed).data, outline, 'coincident landmark faces cannot add lines or suppress environmental edges');
@@ -179,11 +180,32 @@ test('environment outlines ignore landmarks, remove flat diagonals and retain re
   assert.equal(keys.filter(key => key === edgeKey(a, b)).length, 1, 'the physical ninety-degree crease survives exactly once');
 });
 
+test('ordinary building outlines retain the same geometry, brighten only their own lines and exempt landmarks and cars', () => {
+  const points=[[0,0,0],[100,0,0],[100,100,0],[0,100,0]];
+  const props=hologramEdges(Float32Array.from(surfaceQuad(points,3))).data;
+  const building=Float32Array.from(surfaceQuad(points,6)),before=building.slice();
+  const outlines=hologramEdges(building).data;
+  assert.deepEqual(edgeKeys(outlines),edgeKeys(props),'the brighter architectural pass adds no lines or triangulation diagonals');
+  assert.deepEqual(building,before,'building classification never edits its solid mesh');
+  for(let i=0;i<outlines.length;i+=11){
+    assert.deepEqual(outlines.slice(i,i+6),props.slice(i,i+6));
+    for(let color=6;color<9;color++){
+      assert.ok(outlines[i+color]>props[i+color]);
+      assert.ok(outlines[i+color]<props[i+color]*1.3,'the extra building illumination stays modest');
+    }
+    assert.equal(outlines[i+9],1,'outlines stay opaque');assert.equal(outlines[i+10],1,'outlines use the existing emissive pass');
+  }
+  const withProtected=Float32Array.from([...building,...surfaceQuad(points,0),...surfaceQuad(points,5)]);
+  assert.deepEqual(hologramEdges(withProtected).data,outlines,'coincident landmarks and player cars neither add nor suppress building edges');
+  const mixed=building.slice(0,33);mixed[21]=12.25;
+  assert.equal(hologramEdges(mixed).data.length,0,'a triangle cannot mix ordinary-prop and building classes');
+});
+
 test('dense environment outlines are deterministic and leave room for the complete six-ghost challenge', () => {
   const source = [];
   for (let i = 0; i < 4096; i++) {
     const x = i * 300;
-    source.push(...surfaceQuad([[x, 0, 0], [x + 100, 0, 0], [x + 100, 0, 100], [x, 0, 100]]));
+    source.push(...surfaceQuad([[x, 0, 0], [x + 100, 0, 0], [x + 100, 0, 100], [x, 0, 100]],i%2?6:3));
   }
   const input = Float32Array.from(source), before = input.slice(), result = hologramEdges(input).data;
   assert.ok(result.length > 0);
@@ -207,6 +229,8 @@ for (const id of Object.keys(locks.tracks)) test(`${id}: production geometry, co
   const { renderer, gl } = scene();
   const bytes = assertSceneUnchanged(id, renderer, gl);
   const data = gl.buffers.get(renderer.meshes.props.buffer);
+  if(VISIBLE_CITIES.includes(id))assert.ok(data.some((value,i)=>i%11===10&&Math.floor(value/4)===6),
+    `${id}: actual uploaded ordinary buildings must receive their separate laser projection material`);
   // Inspect real uploaded vertices at every declared landmark, in addition to
   // the complete channel hashes. A material switch accidentally wrapping only
   // the first landmark must not pass because other protected objects exist.

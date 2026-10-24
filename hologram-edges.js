@@ -7,7 +7,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
 /**
  * Extract a static GL_LINES batch from the existing, non-indexed props mesh.
- * Only material mode 3 (encoded as 12 + emission) participates. Landmarks and
+ * Only props mode 3 and ordinary-building mode 6 participate. Landmarks and
  * their triangles never enter the adjacency map. Source geometry is read-only.
  *
  * Shared endpoints are matched at 0.001 world units. Geometric face normals,
@@ -33,7 +33,7 @@ export function hologramEdges(data) {
     if (id === undefined) { id = nextPoint++; points.set(key, id); }
     return id;
   }
-  function edge(a, b, ia, ib, nx, ny, nz) {
+  function edge(a, b, ia, ib, nx, ny, nz, building) {
     const dx = data[a] - data[b], dy = data[a + 1] - data[b + 1], dz = data[a + 2] - data[b + 2];
     const lengthSquared = dx * dx + dy * dy + dz * dz;
     if (ia === ib || lengthSquared < MIN_LENGTH_SQUARED) return;
@@ -45,20 +45,20 @@ export function hologramEdges(data) {
       existing.count++;
       existing.red += r;
       existing.blue += blue;
+      existing.buildings += building;
       if (Math.abs(existing.nx * nx + existing.ny * ny + existing.nz * nz) <= COPLANAR_DOT) existing.hard = true;
     } else {
       const aFirst = data[a] < data[b] || (data[a] === data[b] &&
         (data[a + 1] < data[b + 1] || (data[a + 1] === data[b + 1] && data[a + 2] <= data[b + 2])));
-      edges.set(key, { a: aFirst ? a : b, b: aFirst ? b : a, nx, ny, nz, lengthSquared, count: 1, hard: false, red: r, blue });
+      edges.set(key, { a: aFirst ? a : b, b: aFirst ? b : a, nx, ny, nz, lengthSquared, count: 1, hard: false, red: r, blue, buildings: building });
     }
   }
   for (let a = 0; a < data.length; a += STRIDE * 3) {
     const b = a + STRIDE, c = b + STRIDE;
     // All three vertices must belong to ordinary scenery. Material values are
     // exact small integers plus [0,1] emission in both JS and Float32 uploads.
-    if (data[a + 10] < 12 || data[a + 10] >= 16 ||
-        data[b + 10] < 12 || data[b + 10] >= 16 ||
-        data[c + 10] < 12 || data[c + 10] >= 16) continue;
+    const mode = Math.floor(data[a + 10] / 4);
+    if ((mode !== 3 && mode !== 6) || Math.floor(data[b + 10] / 4) !== mode || Math.floor(data[c + 10] / 4) !== mode) continue;
     const ux = data[b] - data[a], uy = data[b + 1] - data[a + 1], uz = data[b + 2] - data[a + 2];
     const vx = data[c] - data[a], vy = data[c + 1] - data[a + 1], vz = data[c + 2] - data[a + 2];
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -66,9 +66,10 @@ export function hologramEdges(data) {
     if (!(length > 1e-8) || !Number.isFinite(length)) continue;
     nx /= length; ny /= length; nz /= length;
     const ia = pointId(a), ib = pointId(b), ic = pointId(c);
-    edge(a, b, ia, ib, nx, ny, nz);
-    edge(b, c, ib, ic, nx, ny, nz);
-    edge(c, a, ic, ia, nx, ny, nz);
+    const building = mode === 6 ? 1 : 0;
+    edge(a, b, ia, ib, nx, ny, nz, building);
+    edge(b, c, ib, ic, nx, ny, nz, building);
+    edge(c, a, ic, ia, nx, ny, nz, building);
   }
   const selected = [];
   for (const item of edges.values()) if (item.count === 1 || item.hard) selected.push(item);
@@ -91,9 +92,10 @@ export function hologramEdges(data) {
     const height = (data[item.a + 1] + data[item.b + 1]) * 0.5;
     const warmth = (item.red - item.blue) / item.count;
     const purple = clamp(0.38 + warmth * 0.65 + clamp(height / 220, 0, 1) * 0.22, 0.12, 0.85);
-    const red = 0.18 + (0.40 - 0.18) * purple;
-    const green = 0.48 + (0.25 - 0.48) * purple;
-    const blue = 0.62 + (0.65 - 0.62) * purple;
+    const brightness = 1 + 0.28 * item.buildings / item.count;
+    const red = (0.18 + (0.40 - 0.18) * purple) * brightness;
+    const green = (0.48 + (0.25 - 0.48) * purple) * brightness;
+    const blue = (0.62 + (0.65 - 0.62) * purple) * brightness;
     for (const source of [item.a, item.b]) {
       output[offset++] = data[source];
       output[offset++] = data[source + 1];

@@ -19,7 +19,8 @@ import { SPLIT_FRACTIONS } from './split-timing.js';
 import { CHALLENGE_COLORS } from './ghost-challenge.js';
 import { createEntryCameraPlan, entryCameraForProgress, entryMeshOcclusion } from './entry-cameras.js';
 import { addBeijingGreatWall } from './beijing-great-wall.js';
-import { HOLOGRAM_MATERIALS, HOLOGRAM_FRAGMENT, HOLOGRAM_SKY } from './hologram-theme.js';
+import { HOLOGRAM_MATERIALS, HOLOGRAM_FRAGMENT } from './hologram-theme.js';
+import { AURORA_SKY } from './aurora-sky.js';
 import { hologramEdges } from './hologram-edges.js';
 import { COLOR_THEMES, COLOR_THEME_GLSL, themeForTrack, remapHologramColor } from './color-themes.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
@@ -198,7 +199,7 @@ void main() {
   }
   // Map only the environment and its outlines. Landmark, car, ghost and spell
   // materials retain their established colours under the new ambient fog.
-  if ((surfaceMode > .5 && surfaceMode < 4.5) || uHologramLine > .5)
+  if ((surfaceMode > .5 && surfaceMode < 4.5) || (surfaceMode > 5.5 && surfaceMode < 6.5) || uHologramLine > .5)
     color = themeColor(color,uColorTheme);
   float fog = smoothstep(uFogRange.x,uFogRange.y,length(vPosition-uEye));
   color = mix(color, uFog, fog*uFogRange.z);
@@ -222,8 +223,9 @@ uniform vec3 uHorizon;
 uniform float uLondon;
 uniform float uMagic;
 uniform float uColorTheme;
+uniform float uAuroraPhase;
 ${COLOR_THEME_GLSL}
-${HOLOGRAM_SKY}
+${AURORA_SKY}
 void main(){
   vec3 gradient = mix(uHorizon,uZenith,pow(clamp(vUV.y,0.0,1.0),0.7));
   // Gentle repeating parallax keeps the painted horizon stable through corners.
@@ -239,7 +241,7 @@ void main(){
   night+=vec3(.06,.08,.12)*luminance;
   image=mix(image,night,uMagic);
   float landscape = smoothstep(0.03,0.3,vUV.y);
-  gl_FragColor=vec4(themeColor(hologramSky(vUV,uHeading,uAspect,uMagic),uColorTheme),1.0);
+  gl_FragColor=vec4(themeColor(auroraSky(vUV,uHeading,uAspect,uMagic,uAuroraPhase),uColorTheme),1.0);
 }`;
 
 const POSTER_VERTEX=`
@@ -955,6 +957,11 @@ function buildWorld() {
     if(height>340) props.cone(cx,height*.63,cz,radius*.36,height*.37,'#c3d5cf',6,0,rng()*2);
   }
   for(const item of sceneryPlacements()) {
+    // Classify by the existing semantic placement, never by paint or location.
+    // Trees, street furniture and all named landmarks keep their own materials.
+    props.surfaceMode=['terrace','building','hutong','music-street','rio-house','haussmann','shikumen',
+      'beijing-courtyard','beijing-street-block'].includes(item.kind)
+      ?HOLOGRAM_MATERIALS.building:HOLOGRAM_MATERIALS.props;
     if(themedCity)addCityStreetScenery(props,item);
     else if(item.kind==='terrace')englishTerrace(props,item);
     else if(item.kind==='london-tree')londonTree(props,item);
@@ -1173,6 +1180,9 @@ export class RaceRenderer {
   constructor(canvas,{sceneUrls={}}={}) {
     this.canvas=canvas;this.available=false;this.error=null;this.cameras=[null,null];this.textures={};this.obstacles=[];this.ghostPoses=[];this.singlePlayer=false;
     this.entryProgress=null;this.entryPlan=null;this.entryCamera=null;
+    this.auroraPhase=0;
+    this.auroraMotionQuery=typeof globalThis.matchMedia==='function'
+      ?globalThis.matchMedia('(prefers-reduced-motion: reduce)'):null;
     this.posterUrls=Object.fromEntries(THEATRE_POSTERS.map(p=>[p.key,globalThis.__TWIN_TURBO_POSTERS__?.[p.key]||`./assets/posters/${p.file}`]));
     this.sceneUrls={coast:'./assets/coast.png',alpine:'./assets/alpine.png',city:'./assets/city.png',clouds:'./assets/cloud-sky.jpg',...sceneUrls};
     try {
@@ -1195,7 +1205,7 @@ export class RaceRenderer {
     for(const name of ['aPosition','aNormal','aColor','aEmission'])this.attributes[name]=gl.getAttribLocation(this.mainProgram,name);
     for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange','uMagic','uSpellPositionA','uSpellPositionB','uSpellColorA','uSpellColorB','uLineOffset','uColorTheme','uHologramLine'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
     this.skyAttributes={position:gl.getAttribLocation(this.skyProgram,'aPosition')};this.skyUniforms={};
-    for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon','uLondon','uMagic','uColorTheme'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
+    for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon','uLondon','uMagic','uColorTheme','uAuroraPhase'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
     this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
     const world=buildWorld();
     this.obstacles=world.obstacles;
@@ -1215,6 +1225,7 @@ export class RaceRenderer {
   rebuild(engine) {
     if(!this.available)return this;
     this.colorTheme=themeForTrack(TRACK.id);
+    this.auroraPhase=0;
     this.setEntryProgress(null);
     const gl=this.gl,world=buildWorld();
     for(const [key,builder] of Object.entries({terrain:world.terrain,road:buildRoad(),water:world.water,props:world.props,magic:world.magic})) {
@@ -1387,6 +1398,7 @@ export class RaceRenderer {
     gl.uniform1f(u.uLondon,TRACK.theme==='london'?1:0);
     gl.uniform1f(u.uMagic,magic);
     gl.uniform1f(u.uColorTheme,colorThemeIndex);
+    gl.uniform1f(u.uAuroraPhase,this.auroraPhase);
     gl.uniform1f(u.uHeading,camera.angle);gl.uniform1f(u.uAspect,aspect);gl.uniform3fv(u.uZenith,color('zenith'));gl.uniform3fv(u.uHorizon,color('horizon'));
     gl.drawArrays(gl.TRIANGLES,0,6);gl.disableVertexAttribArray(this.skyAttributes.position);
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.mainProgram);
@@ -1404,6 +1416,14 @@ export class RaceRenderer {
     if(!this.available)return;
     const gl=this.gl,w=this.canvas.width,h=this.canvas.height;
     if(!w||!h)return;
+    // One bounded visual clock for both viewports. It never touches race time,
+    // and cannot jump after a background tab, pause or context restoration.
+    if(this.auroraMotionQuery?.matches)this.auroraPhase=0;
+    else if(!['paused','finished'].includes(engine.state)
+      &&(['countdown','racing'].includes(engine.state)||this.entryProgress!==null)){
+      const step=Number.isFinite(dt)?clamp(dt,0,.05):0;
+      this.auroraPhase=mod(this.auroraPhase+step*TAU/100,TAU);
+    }
     this._refreshAustinScoreboard();
     this._updateMagic(engine);
     gl.enable(gl.SCISSOR_TEST);gl.disable(gl.BLEND);

@@ -186,13 +186,14 @@ test('actual shader classification recolors scenery and explicit contours but ex
   for (const key of ['terrain', 'water', 'road']) for (const mode of modes(renderer.meshes[key].buffer))
     assert.equal(entersTheme(mode, 0), true, `${key} must adopt the city palette`);
   const propsModes = modes(renderer.meshes.props.buffer);
-  assert.ok(propsModes.has(0) && propsModes.has(3));
+  assert.ok(propsModes.has(0) && propsModes.has(3) && propsModes.has(6));
   assert.equal(entersTheme(0, 0), false, 'landmarks in the shared props batch retain their original material');
   assert.equal(entersTheme(3, 0), true, 'ordinary props in that same batch are themed');
+  assert.equal(entersTheme(6, 0), true, 'laser buildings adopt the city palette without recoloring real landmarks');
   for (const mesh of [...renderer.meshes.cars, renderer.meshes.ghost, renderer.meshes.ghostGold, renderer.meshes.flames])
     for (const mode of modes(mesh.buffer)) assert.equal(entersTheme(mode, 0), false, 'vehicle/ghost/flame identity stays independent of the map');
   for (const mode of modes(renderer.meshes.ambientEdges.buffer)) assert.equal(entersTheme(mode, 1), true);
   assert.ok(gl.draws.some(draw => draw.buffer === renderer.meshes.ghost.buffer && draw.uniforms.uHologramLine === 0));
   const skySource = gl.shaders.get(renderer.skyProgram).map(shader => gl.sources.get(shader)).find(text => text.includes('gl_FragColor'));
-  assert.match(skySource, /themeColor\(hologramSky\(vUV,uHeading,uAspect,uMagic\),uColorTheme\)/);
+  assert.match(skySource, /themeColor\(auroraSky\(vUV,uHeading,uAspect,uMagic,uAuroraPhase\),uColorTheme\)/);
 });

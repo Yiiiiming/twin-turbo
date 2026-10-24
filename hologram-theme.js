@@ -10,11 +10,11 @@
  * deliberately no clock, random noise, alpha modulation, discard or fine grid.
  */
 export const HOLOGRAM_MODES = Object.freeze({
-  original: 0, terrain: 1, water: 2, props: 3, road: 4, playerCar: 5,
+  original: 0, terrain: 1, water: 2, props: 3, road: 4, playerCar: 5, building: 6,
 });
 
 export const HOLOGRAM_MATERIALS = Object.freeze({
-  landmark: 0, terrain: 1, water: 2, props: 3, road: 4, car: 5,
+  landmark: 0, terrain: 1, water: 2, props: 3, road: 4, car: 5, building: 6,
 });
 
 export const HOLOGRAM_PALETTE = Object.freeze({
@@ -57,7 +57,7 @@ vec3 hologramSurface(vec3 baseColor, vec3 position, vec3 normal, vec3 eye, float
     color = mix(vec3(0.020, 0.049, 0.115), vec3(0.079, 0.047, 0.174), reflection * 0.7);
     color += cyan * (edge * 0.15 + lightness * 0.018);
   } else if (mode < 3.5) {
-    // Ordinary facades remain restrained even if their old plaster was white.
+    // Small props remain restrained even if their original paint was white.
     float detail = smoothstep(0.15, 0.85, lightness);
     color = mix(vec3(0.035, 0.046, 0.102), vec3(0.105, 0.115, 0.215), detail);
     color += edgeColor * (edge * 0.095 + scan * vertical * 0.022);
@@ -74,7 +74,7 @@ vec3 hologramSurface(vec3 baseColor, vec3 position, vec3 normal, vec3 eye, float
     float iceLine = smoothstep(0.62, 0.84, lightness) * (1.0 - red);
     color = mix(color, vec3(0.48, 0.77, 0.86), iceLine);
     color += cyan * edge * 0.012;
-  } else {
+  } else if (mode < 5.5) {
     // Preserve recognisable dark tyres/glass, and give the two players different
     // cyan / amber paint accents matching the players' existing colour choices.
     float body = smoothstep(0.22, 0.70, lightness);
@@ -86,6 +86,20 @@ vec3 hologramSurface(vec3 baseColor, vec3 position, vec3 normal, vec3 eye, float
     // Headlights stay cool white; red tail lamps retain their direction cue.
     vec3 lamp = mix(vec3(0.25, 0.58, 0.76), source, 0.72);
     color = mix(color, lamp, emit);
+  } else {
+    // Ordinary architecture becomes an opaque laser projection. Broad, static
+    // floor and mullion bands fade out with distance rather than crawling into
+    // subpixel scanlines. The real building silhouette still owns the depth.
+    float facade = abs(n.x) > abs(n.z) ? position.z : position.x;
+    float floorBand = 1.0 - smoothstep(0.08, 0.28, abs(sin(position.y * 0.115)));
+    float windowBand = 1.0 - smoothstep(0.07, 0.26, abs(sin(facade * 0.095)));
+    float framework = max(floorBand, windowBand * 0.72) * vertical * nearDetail;
+    float paintBias = clamp(0.5 + (source.b - source.r) * 0.65, 0.0, 1.0);
+    vec3 projectedPaint = mix(cyan, violet, paintBias);
+    color = mix(vec3(0.008, 0.012, 0.029), vec3(0.027, 0.035, 0.068), lightness);
+    color += projectedPaint * lightness * 0.018;
+    color += mix(edgeColor, projectedPaint, 0.25) * (framework * 0.54 + edge * (0.20 + nearDetail * 0.10));
+    color += mix(violet, cyan, 0.70) * emit * 0.20;
   }
   float formShade = 0.80 + 0.10 * max(n.y, 0.0)
     + 0.10 * max(dot(n, vec3(-0.436, 0.834, 0.340)), 0.0);
