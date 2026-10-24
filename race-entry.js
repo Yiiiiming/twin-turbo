@@ -1,5 +1,6 @@
 import { landmarkHologramGeometry, paintLandmarkHologram } from './landmark-hologram.js';
 import { ENTRY_CAMERA_CUTS } from './entry-cameras.js';
+import { themeForTrack, themeCssColor, remapHologramColor } from './color-themes.js';
 
 const TRAIN_SECONDS = 3.6, PREVIEW_SECONDS = 6.0, TOTAL_SECONDS = TRAIN_SECONDS + PREVIEW_SECONDS;
 const MENU_ZOOM_SECONDS = .75;
@@ -7,6 +8,14 @@ const clamp = value => Math.max(0, Math.min(1, value));
 const smooth = value => { const t = clamp(value); return t * t * (3 - 2 * t); };
 const mix = (a, b, t) => a + (b - a) * t;
 const TAU = Math.PI * 2;
+const ENTRY_COLORS = Object.freeze({
+  '--entry-menu-core':'#30257b', '--entry-menu-mid':'#251e61',
+  '--entry-menu-outer':'#1c1745', '--entry-menu-edge':'#15112b',
+  '--entry-bars':'#0d081fe8', '--entry-cut-color':'#080413',
+  '--entry-skip-bg':'#1a1238a6', '--entry-skip-border':'#d4c1ff4d',
+  '--entry-skip-text':'#eee6ff', '--entry-skip-hover':'#38265bba',
+  '--entry-skip-hover-border':'#e5d6ff99', '--entry-skip-focus':'#ded0ff',
+});
 
 function polygon(ctx, points, fill, stroke, lineWidth = 1) {
   if (points.length < 3) return;
@@ -31,7 +40,8 @@ function clipPortal(points, plane) {
   return result;
 }
 
-function paintTrain(ctx, width, height, time, portal) {
+function paintTrain(ctx, width, height, time, portal, themeId = 'purple') {
+  const color = value => themeCssColor(value, themeId);
   const unit = Math.min(width / 1000, height / 650), plane = 1800, far = 700 / (plane + 700);
   const eye = [240,170,-700];
   const project = p => {
@@ -45,12 +55,12 @@ function paintTrain(ctx, width, height, time, portal) {
   for (const x of [-48, 48]) {
     ctx.beginPath();
     for (let z = -160; z <= plane; z += 40) { const p = project([x, 0, z]);z === -160 ? ctx.moveTo(...p) : ctx.lineTo(...p); }
-    ctx.strokeStyle = '#9d7eff55';ctx.lineWidth = 3;ctx.stroke();
-    ctx.strokeStyle = '#a9e8ff99';ctx.lineWidth = .8;ctx.stroke();
+    ctx.strokeStyle = color('#9d7eff55');ctx.lineWidth = 3;ctx.stroke();
+    ctx.strokeStyle = color('#a9e8ff99');ctx.lineWidth = .8;ctx.stroke();
   }
   for (let z = -120; z < plane; z += 100) {
     const a = project([-72, -2, z]), b = project([72, -2, z]);
-    ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle = '#9777c62e';ctx.lineWidth = 1;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle = color('#9777c62e');ctx.lineWidth = 1;ctx.stroke();
   }
   const faces = [], wheels = [], axles = [];
   const add = (points, glass = false) => {
@@ -98,7 +108,7 @@ function paintTrain(ctx, width, height, time, portal) {
   // a new bright line would draw an artificial bulkhead through the portal.
   const lines = new Map();
   for(const face of faces){
-    polygon(ctx,face.clipped.map(project),face.glass?'rgba(119,230,255,.065)':'rgba(132,89,221,.035)');
+    polygon(ctx,face.clipped.map(project),color(face.glass?'rgba(119,230,255,.065)':'rgba(132,89,221,.035)'));
     for(let i=0;i<face.points.length;i++){
       let a=face.points[i],b=face.points[(i+1)%face.points.length];
       if(a[2]>plane&&b[2]>plane)continue;
@@ -109,12 +119,12 @@ function paintTrain(ctx, width, height, time, portal) {
   }
   for(const glass of [false,true]){
     ctx.beginPath();for(const edge of lines.values())if(edge.glass===glass){ctx.moveTo(...edge.a);ctx.lineTo(...edge.b);}
-    ctx.strokeStyle=glass?'rgba(90,227,255,.10)':'rgba(161,110,255,.13)';ctx.lineWidth=4;ctx.stroke();
-    ctx.strokeStyle=glass?'rgba(145,239,255,.76)':'rgba(199,165,255,.80)';ctx.lineWidth=glass?.7:1;ctx.stroke();
+    ctx.strokeStyle=color(glass?'rgba(90,227,255,.10)':'rgba(161,110,255,.13)');ctx.lineWidth=4;ctx.stroke();
+    ctx.strokeStyle=color(glass?'rgba(145,239,255,.76)':'rgba(199,165,255,.80)');ctx.lineWidth=glass?.7:1;ctx.stroke();
   }
   for(const axle of axles){
     ctx.beginPath();ctx.moveTo(...project(axle[0]));ctx.lineTo(...project(axle[1]));
-    ctx.strokeStyle='#8ebdff66';ctx.lineWidth=.65;ctx.stroke();
+    ctx.strokeStyle=color('#8ebdff66');ctx.lineWidth=.65;ctx.stroke();
   }
   // The transparent train shows both wheels on each axle. Clip every original
   // ring segment at the portal; never invent a straight closing edge there.
@@ -127,20 +137,21 @@ function paintTrain(ctx, width, height, time, portal) {
       if(a[2]>plane||b[2]>plane){const t=(plane-a[2])/(b[2]-a[2]),hit=a.map((n,k)=>mix(n,b[k],t));if(a[2]>plane)a=hit;else b=hit;}
       ctx.moveTo(...project(a));ctx.lineTo(...project(b));
     }
-    ctx.strokeStyle='#a4d8ff99';ctx.lineWidth=.75;ctx.stroke();
+    ctx.strokeStyle=color('#a4d8ff99');ctx.lineWidth=.75;ctx.stroke();
   }
   ctx.restore();
 }
 
-function paintEntry(ctx, width, height, time, image, origin) {
+function paintEntry(ctx, width, height, time, image, origin, themeId = 'purple') {
+  const color = value => themeCssColor(value, themeId);
   ctx.clearRect(0,0,width,height);
   if (time >= TRAIN_SECONDS) return;
   const appear = smooth(time / MENU_ZOOM_SECONDS), passage = smooth((time - 3) / .6);
   // The train canvas is opaque from its very first frame. CSS fades this whole
   // canvas over the menu, with the world canvases hidden until the preview.
-  ctx.fillStyle = '#15112b';ctx.fillRect(0,0,width,height);
+  ctx.fillStyle = color('#15112b');ctx.fillRect(0,0,width,height);
   const background = ctx.createRadialGradient(width*.5,height*.46,0,width*.5,height*.46,Math.max(width*.72,height*.8));
-  background.addColorStop(0,'#30257b');background.addColorStop(.36,'#251e61');background.addColorStop(.68,'#1c1745');background.addColorStop(1,'#15112b');
+  background.addColorStop(0,color('#30257b'));background.addColorStop(.36,color('#251e61'));background.addColorStop(.68,color('#1c1745'));background.addColorStop(1,color('#15112b'));
   ctx.fillStyle = background;ctx.fillRect(0,0,width,height);
   const portal = {x:width*.56,y:height*.40,rx:Math.min(width*.23,height*.29),ry:Math.min(height*.34,width*.31)};
   const cx = mix(origin.x,portal.x,appear), cy = mix(origin.y,portal.y,appear);
@@ -148,33 +159,33 @@ function paintEntry(ctx, width, height, time, image, origin) {
   const iw = mix(origin.width,image.width*imageScale,appear), ih = mix(origin.height,image.height*imageScale,appear);
   ctx.save();ctx.globalAlpha = 1-passage;
   const halo = ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(iw,ih)*.7);
-  halo.addColorStop(0,'#8757ed21');halo.addColorStop(.65,'#6b55e90b');halo.addColorStop(1,'#6b55e900');
+  halo.addColorStop(0,color('#8757ed21'));halo.addColorStop(.65,color('#6b55e90b'));halo.addColorStop(1,color('#6b55e900'));
   ctx.fillStyle = halo;ctx.fillRect(0,0,width,height);
   ctx.drawImage(image,cx-iw/2,cy-ih/2,iw,ih);
   ctx.restore();
   ctx.save();ctx.globalAlpha = appear*(1-passage);
   for (let i=0;i<3;i++) {
     ctx.beginPath();ctx.ellipse(portal.x,portal.y,portal.rx*(1+i*.045),portal.ry*(1+i*.025),0,0,TAU);
-    ctx.strokeStyle = ['#c3a1ffb3','#75dcf94d','#a186ef26'][i];ctx.lineWidth = i ? 1 : 1.8;ctx.stroke();
+    ctx.strokeStyle = color(['#c3a1ffb3','#75dcf94d','#a186ef26'][i]);ctx.lineWidth = i ? 1 : 1.8;ctx.stroke();
   }
   // Only the illuminated rim accents travel. The opening stays fixed for the
   // train, and one eased revolution settles before the map is revealed.
   const rimAngle=-Math.PI/2+TAU*smooth((time-.55)/2.75),rimX=portal.rx*1.045,rimY=portal.ry*1.025;
   ctx.beginPath();ctx.ellipse(portal.x,portal.y,rimX,rimY,0,rimAngle-.34,rimAngle+.34);
-  ctx.strokeStyle='#8c68e84d';ctx.lineWidth=6;ctx.stroke();
-  ctx.strokeStyle='#96eaffd9';ctx.lineWidth=1.8;ctx.stroke();
+  ctx.strokeStyle=color('#8c68e84d');ctx.lineWidth=6;ctx.stroke();
+  ctx.strokeStyle=color('#96eaffd9');ctx.lineWidth=1.8;ctx.stroke();
   ctx.beginPath();
   for(let i=0;i<3;i++){
     const angle=rimAngle+.8+i*2;
     ctx.moveTo(portal.x+Math.cos(angle-.025)*rimX,portal.y+Math.sin(angle-.025)*rimY);
     ctx.ellipse(portal.x,portal.y,rimX,rimY,0,angle-.025,angle+.025);
   }
-  ctx.strokeStyle='#bd9fffc4';ctx.lineWidth=1.6;ctx.stroke();
+  ctx.strokeStyle=color('#bd9fffc4');ctx.lineWidth=1.6;ctx.stroke();
   ctx.restore();
-  paintTrain(ctx,width,height,time,portal);
+  paintTrain(ctx,width,height,time,portal,themeId);
   if (passage > 0) {
-    // The portal settles into a quiet purple veil, never an expanding flash.
-    ctx.save();ctx.globalAlpha = passage;ctx.fillStyle='#0d081f';ctx.fillRect(0,0,width,height);ctx.restore();
+    // The portal settles into a quiet themed veil, never an expanding flash.
+    ctx.save();ctx.globalAlpha = passage;ctx.fillStyle=color('#0d081f');ctx.fillRect(0,0,width,height);ctx.restore();
   }
 }
 
@@ -182,7 +193,7 @@ function paintEntry(ctx, width, height, time, image, origin) {
 export function createRaceEntry(doc = globalThis.document) {
   const win = doc?.defaultView || globalThis.window;
   let stage=null,overlay=null,canvas=null,ctx=null,button=null,texture=null,clock=0,running=false,origin=null,media=null;
-  let width=0,height=0,resizeObserver=null,previousFocus=null;
+  let width=0,height=0,resizeObserver=null,previousFocus=null,themeId='purple';
   const snapshot = () => ({active:running,previewProgress:!running||clock<TRAIN_SECONDS?null:clamp((clock-TRAIN_SECONDS)/PREVIEW_SECONDS)});
   function finish() {
     running=false;
@@ -192,6 +203,7 @@ export function createRaceEntry(doc = globalThis.document) {
     overlay?.remove();overlay=null;canvas=null;ctx=null;texture=null;button=null;
     stage?.classList.remove('race-entry-active');
     if(stage){delete stage.dataset.entryPhase;stage.style.removeProperty('--entry-menu-scale');stage.style.removeProperty('--entry-menu-opacity');stage.style.removeProperty('--entry-canvas-opacity');stage.style.removeProperty('--entry-preview-opacity');stage.style.removeProperty('--entry-cut-shade');}
+    if(stage)for(const property of [...Object.keys(ENTRY_COLORS),'--entry-veil-rgb'])stage.style.removeProperty(property);
     if(heldFocus)previousFocus?.focus?.({preventScroll:true});
     previousFocus=null;
   }
@@ -216,7 +228,7 @@ export function createRaceEntry(doc = globalThis.document) {
     stage.style.setProperty('--entry-cut-shade',String(cutShade));
     button.textContent=doc.documentElement.lang?.startsWith('en')?'Skip':'跳过';
     if(preview)ctx.clearRect(0,0,width,height);
-    else paintEntry(ctx,width,height,clock,texture,origin);
+    else paintEntry(ctx,width,height,clock,texture,origin,themeId);
   }
   function start(trackId) {
     finish();clock=0;stage=doc?.getElementById('race-stage');
@@ -224,6 +236,7 @@ export function createRaceEntry(doc = globalThis.document) {
     media=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     if(media?.matches){media=null;return snapshot();}
     const model=landmarkHologramGeometry(trackId);
+    themeId=themeForTrack(model.trackId);
     previousFocus=doc.activeElement;
     const stageRect=stage.getBoundingClientRect(),source=doc.getElementById('landmark-hologram')?.getBoundingClientRect();
     origin=source&&source.width>0&&source.height>0?{x:source.left-stageRect.left+source.width/2,y:source.top-stageRect.top+source.height/2,width:source.width,height:source.height}
@@ -231,11 +244,13 @@ export function createRaceEntry(doc = globalThis.document) {
     texture=doc.createElement('canvas');texture.width=640;texture.height=Math.max(1,Math.round(640*origin.height/origin.width));
     const imageContext=texture.getContext('2d');
     if(!imageContext){finish();return snapshot();}
-    paintLandmarkHologram(imageContext,model,texture.width,texture.height,model.yaw,0,true);
+    paintLandmarkHologram(imageContext,model,texture.width,texture.height,model.yaw,0,true,themeId);
     overlay=doc.createElement('div');overlay.className='race-entry';
     canvas=doc.createElement('canvas');canvas.className='race-entry-canvas';canvas.setAttribute('aria-hidden','true');
     ctx=canvas.getContext('2d');
     if(!ctx){finish();return snapshot();}
+    for(const [property,value] of Object.entries(ENTRY_COLORS))stage.style.setProperty(property,themeCssColor(value,themeId));
+    stage.style.setProperty('--entry-veil-rgb',remapHologramColor([13/255,8/255,31/255],themeId).map(value=>Math.round(value*255)).join(','));
     button=doc.createElement('button');button.className='race-entry-skip';button.type='button';button.setAttribute('data-i18n-skip','');
     button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();finish();});
     overlay.append(canvas,button);stage.appendChild(overlay);

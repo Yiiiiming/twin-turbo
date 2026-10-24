@@ -1,5 +1,22 @@
 # Twin Turbo: route preservation
 
+## Temporarily hidden six maps, 2026-10-24
+
+The user asked to hide the last six maps while deciding how to use them, and explicitly said not to delete them. Future references to “隐藏的六个地图” mean exactly:
+
+- `coast` — 海岸技术环线
+- `coast-bay` — 碧湾追风
+- `coast-pines` — 松岚曲径
+- `coast-neon` — 霓虹疾驰
+- `coast-marina` — 帆港绕行
+- `coast-ridge` — 云脊双螺旋
+
+Hide these from player-facing map choices, including the home screen and leaderboard selector. Preserve their routes, scenery, resources, saved records, ghost namespaces and all twelve-map regression coverage. Do not delete or repurpose them without a new user request. The six visible maps remain London, Beijing, Shanghai, Rio, Austin and Paris, in that order.
+
+## Automatic city palettes, 2026-10-24
+
+Selecting a map on the home screen changes the whole page, landmark hologram, pointer rings and entry animation to its palette, then carries it into the ordinary holographic scenery and roads. London and Paris use purple, Beijing red, Austin UT burnt orange, Rio emerald green, and Shanghai ice blue with silver gray. Real in-world landmarks retain their original colors; player and ghost identity colors remain separate. This replaces the earlier idea of a manual settings color picker.
+
 ## Main-version publishing preference, 2026-10-23
 
 The user explicitly authorized publishing the main game and said “正常就直接在主版本发布就可以了”. After validating ordinary requested main-game changes, publish them to the existing `yiiiiming/twin-turbo` GitHub Pages site without asking again. The separately created London Beta was rejected and abandoned; do not merge or publish it. This preference does not authorize unrequested route changes, unrelated uploads or repository visibility changes.

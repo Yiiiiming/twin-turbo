@@ -11,12 +11,16 @@ import { ghostProgressTimeline, liveGhostPosition } from './race-hud.js';
 import { UnifiedRecordsClient } from './unified-records.js';
 import { createRaceEntry } from './race-entry.js';
 import { createDrivingTutorial } from './driving-tutorial.js';
+import { applyColorTheme } from './color-theme-ui.js';
+import { themeForTrack } from './color-themes.js';
+import { DEFAULT_TRACK_ID, getVisibleTracks, isTrackSelectable } from './track-visibility.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
 const hud = $('hud');
 const ctx = hud.getContext('2d');
 const engine = new RaceEngine({laps:1});
+const visibleTracks = getVisibleTracks(TRACKS);
 let renderer;
 const keys = new Set();
 // A modifier such as Shift does not repeat its keydown. Keep the physical
@@ -30,6 +34,7 @@ let bindingCapture = null;
 const leaderboard = new UnifiedRecordsClient({ document, onSaved: () => {
   if (engine.state === 'finished') returnToMenu();
 }, onChallenge: async entry => {
+  if (entry.city && !isTrackSelectable(entry.city, TRACKS)) return;
   if (selectedMode==='tutorial' || ghostClient.locked || entry.kind === 'race' || entry.laps === 3) return;
   if (engine.state === 'finished') returnToMenu();
   if (!['menu','finished'].includes(engine.state)) return;
@@ -243,10 +248,12 @@ function resize() {
   if (hud.width !== width || hud.height !== height) { hud.width = width; hud.height = height; }
 }
 new ResizeObserver(resize).observe(canvas);
-// Start on the first menu circuit; retired prototype links do not change it.
-engine.selectTrack(Object.keys(TRACKS)[0]);
+// A stale hidden circuit or retired prototype link always starts in London.
+// Stored records are left untouched; visibility only controls map choices.
+engine.selectTrack(DEFAULT_TRACK_ID);
 ghostClient.setTrack(TRACK.id);
 renderer = new RaceRenderer(canvas, { sceneUrls: globalThis.TWIN_SCENE_ART });
+applyColorTheme(document, themeForTrack(TRACK.id));
 engine.setObstacles(renderer.obstacles || []);
 renderer.resetCameras(engine);
 
@@ -272,7 +279,8 @@ function circuitOutline(track) {
     path:points.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')+' Z'};
 }
 function refreshTrackUI() {
-  $('map-count').textContent=`${String(Object.keys(TRACKS).length).padStart(2,'0')} CIRCUITS`;
+  applyColorTheme(document, themeForTrack(TRACK.id));
+  $('map-count').textContent=`${String(visibleTracks.length).padStart(2,'0')} CIRCUITS`;
   for(const [id,card]of trackCards) {
     const active=id===TRACK.id;card.label.textContent=trackName(TRACKS[id]);card.button.setAttribute('aria-label',trackName(TRACKS[id]));
     card.button.classList.toggle('selected',active);card.button.setAttribute('aria-pressed',String(active));
@@ -281,7 +289,7 @@ function refreshTrackUI() {
   $('records-track-choice').value=leaderboard.city;
   const name=trackName();
   $('track-title').textContent=name;
-  $('track-english').textContent=`${String(Object.keys(TRACKS).indexOf(TRACK.id)+1).padStart(2,'0')} / ${(TRACK.nameEn||'COASTLINE GRAND PRIX').toUpperCase()}`;
+  $('track-english').textContent=`${String(visibleTracks.findIndex(track=>track.id===TRACK.id)+1).padStart(2,'0')} / ${(TRACK.nameEn||'COASTLINE GRAND PRIX').toUpperCase()}`;
   $('route-description').textContent=i18n.language==='en'
     ?TRACK.descriptionEn||'Coast, pines and neon. Fast straights, flowing S bends and a hairpin.'
     :TRACK.description||'长直道、连续 S 弯和发夹弯，穿越海岸、松林与霓虹城区。';
@@ -290,7 +298,7 @@ function refreshTrackUI() {
   $('records-track').textContent=boardName;
   $('records-table').setAttribute('aria-label',`${boardName} · ${i18n.language==='en'?'Top five records':'全站前五名'}`);
 }
-for(const [index,track]of Object.values(TRACKS).entries()) {
+for(const [index,track]of visibleTracks.entries()) {
   const button=document.createElement('button');button.type='button';button.className='track-card';button.dataset.track=track.id;
   const scene=['neon','london','beijing','austin','paris'].includes(track.theme)?'city':['pines','ridge'].includes(track.theme)?'alpine':'coast';
   button.style.setProperty('--card-scene',`url('${globalThis.TWIN_SCENE_ART?.[scene] || `./assets/${scene}.png`}')`);
@@ -304,7 +312,7 @@ for(const [index,track]of Object.values(TRACKS).entries()) {
   const option=document.createElement('option');option.value=track.id;$('records-track-choice').appendChild(option);
 }
 function selectCircuit(id) {
-  if(engine.state!=='menu'||!Object.hasOwn(TRACKS,id))return;
+  if(engine.state!=='menu'||!isTrackSelectable(id,TRACKS))return;
   cancelChallengeLoad();challengeSetup=null;keys.clear();engine.selectTrack(id);renderer.rebuild(engine);applyPlayerColors();
   ghostRecorder.reset();splitTiming.reset();activeGhosts=[];lastRescueCounts=[0,0];renderer.setGhostPoses?.([]);
   ghostClient.setTrack(id);ghostClient.setLaps(selectedLaps);void leaderboard.setTrack(id);
@@ -312,7 +320,7 @@ function selectCircuit(id) {
 }
 $('records-track-choice').addEventListener('change',()=>{
   const city=$('records-track-choice').value;
-  if(Object.hasOwn(TRACKS,city))void leaderboard.setTrack(city,{preserveResults:true});
+  if(isTrackSelectable(city,TRACKS))void leaderboard.setTrack(city,{preserveResults:true});
   refreshTrackUI();
 });
 

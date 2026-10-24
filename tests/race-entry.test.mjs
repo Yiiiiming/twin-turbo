@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { createRaceEntry } from '../race-entry.js';
 import { TRACK, TRACKS } from '../engine.js';
 import { ENTRY_CAMERA_CUTS } from '../entry-cameras.js';
+import { themeForTrack, themeCssColor } from '../color-themes.js';
+import { landmarkHologramGeometry, paintLandmarkHologram } from '../landmark-hologram.js';
 
 function fixture({ reduced = false, unavailableCanvas = false, captureStrokes = false } = {}) {
   const stats = { canvases: 0, textureDraws: 0, activeObservers: 0 };
@@ -192,12 +194,13 @@ test('the painted train has sixteen wheels paired by eight axles, and wheel ring
 
 test('portal accents turn exactly once with the train while the elliptical opening remains fixed', () => {
   const f=fixture({captureStrokes:true});f.entry.start('coast-beijing');
+  const color=value=>themeCssColor(value,themeForTrack('coast-beijing'));
   const ctx=f.stage.children[0].children[0].context;let elapsed=0;
   function rimAt(time){
     f.advance(time-elapsed);elapsed=time;ctx.strokes.length=0;f.entry.update(0);
-    const opening=ctx.strokes.find(s=>s.style==='#c3a1ffb3').path[0].args;
-    const arc=ctx.strokes.find(s=>s.style==='#96eaffd9').path[0].args;
-    const ticks=ctx.strokes.find(s=>s.style==='#bd9fffc4').path.filter(p=>p.type==='ellipse').map(p=>p.args);
+    const opening=ctx.strokes.find(s=>s.style===color('#c3a1ffb3')).path[0].args;
+    const arc=ctx.strokes.find(s=>s.style===color('#96eaffd9')).path[0].args;
+    const ticks=ctx.strokes.find(s=>s.style===color('#bd9fffc4')).path.filter(p=>p.type==='ellipse').map(p=>p.args);
     assert.equal(ticks.length,3,'three sparse rim marks rotate with the luminous arc');
     assert.equal(arc[4],0,'the elliptical aperture itself never tilts or flips');
     for(const tick of ticks)assert.deepEqual(tick.slice(0,5),arc.slice(0,5));
@@ -215,4 +218,48 @@ test('portal accents turn exactly once with the train while the elliptical openi
   assert.deepEqual(settled.arc,last.arc,'rotation settles before the map transition');
   for(let i=0;i<3;i++)assert.ok(Math.abs(last.ticks[i][5]-first.ticks[i][5]-Math.PI*2)<1e-9);
   f.entry.cancel();f.clean();
+});
+
+test('city colours cover the train, portal and opaque handoff and reset cleanly when another map starts', () => {
+  const f=fixture({captureStrokes:true});
+  for(const id of ['coast-london','coast-beijing','coast-shanghai','coast-rio','coast-austin','coast-paris']){
+    const theme=themeForTrack(id),color=value=>themeCssColor(value,theme);
+    f.entry.start(id);
+    const ctx=f.stage.children[0].children[0].context;
+    assert.deepEqual(ctx.rectangles[0],{args:[0,0,1200,700],fill:color('#15112b'),alpha:1},`${id} covers the first frame`);
+    assert.equal(f.stage.style.values.get('--entry-menu-edge'),color('#15112b'));
+    assert.equal(f.stage.style.values.get('--entry-skip-bg'),color('#1a1238a6'));
+    f.advance(1.2);ctx.strokes.length=0;f.entry.update(0);
+    assert.equal(ctx.strokes.filter(s=>s.style===color('#a4d8ff99')).length,16,`${id} retains every train wheel`);
+    assert.equal(ctx.strokes.filter(s=>s.style===color('#c3a1ffb3')).length,1,`${id} colours the portal too`);
+    if(theme!=='purple')assert.ok(!ctx.strokes.some(s=>s.style==='#c3a1ffb3'),'no original purple portal remains');
+    f.advance(2.4);
+    assert.equal(f.stage.style.values.get('--entry-preview-opacity'),'1');
+    const veil=f.stage.style.values.get('--entry-veil-rgb');
+    assert.equal(theme==='purple'?`rgb(${veil})`:`rgba(${veil},1)`,theme==='purple'?'rgb(13,8,31)':color('#0d081f'),`${id} canvas and preview veil share a colour`);
+  }
+  f.entry.cancel();f.clean();
+});
+
+test('menu landmark palettes change only paint while retaining cached models, paths and the original purple output', () => {
+  function draw(model,theme){
+    const geometry=[],colours=[];
+    const ctx=new Proxy({}, {
+      get:(_,method)=>(...args)=>{
+        geometry.push([method,args]);
+        if(method==='createLinearGradient'||method==='createRadialGradient')return {addColorStop:(offset,value)=>colours.push(['stop',offset,value])};
+      },
+      set:(_,key,value)=>{if((key==='fillStyle'||key==='strokeStyle')&&typeof value==='string')colours.push([key,value]);return true;},
+    });
+    paintLandmarkHologram(ctx,model,320,200,model.yaw,1200,false,theme);
+    return {geometry,colours};
+  }
+  for(const id of ['coast-london','coast-beijing','coast-shanghai','coast-rio','coast-austin','coast-paris']){
+    const model=landmarkHologramGeometry(id),original=draw(model,'purple'),themed=draw(model,undefined),theme=themeForTrack(id);
+    assert.equal(landmarkHologramGeometry(id),model,'changing colours does not rebuild the production landmark model');
+    assert.deepEqual(themed.geometry,original.geometry,`${id} keeps the same projection, faces and outlines`);
+    assert.deepEqual(themed.colours,original.colours.map(values=>values.map((value,index)=>index===values.length-1?themeCssColor(value,theme):value)));
+    if(theme==='purple')assert.deepEqual(themed,original,'London and Paris keep the exact original purple painting');
+    else assert.notDeepEqual(themed.colours,original.colours);
+  }
 });

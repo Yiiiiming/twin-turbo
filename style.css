@@ -83,3 +83,70 @@ html.orbit-cursor,html.orbit-cursor *,html.orbit-cursor *::before,html.orbit-cur
   .landmark-hologram { width: 150px; height: 60px; margin-bottom: 3px; }
   #menu .lobby-identity:has(.landmark-hologram) { margin: 0; }
 }
+
+/* Circuit colour travels from the lobby into the race. Identity and warning
+   colours remain independent of these background/accent presentation tokens. */
+:root[data-color-theme] {
+  --theme-ink:#f3f0ff;--theme-muted:#b6aed0;--theme-accent:#9875f8;
+  --theme-highlight:#d9c9ff;--theme-glow-rgb:185 157 255;
+  --theme-hot:#30257b;--theme-mid:#251e61;--theme-base:#1c1745;--theme-deep:#15112b;
+  --theme-shade-rgb:23 19 50;
+}
+:root[data-color-theme="red"] {
+  --theme-ink:#fff0eb;--theme-muted:#d1b2b0;--theme-accent:#d5494d;
+  --theme-highlight:#ffd6c5;--theme-glow-rgb:248 112 107;
+  --theme-hot:#7b2f35;--theme-mid:#61262b;--theme-base:#451d20;--theme-deep:#2b1416;
+  --theme-shade-rgb:38 17 27;
+}
+:root[data-color-theme="orange"] {
+  --theme-ink:#fff3e7;--theme-muted:#cebba7;--theme-accent:#bf5700;
+  --theme-highlight:#f8d5b2;--theme-glow-rgb:235 153 84;
+  --theme-hot:#7b4c25;--theme-mid:#613d1e;--theme-base:#452c17;--theme-deep:#2b1d11;
+  --theme-shade-rgb:35 24 18;
+}
+:root[data-color-theme="green"] {
+  --theme-ink:#ecfff7;--theme-muted:#aacdbd;--theme-accent:#258b70;
+  --theme-highlight:#b1f5d9;--theme-glow-rgb:100 228 180;
+  --theme-hot:#2a7b5a;--theme-mid:#226148;--theme-base:#1a4534;--theme-deep:#132b21;
+  --theme-shade-rgb:15 37 31;
+}
+:root[data-color-theme="ice"] {
+  --theme-ink:#eef8ff;--theme-muted:#acc2d4;--theme-accent:#398bb9;
+  --theme-highlight:#d0eeff;--theme-glow-rgb:145 216 255;
+  --theme-hot:#3a637b;--theme-mid:#2e4e61;--theme-base:#223845;--theme-deep:#17242b;
+  --theme-shade-rgb:17 33 48;
+}
+:root[data-color-theme]:not([data-color-theme="purple"]) {--text:var(--theme-ink);--muted:var(--theme-muted);--violet:var(--theme-accent);--panel:var(--theme-base)}
+:root[data-color-theme]:not([data-color-theme="purple"]) body {background:var(--theme-deep)}
+:root[data-color-theme]:not([data-color-theme="purple"]) #menu {
+  background:radial-gradient(ellipse at 50% 46%,var(--theme-hot) 0%,var(--theme-mid) 36%,var(--theme-base) 68%,var(--theme-deep) 100%);
+  scrollbar-color:color-mix(in srgb,var(--theme-highlight) 50%,transparent) transparent;
+}
+:root[data-color-theme]:not([data-color-theme="purple"]) :is(.start-button,#menu>.start-button) {background:var(--theme-accent);border-color:color-mix(in srgb,var(--theme-highlight) 52%,var(--theme-accent));color:#fff}
+:root[data-color-theme]:not([data-color-theme="purple"]) :is(.start-button,#menu>.start-button):hover:enabled {background:color-mix(in srgb,var(--theme-accent) 85%,#fff);border-color:var(--theme-highlight)}
+:root[data-color-theme]:not([data-color-theme="purple"]) :is(.map-picker-heading,.track-card-name,.track-card-number,.menu-records,.mode-select button) {color:var(--theme-muted)}
+:root[data-color-theme]:not([data-color-theme="purple"]) #menu #route-title {color:var(--theme-muted)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .map-picker-heading small {color:color-mix(in srgb,var(--theme-muted) 76%,transparent)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .track-card {border-bottom-color:rgb(var(--theme-glow-rgb)/.2)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .track-card:hover {background:rgb(var(--theme-glow-rgb)/.05);border-bottom-color:var(--theme-highlight)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .track-card.selected {background:rgb(var(--theme-glow-rgb)/.08);border-color:rgb(var(--theme-glow-rgb)/.55);border-bottom-color:var(--theme-highlight)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .track-card-preview path {stroke:var(--theme-muted)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .track-card.selected .track-card-preview path {stroke:var(--theme-highlight)}
+:root[data-color-theme]:not([data-color-theme="purple"]) :is(.track-card.selected .track-card-name,.mode-select button.selected,.menu-records:hover) {color:var(--theme-ink)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .mode-select button:after {background:var(--theme-highlight)}
+:root[data-color-theme]:not([data-color-theme="purple"]) :is(button,a,input,select,[tabindex]):focus-visible {outline-color:var(--theme-highlight)}
+:root[data-color-theme]:not([data-color-theme="purple"]) :is(.race-card,.race-position,.split-readout,.challenge-live,.finisher-notice) {background:rgb(var(--theme-shade-rgb)/.83)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .scoreboard .race-actions :is(#fullscreen,#pause) {background:rgb(var(--theme-shade-rgb)/.74);color:var(--theme-ink)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .scoreboard .race-actions :is(#fullscreen,#pause):hover:enabled {background:var(--theme-base);border-color:rgb(var(--theme-glow-rgb)/.5)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .speed-readout {background:radial-gradient(circle,rgb(var(--theme-shade-rgb)/.79),rgb(var(--theme-shade-rgb)/.47) 63%,transparent 73%)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .countdown {background:rgb(var(--theme-shade-rgb)/.3)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .countdown strong {text-shadow:0 0 60px rgb(var(--theme-glow-rgb)/.48)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .countdown:before {border-color:rgb(var(--theme-glow-rgb)/.21);box-shadow:0 0 0 36px rgb(var(--theme-glow-rgb)/.03),0 0 0 72px rgb(var(--theme-glow-rgb)/.02)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .pointer-orbits i {border-color:rgb(var(--theme-glow-rgb)/.55)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .pointer-orbits i:nth-child(2) {border-color:rgb(var(--theme-glow-rgb)/.3)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .pointer-orbits i:nth-child(3) {border-color:rgb(var(--theme-glow-rgb)/.16)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .landmark-hologram {background:radial-gradient(ellipse 45% 12% at 50% 88%,rgb(var(--theme-glow-rgb)/.08),transparent 75%)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .driving-tutorial {background:linear-gradient(135deg,rgb(var(--theme-shade-rgb)/.94),rgb(var(--theme-shade-rgb)/.85));border-color:rgb(var(--theme-glow-rgb)/.4)}
+:root[data-color-theme]:not([data-color-theme="purple"]) :is(.tutorial-progress,.tutorial-instruction,.tutorial-exit) {color:var(--theme-muted)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .tutorial-keys kbd {color:var(--theme-ink);border-color:rgb(var(--theme-glow-rgb)/.4);background:rgb(var(--theme-glow-rgb)/.07)}
+:root[data-color-theme]:not([data-color-theme="purple"]) .driving-tutorial.is-complete .tutorial-exit {color:var(--theme-ink);border-color:rgb(var(--theme-glow-rgb)/.35);background:rgb(var(--theme-glow-rgb)/.15)}

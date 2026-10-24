@@ -1,6 +1,7 @@
 import { TRACKS } from './engine.js';
 import { addCityLandmark } from './city-scenery.js';
 import { londonEye } from './renderer.js';
+import { themeForTrack, themeCssColor } from './color-themes.js';
 
 // The same model builders as the race, collected once without a scene, physics
 // world or WebGL context. Only their presentation changes in the lobby.
@@ -109,7 +110,11 @@ export function landmarkHologramGeometry(trackId) {
   return result;
 }
 
-export function paintLandmarkHologram(ctx, model, width, height, yaw, time, reduced) {
+export function paintLandmarkHologram(ctx, model, width, height, yaw, time, reduced, themeId = themeForTrack(model.trackId)) {
+  const colors = new Map(), color = value => {
+    if (!colors.has(value)) colors.set(value, themeCssColor(value, themeId));
+    return colors.get(value);
+  };
   ctx.clearRect(0,0,width,height);
   const pitch = model.kind === 'circuit' ? .70 : .18, cp=Math.cos(pitch),sp=Math.sin(pitch),cs=Math.cos(yaw),sn=Math.sin(yaw);
   const scale = Math.min(width*.83/(2*model.radius),height*.78/Math.max(1,model.height*cp+2*model.radius*sp));
@@ -120,10 +125,10 @@ export function paintLandmarkHologram(ctx, model, width, height, yaw, time, redu
   const rx=Math.min(width*.36,Math.max(21,model.radius*scale*1.03)),ry=Math.max(4,rx*.16);
   ctx.save();ctx.translate(width/2,base[1]);ctx.scale(1,.27);
   const glow=ctx.createRadialGradient(0,0,0,0,0,rx*1.25);
-  glow.addColorStop(0,'rgba(128,81,255,.18)');glow.addColorStop(1,'rgba(113,67,233,0)');
+  glow.addColorStop(0,color('rgba(128,81,255,.18)'));glow.addColorStop(1,color('rgba(113,67,233,0)'));
   ctx.fillStyle=glow;ctx.fillRect(-rx*1.25,-rx*1.25,rx*2.5,rx*2.5);ctx.restore();
   for(const [r,alpha] of [[1,.32],[.78,.12]]){
-    ctx.beginPath();ctx.ellipse(width/2,base[1]+2,rx*r,ry*r,0,0,TAU);ctx.strokeStyle=`rgba(172,128,255,${alpha})`;ctx.lineWidth=.7;ctx.stroke();
+    ctx.beginPath();ctx.ellipse(width/2,base[1]+2,rx*r,ry*r,0,0,TAU);ctx.strokeStyle=color(`rgba(172,128,255,${alpha})`);ctx.lineWidth=.7;ctx.stroke();
   }
   const facing=[], order=[];
   model.faces.forEach((face,index)=>{
@@ -135,7 +140,7 @@ export function paintLandmarkHologram(ctx, model, width, height, yaw, time, redu
   order.sort((a,b)=>b.depth-a.depth);
   for(const {face,front} of order){
     ctx.beginPath();face.ids.forEach((id,i)=>{const p=points[id];if(i)ctx.lineTo(p[0],p[1]);else ctx.moveTo(p[0],p[1]);});ctx.closePath();
-    const light=Math.round(face.light*4);ctx.fillStyle=`rgba(${25+light*3},${23+light*3},${62+light*6},${front?.72:.44})`;ctx.fill();
+    const light=Math.round(face.light*4);ctx.fillStyle=color(`rgba(${25+light*3},${23+light*3},${62+light*6},${front?.72:.44})`);ctx.fill();
   }
   // Batch all edges into three paths; do not apply costly per-edge shadows.
   const groups=[[],[],[]];
@@ -145,8 +150,8 @@ export function paintLandmarkHologram(ctx, model, width, height, yaw, time, redu
   }
   for(let i=0;i<groups.length;i++){
     ctx.beginPath();for(const [a,b]of groups[i]){ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);}
-    ctx.lineWidth=i===2?2.3:1.5;ctx.strokeStyle=`rgba(143,91,255,${[.04,.075,.15][i]})`;ctx.stroke();
-    ctx.lineWidth=i===2?.8:.55;ctx.strokeStyle=[ 'rgba(148,109,238,.15)','rgba(168,161,255,.40)','rgba(122,230,255,.79)' ][i];ctx.stroke();
+    ctx.lineWidth=i===2?2.3:1.5;ctx.strokeStyle=color(`rgba(143,91,255,${[.04,.075,.15][i]})`);ctx.stroke();
+    ctx.lineWidth=i===2?.8:.55;ctx.strokeStyle=color([ 'rgba(148,109,238,.15)','rgba(168,161,255,.40)','rgba(122,230,255,.79)' ][i]);ctx.stroke();
   }
   // A moving, clipped light sweep enhances the projection without introducing
   // flicker. Reduced-motion mode has neither sweep nor automatic rotation.
@@ -154,7 +159,7 @@ export function paintLandmarkHologram(ctx, model, width, height, yaw, time, redu
     const scan=height*(.12+((time*.00009)%1)*.70);
     ctx.save();ctx.globalCompositeOperation='source-atop';
     const stripe=ctx.createLinearGradient(0,scan-7,0,scan+7);
-    stripe.addColorStop(0,'rgba(104,223,255,0)');stripe.addColorStop(.5,'rgba(133,233,255,.22)');stripe.addColorStop(1,'rgba(104,223,255,0)');
+    stripe.addColorStop(0,color('rgba(104,223,255,0)'));stripe.addColorStop(.5,color('rgba(133,233,255,.22)'));stripe.addColorStop(1,color('rgba(104,223,255,0)'));
     ctx.fillStyle=stripe;ctx.fillRect(0,scan-7,width,14);ctx.restore();
   }
 }

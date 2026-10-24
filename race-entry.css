@@ -3,7 +3,7 @@
 /* Keep the real world out of both transparent transition layers. Visibility
    preserves the renderer's sizing; the preview restores it under an opaque veil. */
 .race-entry-active[data-entry-phase="train"] :is(#game,#city-game) { visibility: hidden !important; }
-.race-entry-active[data-entry-phase="train"] .arena { background: radial-gradient(ellipse at 50% 46%,#30257b 0%,#251e61 36%,#1c1745 68%,#15112b 100%); }
+.race-entry-active[data-entry-phase="train"] .arena { background: radial-gradient(ellipse at 50% 46%,var(--entry-menu-core,#30257b) 0%,var(--entry-menu-mid,#251e61) 36%,var(--entry-menu-outer,#1c1745) 68%,var(--entry-menu-edge,#15112b) 100%); }
 .race-entry-active[data-entry-phase="train"] #menu {
   display: flex !important;
   transform: scale(var(--entry-menu-scale, 1));
@@ -30,11 +30,11 @@
 }
 .race-entry::before {
   inset: 0;
-  border-top: clamp(14px, 4vh, 38px) solid #0d081fe8;
-  border-bottom: clamp(14px, 4vh, 38px) solid #0d081fe8;
+  border-top: clamp(14px, 4vh, 38px) solid var(--entry-bars,#0d081fe8);
+  border-bottom: clamp(14px, 4vh, 38px) solid var(--entry-bars,#0d081fe8);
 }
-.race-entry::after { inset: 0; background: #080413; opacity: var(--entry-cut-shade, 0); }
-.race-entry-active[data-entry-phase="preview"] .race-entry { background: rgba(13,8,31,var(--entry-preview-opacity,0)); }
+.race-entry::after { inset: 0; background: var(--entry-cut-color,#080413); opacity: var(--entry-cut-shade, 0); }
+.race-entry-active[data-entry-phase="preview"] .race-entry { background: rgba(var(--entry-veil-rgb,13,8,31),var(--entry-preview-opacity,0)); }
 .race-entry .race-entry-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
 .race-entry-active[data-entry-phase="train"] .race-entry-canvas { opacity: var(--entry-canvas-opacity,0); }
 .race-entry .race-entry-skip {
@@ -46,10 +46,10 @@
   min-height: 38px;
   margin: 0;
   padding: 8px 18px;
-  border: 1px solid #d4c1ff4d;
+  border: 1px solid var(--entry-skip-border,#d4c1ff4d);
   border-radius: 18px;
-  background: #1a1238a6;
-  color: #eee6ff;
+  background: var(--entry-skip-bg,#1a1238a6);
+  color: var(--entry-skip-text,#eee6ff);
   font: 400 12px/1.4 var(--font, sans-serif);
   letter-spacing: .02em;
   pointer-events: auto;
@@ -57,8 +57,8 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-.race-entry .race-entry-skip:hover { background: #38265bba; border-color: #e5d6ff99; }
-.race-entry .race-entry-skip:focus-visible { outline: 2px solid #ded0ff; outline-offset: 4px; }
+.race-entry .race-entry-skip:hover { background: var(--entry-skip-hover,#38265bba); border-color: var(--entry-skip-hover-border,#e5d6ff99); }
+.race-entry .race-entry-skip:focus-visible { outline: 2px solid var(--entry-skip-focus,#ded0ff); outline-offset: 4px; }
 @media (max-width: 600px) {
   .race-entry .race-entry-skip { right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); min-height: 40px; }
 }

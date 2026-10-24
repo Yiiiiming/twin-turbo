@@ -21,6 +21,7 @@ import { createEntryCameraPlan, entryCameraForProgress, entryMeshOcclusion } fro
 import { addBeijingGreatWall } from './beijing-great-wall.js';
 import { HOLOGRAM_MATERIALS, HOLOGRAM_FRAGMENT, HOLOGRAM_SKY } from './hologram-theme.js';
 import { hologramEdges } from './hologram-edges.js';
+import { COLOR_THEMES, COLOR_THEME_GLSL, themeForTrack, remapHologramColor } from './color-themes.js';
 /** Native WebGL racing renderer: two genuinely perspective, low chase cameras. */
 import { TRACK, trackPoint, projectTrack, mod } from './engine.js';
 
@@ -174,6 +175,9 @@ uniform vec3 uSpellPositionA;
 uniform vec3 uSpellPositionB;
 uniform vec3 uSpellColorA;
 uniform vec3 uSpellColorB;
+uniform float uColorTheme;
+uniform float uHologramLine;
+${COLOR_THEME_GLSL}
 ${HOLOGRAM_FRAGMENT}
 void main() {
   vec3 n = normalize(vNormal);
@@ -192,6 +196,10 @@ void main() {
     color *= mix(1.0, .8, uMagic);
     color += (uSpellColorA*a*a+uSpellColorB*b*b)*uMagic*.22;
   }
+  // Map only the environment and its outlines. Landmark, car, ghost and spell
+  // materials retain their established colours under the new ambient fog.
+  if ((surfaceMode > .5 && surfaceMode < 4.5) || uHologramLine > .5)
+    color = themeColor(color,uColorTheme);
   float fog = smoothstep(uFogRange.x,uFogRange.y,length(vPosition-uEye));
   color = mix(color, uFog, fog*uFogRange.z);
   gl_FragColor = vec4(color, vColor.a);
@@ -213,6 +221,8 @@ uniform vec3 uZenith;
 uniform vec3 uHorizon;
 uniform float uLondon;
 uniform float uMagic;
+uniform float uColorTheme;
+${COLOR_THEME_GLSL}
 ${HOLOGRAM_SKY}
 void main(){
   vec3 gradient = mix(uHorizon,uZenith,pow(clamp(vUV.y,0.0,1.0),0.7));
@@ -229,7 +239,7 @@ void main(){
   night+=vec3(.06,.08,.12)*luminance;
   image=mix(image,night,uMagic);
   float landscape = smoothstep(0.03,0.3,vUV.y);
-  gl_FragColor=vec4(hologramSky(vUV,uHeading,uAspect,uMagic),1.0);
+  gl_FragColor=vec4(themeColor(hologramSky(vUV,uHeading,uAspect,uMagic),uColorTheme),1.0);
 }`;
 
 const POSTER_VERTEX=`
@@ -1175,6 +1185,7 @@ export class RaceRenderer {
   }
   _initialize() {
     const gl=this.gl;
+    this.colorTheme=themeForTrack(TRACK.id);
     this.mainProgram=program(gl,VERTEX,FRAGMENT);this.skyProgram=program(gl,SKY_VERTEX,SKY_FRAGMENT);
     this.posterProgram=program(gl,POSTER_VERTEX,POSTER_FRAGMENT);
     this.posterAttributes={position:gl.getAttribLocation(this.posterProgram,'aPosition'),uv:gl.getAttribLocation(this.posterProgram,'aUV')};
@@ -1182,9 +1193,9 @@ export class RaceRenderer {
     this.posterMeshes=[];this.scoreboardCanvas=null;
     this.attributes={};this.uniforms={};
     for(const name of ['aPosition','aNormal','aColor','aEmission'])this.attributes[name]=gl.getAttribLocation(this.mainProgram,name);
-    for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange','uMagic','uSpellPositionA','uSpellPositionB','uSpellColorA','uSpellColorB','uLineOffset'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
+    for(const name of ['uViewProjection','uModel','uEye','uFog','uFogRange','uMagic','uSpellPositionA','uSpellPositionB','uSpellColorA','uSpellColorB','uLineOffset','uColorTheme','uHologramLine'])this.uniforms[name]=gl.getUniformLocation(this.mainProgram,name);
     this.skyAttributes={position:gl.getAttribLocation(this.skyProgram,'aPosition')};this.skyUniforms={};
-    for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon','uLondon','uMagic'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
+    for(const name of ['uTextureA','uTextureB','uTextureC','uReadyA','uReadyB','uReadyC','uWeights','uHeading','uAspect','uZenith','uHorizon','uLondon','uMagic','uColorTheme'])this.skyUniforms[name]=gl.getUniformLocation(this.skyProgram,name);
     this.skyBuffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
     const world=buildWorld();
     this.obstacles=world.obstacles;
@@ -1203,6 +1214,7 @@ export class RaceRenderer {
   }
   rebuild(engine) {
     if(!this.available)return this;
+    this.colorTheme=themeForTrack(TRACK.id);
     this.setEntryProgress(null);
     const gl=this.gl,world=buildWorld();
     for(const [key,builder] of Object.entries({terrain:world.terrain,road:buildRoad(),water:world.water,props:world.props,magic:world.magic})) {
@@ -1351,6 +1363,7 @@ export class RaceRenderer {
       gl.enableVertexAttribArray(a[name]);gl.vertexAttribPointer(a[name],size,gl.FLOAT,false,44,offset);
     }
     gl.uniform1f(this.uniforms.uLineOffset,mesh.lines ? .002 : 0);
+    gl.uniform1f(this.uniforms.uHologramLine,mesh.lines ? 1 : 0);
     gl.uniformMatrix4fv(this.uniforms.uModel,false,model);gl.drawArrays(mesh.lines?gl.LINES:gl.TRIANGLES,0,mesh.count);
   }
   _sky(camera,weights,aspect,magic=0) {
@@ -1361,7 +1374,8 @@ export class RaceRenderer {
     const one=citySky?clouds:this.textures.coast,two=citySky?clouds:this.textures.alpine,three=citySky?clouds:this.textures.city;
     const night={zenith:[.009,.012,.035],horizon:[.035,.032,.075],fog:[.03,.027,.065]};
     const projection={zenith:[.018,.022,.06],horizon:[.085,.065,.16],fog:[.058,.052,.115]};
-    const color=field=>projection[field].map((value,i)=>mix(value,night[field][i],magic));
+    const color=field=>remapHologramColor(projection[field].map((value,i)=>mix(value,night[field][i],magic)),this.colorTheme);
+    const colorThemeIndex=COLOR_THEMES[this.colorTheme].index;
     gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.useProgram(this.skyProgram);
     for(const loc of Object.values(this.attributes))gl.disableVertexAttribArray(loc);
     gl.bindBuffer(gl.ARRAY_BUFFER,this.skyBuffer);gl.enableVertexAttribArray(this.skyAttributes.position);gl.vertexAttribPointer(this.skyAttributes.position,2,gl.FLOAT,false,0,0);
@@ -1372,10 +1386,12 @@ export class RaceRenderer {
     gl.uniform3fv(u.uWeights,[weights.coast,weights.alpine,weights.city]);
     gl.uniform1f(u.uLondon,TRACK.theme==='london'?1:0);
     gl.uniform1f(u.uMagic,magic);
+    gl.uniform1f(u.uColorTheme,colorThemeIndex);
     gl.uniform1f(u.uHeading,camera.angle);gl.uniform1f(u.uAspect,aspect);gl.uniform3fv(u.uZenith,color('zenith'));gl.uniform3fv(u.uHorizon,color('horizon'));
     gl.drawArrays(gl.TRIANGLES,0,6);gl.disableVertexAttribArray(this.skyAttributes.position);
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.mainProgram);
     this.activeMagic=magic;this.activeFog=color('fog');gl.uniform3fv(this.uniforms.uFog,this.activeFog);
+    gl.uniform1f(this.uniforms.uColorTheme,colorThemeIndex);
     this.fogRange=TRACK.theme==='shanghai'?[1800,6500,.65]:[mix(620,580,magic),mix(2550,2900,magic),.9];gl.uniform3fv(this.uniforms.uFogRange,this.fogRange);
     gl.uniform1f(this.uniforms.uMagic,magic);
     for(const [index,suffix]of ['A','B'].entries()){
