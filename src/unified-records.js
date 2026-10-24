@@ -1,6 +1,7 @@
 import { leaderboardVersionForCity, LEADERBOARD_CITIES, normalizeEntries, normalizeName, leaderboardNameKey } from './leaderboard.js';
 import { validGhostReplay } from './ghost-client.js';
 import { GHOST_VERSION, RACE_GHOST_VERSION, ghostVersionForCity, validateRaceReplay } from './ghost-replay.js';
+import { setNicknameText, submissionNickname, limitNicknameInput } from './display-names.js';
 
 const API_ORIGIN = 'https://twin-turbo-records-yiiiiming.heym0701.chatgpt.site';
 const CITY = 'coast';
@@ -116,7 +117,7 @@ export class UnifiedRecordsClient {
       const row = this.el('tr', 'record-row');
       row.appendChild(this.el('td', 'record-rank', String(index + 1).padStart(2, '0')));
       const identity = this.el('td', 'record-identity');
-      const nickname = this.el('strong', '', normalizeName(entry.name)); nickname.setAttribute('translate', 'no'); identity.appendChild(nickname);
+      const nickname = setNicknameText(this.el('strong'),normalizeName(entry.name)); identity.appendChild(nickname);
       identity.appendChild(this.el('small', '', entry.mode === 'ai' ? '单人' : '本地双人')); row.appendChild(identity);
       row.appendChild(this.el('td', 'record-time record-total-time', timeLabel(entry.timeMs)));
       const challenge = this.el('td', 'record-ghost-cell');
@@ -191,13 +192,15 @@ export class UnifiedRecordsClient {
       form.appendChild(this.el('p', 'records-save-summary', `${total ? `${result.laps} 圈 ${timeLabel(result.timeMs)}` : '本场未完赛'}${replay ? ` · 最快有效单圈 ${timeLabel(replay.durationMs)}` : ''}`));
       const label = this.el('label', 'records-save-label', '你的昵称');
       card.input = this.el('input', 'records-nickname'); card.input.type = 'text'; card.input.name = 'nickname'; card.input.autocomplete = 'nickname';
-      card.input.required = true; card.input.value = this.remembered(result.playerId); card.input.setAttribute('aria-label', `P${result.playerId} 成绩昵称`);
+      card.rememberedName=this.remembered(result.playerId);
+      card.input.required = true; card.input.value = card.rememberedName; card.input.setAttribute('aria-label', `P${result.playerId} 成绩昵称`);
       label.appendChild(card.input); form.appendChild(label);
       card.button = this.el('button', 'records-save-button', '保存我的成绩'); card.button.type = 'submit'; form.appendChild(card.button);
       card.message = this.el('p', 'records-save-status', '一个昵称，一次保存。符合条件的总成绩、最快单圈与幽灵将一起记录。');
       card.message.setAttribute('role', 'status'); form.appendChild(card.message);
       card.input.addEventListener('compositionstart', () => { card.composing = true; });
-      card.input.addEventListener('compositionend', () => { card.composing = false; card.input.value = normalizeName(card.input.value); });
+      card.input.addEventListener('compositionend', () => { card.composing = false; card.input.value = submissionNickname(card.input.value,card.rememberedName); });
+      card.input.addEventListener('input',event=>{if(!event.isComposing&&!card.composing)limitNicknameInput(card.input,card.rememberedName);});
       form.addEventListener('submit', event => { event.preventDefault(); return this.save(card); });
       this.cards.push(card); list.appendChild(form);
     }
@@ -238,8 +241,8 @@ export class UnifiedRecordsClient {
   }
   async save(card) {
     if (this.locked || card.token !== this.raceToken || card.submitting || card.done || card.composing) return;
-    const name = card.submissionName || normalizeName(card.input.value);
-    if (!name) { card.message.textContent = '请输入昵称，最多 16 个字符。'; card.input.focus(); return; }
+    const name = card.submissionName || submissionNickname(card.input.value,card.rememberedName);
+    if (!name) { card.message.textContent = '请输入昵称，最多 12 个字符。'; card.input.focus(); return; }
     card.submissionName = name; card.input.value = name; this.remember(card.playerId, name);
     card.submitting = true; card.button.disabled = true; card.input.disabled = true; card.message.textContent = '正在保存成绩与幽灵…';
     // The linked total supplies the lap's start evidence. Wait for its write

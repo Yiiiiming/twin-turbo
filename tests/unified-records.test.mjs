@@ -145,6 +145,37 @@ test('one nickname saves both records; two human players get one independent car
   assert.deepEqual(h.client.cards.map(card => card.input.value), ['双人一号', '双人二号']);
 });
 
+test('new save inputs limit twelve Unicode code points after IME confirmation and before posting',async()=>{
+  const h=setup();await h.client.init();h.client.showResults([result()]);const card=h.client.cards[0];
+  card.input.value='🚗'.repeat(14);await card.input.dispatch('input');
+  assert.equal(card.input.value,'🚗'.repeat(12),'surrogate pairs remain intact');
+  await card.input.dispatch('compositionstart');card.input.value='赛车'.repeat(10);
+  await card.input.dispatch('input',{isComposing:true});await h.client.save(card);
+  assert.equal(card.input.value,'赛车'.repeat(10));assert.equal(posted(h).length,0);
+  await card.input.dispatch('compositionend');assert.equal(card.input.value,'赛车'.repeat(6));
+  h.handler=req=>req.method==='POST'?req.url.pathname==='/api/records'?response(tp({saved:true})):savedLap(req.body):undefined;
+  card.input.value='abcdefghijklmnop';await h.client.save(card);
+  assert.deepEqual(posted(h).map(req=>req.body.name),['abcdefghijkl','abcdefghijkl'],'programmatic edits cannot bypass the new-name limit');
+});
+
+test('legacy nickname identity remains intact in remembered prefill, original records, challenge and retry',async()=>{
+  const h=setup(),name='abcdefghijklmnop';h.memory.set('twin-turbo-ghost-name-1',name);
+  h.handler=req=>req.method==='GET'?response(lp({entries:[lap(name)]})):undefined;
+  await h.client.init();
+  const nickname=h.get('records-list').children[0].children[1].children[0];
+  assert.equal(nickname.textContent,'abcdefghijk…');assert.equal(nickname.attributes.get('title'),name);
+  await h.client.challengeButtons[0].dispatch('click');assert.equal(h.challenges[0].name,name);
+  h.client.showResults([result()]);const card=h.client.cards[0];
+  assert.equal(card.input.value,name);assert.equal(h.memory.get('twin-turbo-ghost-name-1'),name);
+  let attempts=0;
+  h.handler=req=>req.method==='POST'?(++attempts===1?Promise.reject(new Error('offline')):req.url.pathname==='/api/records'?response(tp({saved:true})):savedLap(req.body)):undefined;
+  await h.client.save(card);
+  assert.ok(posted(h).every(req=>req.body.name===name));
+  card.input.value='changed';await h.client.save(card);
+  assert.ok(posted(h).every(req=>req.body.name===name),'a retry never renames the submitted identity');
+  assert.equal(card.done,true);
+});
+
 test('when the total saves but the ghost response is lost, retry sends only the same ghost payload', async () => {
   const h = setup(); await h.client.init(); let lapAttempts = 0;
   h.handler = req => {

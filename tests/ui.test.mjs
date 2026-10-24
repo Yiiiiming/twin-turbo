@@ -246,6 +246,7 @@ async function loadUI(t, { graphicsAvailable = true, fetchImpl, search = '?city=
     .replace("from './race-entry.js'", `from '${entryURL}'`)
     .replace("from './driving-tutorial.js'", `from '${new URL('../src/driving-tutorial.js', import.meta.url).href}'`)
     .replace("from './i18n.js'", `from '${new URL('../src/i18n.js', import.meta.url).href}'`)
+    .replace("from './display-names.js'", `from '${new URL('../src/display-names.js', import.meta.url).href}'`)
     .replace("from './track-visibility.js'", `from '${visibilityURL}'`)
     .replace("from './color-theme-ui.js'", `from '${new URL('../src/color-theme-ui.js', import.meta.url).href}'`)
     .replace("from './color-themes.js'", `from '${new URL('../src/color-themes.js', import.meta.url).href}'`)
@@ -1490,7 +1491,7 @@ test('a real-control one-lap race saves one nickname for total and lap ghost, re
   assert.equal(savedTotals.length, 1); assert.equal(savedLaps.length, 0); assert.equal(savedRaces.length, 0);
   assert.equal(racePosts().length, 0, 'single-lap results do not post a three-lap ghost');
   const totalSubmission = JSON.parse(totalPosts()[0].body), lapSubmission = JSON.parse(lapPosts()[0].body);
-  assert.equal(totalSubmission.name, 'Harbor Champion');
+  assert.equal(totalSubmission.name, 'Harbor Champ', 'a new nickname is capped at twelve characters before both submissions');
   assert.equal(lapSubmission.name, totalSubmission.name, 'one nickname is shared by both records');
   assert.equal(totalSubmission.timeMs, Math.round(ui.engine.cars[0].finishTime * 1000));
   assert.equal(lapSubmission.timeMs, Math.round(ui.engine.cars[0].bestLap * 1000));
@@ -1691,7 +1692,8 @@ test('all six solo split rivals follow actual checkpoint crossing order without 
   for(const [index,row]of allRows.entries()){
     assert.match(row.children[1].textContent,/^[+−]\d+\.\d{2} 秒$/);
     const shown=Number(row.children[1].textContent.replace('−','-').split(' ')[0]);
-    assert.equal(shown,Math.round((10750-checkpointOrder[index].timeMs)/10)/100);
+    const deltaMs=10750-checkpointOrder[index].timeMs;
+    assert.equal(shown,Math.sign(deltaMs)*Math.round(Math.abs(deltaMs)/10)/100||0);
   }
   const alice=allRows.find(row=>row.children[0].textContent==='<b>Alice</b>');
   assert.ok(alice);assert.equal(alice.children[1].textContent,'+0.25 秒','positive means the player passed this point later');
@@ -1706,6 +1708,35 @@ test('all six solo split rivals follow actual checkpoint crossing order without 
     'changing the player gap never changes the rivals’ checkpoint crossing order');
 });
 
+
+test('checkpoint rank arrows use separate colors and preserve twelve-character names and crossing order',async t=>{
+  const fixture=challengeFixture();fixture.entries[0].name='abcdefghijklmnop';fixture.board=fixture.entries;
+  const ui=await loadCoastUI(t,{fetchImpl:challengeFetch(fixture)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();await ui.launchPrepared();ui.advance(3.1);
+  const before=[9000,11000,12000,13000,14000,15000],after=[23000,19000,21000,22000,24000,25000];
+  ui.splitTiming.ghosts.forEach((ghost,index)=>{ghost.times=[before[index],after[index],30000,42000];});
+  const racer=ui.splitTiming.racers.get(1);
+  racer.records.set('1:1',{playerId:1,lap:1,index:1,timeMs:10000,lapTimeMs:10000});
+  racer.latest={playerId:1,lap:1,index:2,timeMs:20000,lapTimeMs:20000};ui.frame(0);
+  const rows=[ui.nodes.get('split-gap1'),...ui.nodes.get('split-ghost1').children];
+  const order=[1,2,3,0,4,5],changes=[2,1,1,-4,0,0];
+  for(const [index,row]of rows.entries()){
+    assert.equal(row.children.length,2,'name and time remain separate columns');
+    const ghost=ui.application.activeGhosts[order[index]],identity=row.children[0];
+    assert.equal(row.style.color,ghost.color,'identity retains its rival color');
+    if(changes[index]){
+      assert.equal(identity.children[0].textContent,`${changes[index]>0?'↑':'↓'}${Math.abs(changes[index])}`);
+      assert.match(identity.children[0].className,changes[index]>0?/rank-up/:/rank-down/);
+      assert.equal(identity.children[1].textContent,ghost.displayName||ghost.entry.name);
+    }else assert.equal(identity.children.length,0,'unchanged places have no badge');
+    assert.match(row.children[1].textContent,/^[+−]\d+\.\d{2} 秒$/);
+  }
+  const longIdentity=rows[3].children[0];
+  assert.equal(longIdentity.getAttribute('title'),'abcdefghijklmnop');
+  assert.equal(longIdentity.children[1].textContent,'abcdefghijk…');
+  assert.equal(ui.nodes.get('challenge-roster').children[0].children[0].children[0].textContent,'abcdefghijk…');
+  assert.equal(ui.nodes.get('challenge-live-list').children[0].children[0].textContent,'abcdefghijk…');
+});
 
 test('Ghost Challenge accepts either steering layout for its cyan car', async t => {
   const ui = await loadCoastUI(t);
@@ -2042,9 +2073,10 @@ test('automatic solo setup waits for matching, then starts three distinct human 
   assert.deepEqual(roster.ghosts.filter(ghost=>!ghost.synthetic).map(ghost=>ghost.entry.name),['Alice','Bob','Carol']);
   assert.equal(new Set(roster.ghosts.map(ghost=>ghost.color)).size,6);
   assert.deepEqual(roster.ghosts.map(ghost=>ghost.slotId),[0,1,2,3,4,5]);
-  const slowestHuman=Math.max(...roster.ghosts.filter(ghost=>!ghost.synthetic).map(ghost=>ghost.replay.durationMs));
-  for(const [index,ghost] of roster.ghosts.filter(ghost=>ghost.synthetic).entries()){
-    assert.ok(ghost.replay.durationMs>=slowestHuman+(index+1)*1000,'pace finish targets are later than every matched human');
+  for(const [index,ghost] of roster.ghosts.entries()){
+    if(!ghost.synthetic)continue;
+    const gap=ghost.replay.durationMs-roster.ghosts[index-1].replay.durationMs;
+    assert.ok(gap>=800&&gap<=1200,'each machine fills the requested 0.8–1.2 second window');
     assert.equal(ghost.entry.timeMs,ghost.replay.durationMs,'the roster reports the actual generated replay duration');
     assert.equal(ghost.targetMs,ghost.replay.durationMs,'live and final ranking use the same actual duration');
   }

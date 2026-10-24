@@ -1,3 +1,4 @@
+import { displayNickname } from './display-names.js';
 import './ui-effects.js';
 import { ControlBindings, ACTION_LABELS } from './controls.js';
 import { createI18n } from './i18n.js';
@@ -58,12 +59,12 @@ let ghostTimelines = [];
 function cancelChallengeLoad() {
   challengeRequest++; challengeAbort?.abort(); challengeAbort = null;
 }
-function challengeLabel(ghost) { return ghost.synthetic && i18n.language==='en' ? ghost.entry.nameEn : ghost.displayName || ghost.entry.name; }
+function challengeLabel(ghost) { return ghost.synthetic ? (i18n.language==='en'?ghost.entry.nameEn:ghost.entry.name) : ghost.displayName || displayNickname(ghost.entry.name); }
 function renderChallengeRoster() {
   const roster = $('challenge-roster'); roster.replaceChildren();
   for (const ghost of challengeSetup?.ghosts || []) {
     const item = document.createElement('li'); item.className = 'challenge-driver'; item.style.setProperty('--ghost-color', ghost.color);
-    const name = document.createElement('strong'); name.textContent = challengeLabel(ghost); name.setAttribute('data-i18n-skip','');
+    const name = document.createElement('strong'); name.textContent = challengeLabel(ghost); name.setAttribute('data-i18n-skip','');name.setAttribute('title',ghost.displayFullName||ghost.entry.name);
     const kind = document.createElement('small'); kind.textContent = i18n.t(ghost.synthetic ? '配速幽灵' : '人类纪录');
     const identity = document.createElement('div'); identity.append(name,kind);
     const time = document.createElement('span'); time.textContent = fmt(ghost.entry.timeMs/1000);
@@ -111,7 +112,7 @@ function buildChallengeRacePanel() {
   $('challenge-live-list').replaceChildren(); challengeRows = [];
   for (const ghost of activeGhosts) {
     const row = document.createElement('li'); row.style.setProperty('--ghost-color',ghost.color);
-    const name = document.createElement('span'); name.textContent=challengeLabel(ghost); name.setAttribute('data-i18n-skip','');
+    const name = document.createElement('span'); name.textContent=challengeLabel(ghost); name.setAttribute('data-i18n-skip','');name.setAttribute('title',ghost.displayFullName||ghost.entry.name);
     const time = document.createElement('b'); time.textContent=fmt(ghost.entry.timeMs/1000);
     row.append(name,time); $('challenge-live-list').appendChild(row); challengeRows.push(row);
   }
@@ -119,7 +120,7 @@ function buildChallengeRacePanel() {
 function challengeElapsed(car) { return (selectedLaps===3 ? engine.time : car._started ? car.finished ? car.lastLap : car.lapTime : 0)*1000; }
 function renderChallengeResults(car) {
   const timeMs = Math.round((engine.laps===3 ? car.finishTime : car.lastLap)*1000);
-  const rows = activeGhosts.map((ghost,index)=>({name:challengeLabel(ghost),timeMs:ghost.entry.timeMs,color:ghost.color,order:index,human:false}));
+  const rows = activeGhosts.map((ghost,index)=>({name:challengeLabel(ghost),fullName:ghost.displayFullName||ghost.entry.name,timeMs:ghost.entry.timeMs,color:ghost.color,order:index,human:false}));
   rows.push({name:i18n.t('你'),timeMs,color:colors[0],order:rows.length,human:true});
   rows.sort((a,b)=>a.timeMs-b.timeMs||Number(b.human)-Number(a.human)||a.order-b.order);
   const place = rows.findIndex(row=>row.human)+1;
@@ -130,7 +131,7 @@ function renderChallengeResults(car) {
   for(const [index,result] of rows.entries()) {
     const row=document.createElement('li'); row.className='challenge-result-row'+(result.human?' is-you':''); row.style.setProperty('--ghost-color',result.color);
     const rank=document.createElement('small');rank.textContent=String(index+1).padStart(2,'0');
-    const name=document.createElement('strong');name.textContent=result.name;name.setAttribute('data-i18n-skip','');
+    const name=document.createElement('strong');name.textContent=result.name;name.setAttribute('data-i18n-skip','');name.setAttribute('title',result.fullName||result.name);
     const time=document.createElement('span');time.textContent=fmt(result.timeMs/1000);row.append(rank,name,time);$('challenge-results-list').appendChild(row);
   }
 }
@@ -323,10 +324,17 @@ $('records-track-choice').addEventListener('change',()=>{
   refreshTrackUI();
 });
 
-function renderSplitRow(row, name, deltaMs) {
-  const label=document.createElement('span');label.textContent=name;label.setAttribute('data-i18n-skip','');
+function renderSplitRow(row, name, deltaMs, rankChange = null, fullName = name) {
+  const label=document.createElement('span');label.className='split-identity';label.textContent=name;label.setAttribute('data-i18n-skip','');label.setAttribute('title',fullName);
+  if(Number.isInteger(rankChange)&&rankChange!==0){
+    const movement=document.createElement('i'),nickname=document.createElement('span');
+    movement.className=`split-rank-change ${rankChange>0?'rank-up':'rank-down'}`;
+    movement.textContent=`${rankChange>0?'↑':'↓'}${Math.abs(rankChange)}`;
+    movement.setAttribute('aria-label',i18n.language==='en'?`${Math.abs(rankChange)} places ${rankChange>0?'up':'down'}`:`${rankChange>0?'上升':'下降'} ${Math.abs(rankChange)} 名`);
+    nickname.className='split-name';nickname.textContent=name;label.replaceChildren(movement,nickname);
+  }
   const time=document.createElement('b'),value=Math.abs(deltaMs)<5?0:deltaMs;
-  time.textContent=`${value<0?'−':'+'}${(Math.abs(value)/1000).toFixed(2)} ${i18n.t('秒')}`;
+  time.textContent=`${value<0?'−':'+'}${(Math.round(Math.abs(value)/10)/100).toFixed(2)} ${i18n.t('秒')}`;
   row.replaceChildren(label,time);
 }
 function updateSplitUI(car) {
@@ -343,7 +351,8 @@ function updateSplitUI(car) {
   const target=raceMode==='ai'?(ghost?challengeLabel(ghost):i18n.t('幽灵')):i18n.t(names[split.opponentId-1]||'对手');
   const delta = $('split-gap'+car.id);
   delta.hidden=!Number.isFinite(comparison);
-  if(delta.hidden)delta.replaceChildren();else renderSplitRow(delta,target,comparison);
+  delta.style.color=raceMode==='ai'?(ghost?.color||''):'';
+  if(delta.hidden)delta.replaceChildren();else renderSplitRow(delta,target,comparison,raceMode==='ai'?primary?.rankChange:split.opponentRankChange,raceMode==='ai'?(ghost?.displayFullName||ghost?.entry.name||target):target);
   delta.classList.toggle('split-ahead', Number.isFinite(comparison) && comparison <= -5);
   delta.classList.toggle('split-behind', Number.isFinite(comparison) && comparison >= 5);
   const ghostLine = $('split-ghost'+car.id); ghostLine.replaceChildren();
@@ -351,7 +360,7 @@ function updateSplitUI(car) {
   for (const comparison of remaining) {
     const row=document.createElement('span');row.style.color=comparison.color;
     const ghost=activeGhosts.find(value=>value.slotId===comparison.slotId);
-    renderSplitRow(row,ghost?challengeLabel(ghost):i18n.t(`${comparison.colorLabel}幽灵`),comparison.deltaMs);
+    renderSplitRow(row,ghost?challengeLabel(ghost):i18n.t(`${comparison.colorLabel}幽灵`),comparison.deltaMs,comparison.rankChange,ghost?.displayFullName||ghost?.entry.name);
     ghostLine.appendChild(row);
   }
 }

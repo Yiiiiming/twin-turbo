@@ -1,5 +1,6 @@
 import { normalizeName, leaderboardNameKey } from './leaderboard.js';
 import { ghostVersionForCity, validateReplay, validateRaceReplay, sampleReplay, GHOST_LIMITS } from './ghost-replay.js';
+import { displayNickname } from './display-names.js';
 
 export const CHALLENGE_COLORS = Object.freeze([
   { color: '#b8a2ed', colorLabel: '紫色', colorLabelEn: 'Violet' },
@@ -86,8 +87,8 @@ function ladderCandidates(entries,previous,usedNames){
     .sort((a,b)=>Number(usedNames.has(leaderboardNameKey(a.name)))-Number(usedNames.has(leaderboardNameKey(b.name)))
       ||Math.abs(a.timeMs-target)-Math.abs(b.timeMs-target)||compareEntries(a,b));
 }
-function challengeRoster(laps){
-  const ghosts=[],usedNames=new Set();let humanCount=0,paceCount=0;
+function challengeRoster(laps,random){
+  const ghosts=[],usedNames=new Set();let humanCount=0,paceCount=0,lastPaceGap=null;
   return {ghosts,usedNames,
     human(value){
       ghosts.push({...CHALLENGE_COLORS[ghosts.length],entry:{...value.entry,name:normalizeName(value.entry.name)},
@@ -96,7 +97,13 @@ function challengeRoster(laps){
     },
     pace(){
       if(!ghosts.length)return false;
-      const source=ghosts[0],target=ghosts.at(-1).targetMs+LADDER_GAP_MS.target;
+      const roll=random(),range=LADDER_GAP_MS.maximum-LADDER_GAP_MS.minimum+1;
+      let gap=LADDER_GAP_MS.minimum+Math.min(range-1,Math.floor(Math.max(0,Number.isFinite(roll)?roll:.5)*range));
+      // Fresh matching chooses new clocks. Avoid visually identical neighboring
+      // gaps even when random draws land close together; never alter live pace.
+      if(lastPaceGap!==null&&Math.abs(gap-lastPaceGap)<60)gap=LADDER_GAP_MS.minimum+(gap-LADDER_GAP_MS.minimum+173)%range;
+      lastPaceGap=gap;
+      const source=ghosts[0],target=ghosts.at(-1).targetMs+gap;
       const replay=paceReplay(source.replay,target,paceCount%PACE_PROFILES.length);
       if(!replay)return false;
       paceCount++;const targetMs=replay.durationMs;
@@ -113,19 +120,21 @@ function challengeRoster(laps){
         families.get(key).push(ghost);
       }
       for(const family of families.values())family.forEach((ghost,index)=>{
-        ghost.displayName=family.length>1?`${family[0].entry.name}${index+1}`:ghost.entry.name;
+        const name=family.length>1?family[0].entry.name:ghost.entry.name,suffix=family.length>1?String(index+1):'';
+        ghost.displayName=displayNickname(name,suffix);
+        ghost.displayFullName=name+suffix;
       });
       return {laps,ghosts,humanCount,paceCount};
     }};
 }
 
-/** Human-first one-second ladder; original record identities and clocks stay intact. */
-export function createGhostChallenge(candidates = [], laps = 1) {
+/** Human-first ladder with varied 0.8–1.2 second machine steps. */
+export function createGhostChallenge(candidates = [], laps = 1, {random=Math.random} = {}) {
   if (!validDistance(laps)) throw new RangeError('Ghost Challenge supports one or three laps.');
   const humans=new Map();
   for(const value of candidates)if(validEntry(value?.entry,laps)&&replayValid(value.replay,laps)
     &&value.entry.timeMs===value.replay.durationMs&&!humans.has(value.entry.id))humans.set(value.entry.id,value);
-  const roster=challengeRoster(laps),entries=[...humans.values()].map(value=>value.entry);
+  const roster=challengeRoster(laps,random),entries=[...humans.values()].map(value=>value.entry);
   while(roster.ghosts.length<CHALLENGE_COLORS.length){
     const [human]=ladderCandidates(entries,roster.ghosts.at(-1)?.targetMs,roster.usedNames);
     if(human)roster.human(humans.get(human.id));
@@ -136,7 +145,7 @@ export function createGhostChallenge(candidates = [], laps = 1) {
 
 /** Read public metadata, then load only the replay candidates needed by the ladder. */
 export async function loadGhostChallenge({ city, laps = 1, fetchImpl = (...args) => globalThis.fetch(...args),
-  origin = API_ORIGIN, signal, timeoutMs = 20000 } = {}) {
+  origin = API_ORIGIN, signal, timeoutMs = 20000, random = Math.random } = {}) {
   if (!validDistance(laps) || typeof city !== 'string') throw new TypeError('Invalid ghost challenge category.');
   const version = ghostVersionForCity(city, laps), controller = new AbortController();
   const abort = () => controller.abort(signal?.reason);
@@ -178,7 +187,7 @@ export async function loadGhostChallenge({ city, laps = 1, fetchImpl = (...args)
       }
     };
     await Promise.all(Array.from({length:Math.min(4,historyNames.length)},loadHistory));
-    const roster=challengeRoster(laps),failedIds=new Set();let detailReads=0;
+    const roster=challengeRoster(laps,random),failedIds=new Set();let detailReads=0;
     while(roster.ghosts.length<CHALLENGE_COLORS.length){
       const candidates=ladderCandidates([...entries.values()].filter(entry=>!failedIds.has(entry.id)),
         roster.ghosts.at(-1)?.targetMs,roster.usedNames);

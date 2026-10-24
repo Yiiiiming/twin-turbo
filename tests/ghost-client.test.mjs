@@ -100,6 +100,31 @@ test('nickname lookup escapes query; remote markup remains plain text', async ()
   assert.ok(h.requests[1].url.includes(encodeURIComponent('<b>双人</b>')));
   assert.ok(h.get('ghost-choice').textContent.includes('<b>')); assert.equal(h.document.htmlWrites.length, 0);
 });
+
+test('legacy full names remain searchable and selected while picker labels use twelve-character displays',async()=>{
+  const h=setup(),name='abcdefghijklmnop';await ready(h);await search(h,name);
+  assert.equal(new URL(h.requests.at(-1).url).searchParams.get('name'),name);
+  assert.equal(h.get('ghost-name').value,name);
+  assert.match(h.get('ghost-choice').textContent,/abcdefghijk…/);
+  assert.equal(h.get('ghost-choice').children[0].getAttribute('title'),name);
+  h.queue.push(response({entry:entry(name),replay:replay()}));await h.client.loadSelected();
+  assert.equal(h.client.selected.entry.name,name);
+  assert.match(h.get('ghost-slot-label-0').textContent,/abcdefghijk…/);
+  h.client.renderPickerBoard([entry(name)]);
+  const nickname=h.get('ghost-picker-list').children[0].children[1].children[0];
+  assert.equal(nickname.textContent,'abcdefghijk…');assert.equal(nickname.getAttribute('title'),name);
+});
+
+test('ghost-only new save names cap at twelve Unicode code points without changing old remembered prefill',async()=>{
+  const h=setup(),legacy='abcdefghijklmnop';await ready(h);h.memory.set('twin-turbo-ghost-name-1',legacy);
+  h.client.showResults([{playerId:1,mode:'local',replay:replay()}]);const card=h.client.cards[0];
+  assert.equal(card.input.value,legacy);assert.equal(h.memory.get('twin-turbo-ghost-name-1'),legacy);
+  await card.input.dispatch('compositionstart');card.input.value='🚗'.repeat(14);
+  await card.input.dispatch('input',{isComposing:true});assert.equal(Array.from(card.input.value).length,14);
+  await card.input.dispatch('compositionend');assert.equal(card.input.value,'🚗'.repeat(12));
+  h.queue.push(new Error('offline'));await h.client.save(card);
+  assert.equal(h.requests.at(-1).body.name,'🚗'.repeat(12));
+});
 test('late loads cannot inject a ghost after start; frozen race snapshot is isolated', async () => {
   const h = setup(); await ready(h); await search(h);
   const pending = deferred(); h.queue.push(() => pending.promise); const loading = h.client.loadSelected();

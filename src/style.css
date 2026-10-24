@@ -156,3 +156,19 @@ html.orbit-cursor,html.orbit-cursor *,html.orbit-cursor *::before,html.orbit-cur
 :root[data-color-theme]:not([data-color-theme="purple"]) :is(.tutorial-progress,.tutorial-instruction,.tutorial-exit) {color:var(--theme-muted)}
 :root[data-color-theme]:not([data-color-theme="purple"]) .tutorial-keys kbd {color:var(--theme-ink);border-color:rgb(var(--theme-glow-rgb)/.4);background:rgb(var(--theme-glow-rgb)/.07)}
 :root[data-color-theme]:not([data-color-theme="purple"]) .driving-tutorial.is-complete .tutorial-exit {color:var(--theme-ink);border-color:rgb(var(--theme-glow-rgb)/.35);background:rgb(var(--theme-glow-rgb)/.15)}
+
+/* Keep rank movement, nickname and time in separate columns. Long names may
+   wrap on small split screens, while their duplicate suffix stays readable. */
+.split-readout{width:min(300px,calc(50% - 30px))}
+.solo-mode .split-readout{width:min(300px,calc(100% - 36px))}
+.split-readout .split-identity{display:flex;align-items:baseline;gap:7px;min-width:0;overflow-wrap:anywhere}
+.split-readout .split-name{min-width:0;overflow-wrap:anywhere}
+.split-readout .split-rank-change{flex:none;font-size:11px;font-style:normal;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.split-readout .rank-up{color:#68e4a8}
+.split-readout .rank-down{color:#ff808e}
+.split-readout>strong>b,.split-readout>span>span>b{flex:none}
+.challenge-live{width:260px;max-width:calc(100% - 44px)}
+.challenge-live li{align-items:baseline}
+.challenge-live li span{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.challenge-live li b{flex:none;white-space:nowrap}
+@media(max-width:700px){.split-readout{width:min(250px,calc(50% - 22px));padding:10px}.solo-mode .split-readout{width:min(280px,calc(100% - 24px))}.split-readout>strong:has(>span),.split-readout>span>span{gap:8px}.split-readout>strong>b{font-size:17px}.split-readout .split-rank-change{font-size:10px}.challenge-live{width:225px;max-width:calc(100% - 24px)}}

@@ -69,12 +69,55 @@ test('missing ladder steps use a machine, then resume searching humans from the 
   const input=[candidate('First',39000),candidate('Third',41000),candidate('Fifth',43000)],result=createGhostChallenge(input);
   assert.equal(result.humanCount,3);assert.equal(result.paceCount,3);
   assert.deepEqual(result.ghosts.map(g=>g.entry.name),['First','配速幽灵 1','Third','配速幽灵 2','Fifth','配速幽灵 3']);
-  assert.deepEqual(result.ghosts.map(g=>g.targetMs),[39000,40000,41000,42000,43000,44000]);
+  assert.deepEqual(result.ghosts.filter(g=>!g.synthetic).map(g=>g.targetMs),[39000,41000,43000]);
+  for(let i=1;i<result.ghosts.length;i++)assert.ok(result.ghosts[i].targetMs-result.ghosts[i-1].targetMs>=800
+    &&result.ghosts[i].targetMs-result.ghosts[i-1].targetMs<=1200);
   for(const ghost of result.ghosts.filter(g=>g.synthetic)){
     assert.equal(ghost.targetMs,ghost.replay.durationMs);assert.equal(ghost.entry.timeMs,ghost.targetMs);
     assert.equal(ghost.entry.isHuman,false);assert.equal(ghost.entry.playerId,0);assert.equal(ghost.entry.mode,'ghost');
     assertSegmentBounds(input[0].replay,ghost.replay);
   }
+});
+
+test('machine finish gaps vary within 800–1200 ms while seeded matches stay reproducible and speed-safe',()=>{
+  const input=[candidate('Fastest',38450)],before=structuredClone(input);
+  const randomFor=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  const clocks=new Set();
+  for(const seed of [1,2,9,37,182,700]){
+    const result=createGhostChallenge(input,1,{random:randomFor(seed)});
+    assert.deepEqual(createGhostChallenge(input,1,{random:randomFor(seed)}),result,'one injected seed produces a stable roster');
+    const gaps=result.ghosts.slice(1).map((ghost,index)=>ghost.targetMs-result.ghosts[index].targetMs);
+    assert.ok(gaps.every(gap=>gap>=800&&gap<=1200));
+    assert.ok(gaps.slice(1).every((gap,index)=>Math.abs(gap-gaps[index])>=60),'adjacent machine gaps stay visibly different');
+    assert.ok(new Set(gaps).size>1);
+    clocks.add(result.ghosts.map(ghost=>ghost.targetMs).join(','));
+    for(const ghost of result.ghosts.slice(1)){
+      assert.equal(ghost.entry.timeMs,ghost.replay.durationMs);assert.equal(ghost.targetMs,ghost.replay.durationMs);
+      assert.ok(ghost.targetMs>input[0].entry.timeMs);assertSegmentBounds(input[0].replay,ghost.replay);
+    }
+  }
+  assert.equal(clocks.size,6,'new seeds produce new match clocks');assert.deepEqual(input,before);
+});
+
+test('constant or endpoint random draws cannot make every machine finish exactly one second apart',()=>{
+  const source=candidate('First',39000);
+  for(const roll of [0,.5,1]){
+    const result=createGhostChallenge([source],1,{random:()=>roll});
+    const gaps=result.ghosts.slice(1).map((ghost,index)=>ghost.targetMs-result.ghosts[index].targetMs);
+    assert.ok(gaps.every(gap=>gap>=800&&gap<=1200));assert.ok(new Set(gaps).size>1);
+    assert.equal(gaps[0],roll===0?800:roll===1?1200:1000);
+  }
+});
+
+test('normal matching draws fresh random values while a completed roster never changes its clocks',()=>{
+  const savedRandom=Math.random,source=candidate('First',38450);let roll=.12;
+  try{
+    Math.random=()=>roll;
+    const first=createGhostChallenge([source]),saved=structuredClone(first);
+    roll=.89;const second=createGhostChallenge([source]);
+    assert.notDeepEqual(first.ghosts.map(g=>g.targetMs),second.ghosts.map(g=>g.targetMs));
+    assert.deepEqual(first,saved,'a rematch cannot alter an already-started set of opponents');
+  }finally{Math.random=savedRandom;}
 });
 
 test('the ladder includes 800 and 1200 ms boundaries, rejects outside records and selects the nearest one-second target',()=>{
@@ -94,6 +137,14 @@ test('different humans take priority within the window; repeated real records re
   assert.equal(result.humanCount,4);assert.equal(result.paceCount,2);
   assert.equal(new Set(result.ghosts.map(g=>g.entry.id)).size,6);assert.deepEqual(values,before);
   assert.equal(createGhostChallenge([values[0],candidate('Same person later',42000),values[1]]).ghosts[1].entry.id,values[1].entry.id,'different names outside the window do not displace a valid same-person record');
+});
+
+test('repeated legacy long names fit the race labels while retaining numbered suffixes and original identities',()=>{
+  const name='abcdefghijklmnop',values=[candidate(name,39000),candidate(name,40000)],result=createGhostChallenge(values);
+  assert.deepEqual(result.ghosts.slice(0,2).map(g=>g.displayName),['abcdefghij…1','abcdefghij…2']);
+  assert.deepEqual(result.ghosts.slice(0,2).map(g=>g.displayFullName),[name+'1',name+'2']);
+  assert.ok(result.ghosts.slice(0,2).every(g=>g.entry.name===name));
+  assert.deepEqual(values.map(value=>value.entry.name),[name,name]);
 });
 
 test('long human recordings retain exact one-second pace steps without per-frame rounding drift',()=>{
@@ -151,7 +202,8 @@ test('the absolute speed ceiling adds real time instead of compressing an over-f
   const result=createGhostChallenge([value]);
   assert.equal(result.ghosts.length,6);assert.equal(result.ghosts[1].targetMs,paced.durationMs);
   assert.ok(result.ghosts[1].targetMs-value.entry.timeMs>1200,'safe speed takes precedence when the archive is too fast');
-  for(let i=2;i<6;i++)assert.equal(result.ghosts[i].targetMs-result.ghosts[i-1].targetMs,1000,'later slots use the actual corrected clock');
+  for(let i=2;i<6;i++)assert.ok(result.ghosts[i].targetMs-result.ghosts[i-1].targetMs>=800
+    &&result.ghosts[i].targetMs-result.ghosts[i-1].targetMs<=1200,'later slots use the actual corrected clock');
 });
 
 test('duration and frame capacity limits omit a pace instead of making it faster or dropping path vertices',()=>{

@@ -1,3 +1,4 @@
+import { displayNickname, setNicknameText, submissionNickname, limitNicknameInput } from './display-names.js';
 import { normalizeName, leaderboardNameKey } from './leaderboard.js';
 import { ghostVersionForCity, isNewGhostCircuit } from './ghost-replay.js';
 
@@ -83,7 +84,7 @@ export class GhostClient {
   renderChoices() {
     const state = this.slotStates[this.activeSlot], list = this.node('ghost-choice'); list.replaceChildren();
     for (const entry of state.matches) {
-      const option = this.el('option', '', `${entry.name} · ${timeLabel(entry.timeMs)}`); option.value = entry.id; list.appendChild(option);
+      const option = this.el('option', '', `${displayNickname(entry.name)} · ${timeLabel(entry.timeMs)}`); option.value = entry.id; option.setAttribute('title',entry.name); list.appendChild(option);
     }
     list.value = state.choice; this.node('ghost-name').value = state.name; this.status(state.message); this.controls();
   }
@@ -102,7 +103,7 @@ export class GhostClient {
       const button = this.node(`ghost-slot-${slot.slotId}`), label = this.node(`ghost-slot-label-${slot.slotId}`), remove = this.node(`ghost-remove-${slot.slotId}`);
       if (button) { button.disabled = this.locked; button.classList.toggle('selected', this.activeSlot === slot.slotId); button.setAttribute('aria-pressed', String(this.activeSlot === slot.slotId)); }
       if (label) label.textContent = this.slots[slot.slotId]
-        ? `「${this.slots[slot.slotId].entry.name}」 · ${timeLabel(this.slots[slot.slotId].entry.timeMs)}`
+        ? `「${displayNickname(this.slots[slot.slotId].entry.name)}」 · ${timeLabel(this.slots[slot.slotId].entry.timeMs)}`
         : this.slotStates[slot.slotId].loading ? '正在载入…' : '未加入';
       if (remove) remove.disabled = this.locked || (!this.slots[slot.slotId] && !this.slotStates[slot.slotId].loading);
     }
@@ -196,7 +197,7 @@ export class GhostClient {
     this.node('ghost-enabled').checked = true;
     this.node('ghost-name').value = name;
     const request = ++state.request;
-    state.searching = true; this.status(`正在为${GHOST_SLOTS[slotId].colorLabel}幽灵查找「${name}」…`, slotId); this.controls();
+    state.searching = true; this.status(`正在为${GHOST_SLOTS[slotId].colorLabel}幽灵查找「${displayNickname(name)}」…`, slotId); this.controls();
     try {
       const data = await this.request(`/api/ghosts?${this.query(`&name=${encodeURIComponent(name)}`)}`);
       if (request !== state.request || this.locked) return;
@@ -204,7 +205,7 @@ export class GhostClient {
         .filter(entry => nameKey(entry.name) === nameKey(name)).slice(0, 20).map(copyEntry);
       state.choice = state.matches[0]?.id || '';
       this.status(state.matches.length ? `已找到记录。点击「${this.slots[slotId] ? '替换' : '加入'}${GHOST_SLOTS[slotId].colorLabel}幽灵」确认。`
-        : `还没有「${name}」的单圈幽灵。完成对应比赛后，可以在成绩区保存。`, slotId);
+        : `还没有「${displayNickname(name)}」的单圈幽灵。完成对应比赛后，可以在成绩区保存。`, slotId);
       if (slotId === this.activeSlot) this.renderChoices();
     } catch (error) { if (request === state.request && !this.locked) this.status(error.message, slotId); }
     finally { if (request === state.request) { state.searching = false; this.controls(); } }
@@ -225,7 +226,7 @@ export class GhostClient {
         throw new Error('这份幽灵数据不完整，请重新查找。');
       }
       this.select({ entry: copyEntry(data.entry), replay: copyReplay(data.replay) }, slotId);
-      this.status(`${GHOST_SLOTS[slotId].colorLabel}已就绪：「${data.entry.name}」 · ${timeLabel(data.entry.timeMs)}。可切换颜色挑选或更换幽灵，准备好后确认发车。`, slotId);
+      this.status(`${GHOST_SLOTS[slotId].colorLabel}已就绪：「${displayNickname(data.entry.name)}」 · ${timeLabel(data.entry.timeMs)}。可切换颜色挑选或更换幽灵，准备好后确认发车。`, slotId);
     } catch (error) { if (request === state.request && !this.locked) this.status(error.message, slotId); }
     finally { if (request === state.request) { state.loading = false; this.controls(); } }
     return this.slots[slotId];
@@ -233,7 +234,7 @@ export class GhostClient {
   prepareChallenge(entry, slotId) {
     const state = this.slotStates[slotId]; state.request++; state.searching = false; state.loading = false;
     state.name = normalizeName(entry.name); state.matches = [copyEntry(entry)]; state.choice = entry.id;
-    state.message = `要把「${entry.name}」加入哪种颜色？选择紫色或金色后，点击加入按钮。${this.slots[slotId] ? ' 当前颜色已有幽灵，确认后会替换。' : ''}`;
+    state.message = `要把「${displayNickname(entry.name)}」加入哪种颜色？选择紫色或金色后，点击加入按钮。${this.slots[slotId] ? ' 当前颜色已有幽灵，确认后会替换。' : ''}`;
   }
   challenge(entry) {
     if (this.locked || !this.matchesMode(entry)) return null;
@@ -285,7 +286,7 @@ export class GhostClient {
       const row = this.el('li', 'ghost-picker-row');
       row.appendChild(this.el('span', 'ghost-picker-rank', String(index + 1).padStart(2, '0')));
       const driver = this.el('div', 'ghost-picker-driver');
-      const nickname=this.el('strong', '', normalizeName(entry.name));nickname.setAttribute('translate','no');driver.appendChild(nickname);
+      const nickname=setNicknameText(this.el('strong'),normalizeName(entry.name));driver.appendChild(nickname);
       driver.appendChild(this.el('span', '', timeLabel(entry.timeMs))); row.appendChild(driver);
       const actions = this.el('div', 'ghost-picker-choices');
       for (const slot of GHOST_SLOTS) {
@@ -326,7 +327,7 @@ export class GhostClient {
     for (const state of this.slotStates) { state.request++; state.searching = false; state.loading = false; }
     this.resultsToken++; this.cards = [];
     if (!this.recordsManaged) { this.node('ghost-result-list').replaceChildren(); this.node('ghost-results').hidden = true; }
-    this.status(chosen.length ? `本场幽灵：${chosen.map(ghost => `${ghost.colorLabel} · 「${ghost.entry.name}」`).join(' / ')}` : '本场未载入幽灵。回到发车准备后可以选择。');
+    this.status(chosen.length ? `本场幽灵：${chosen.map(ghost => `${ghost.colorLabel} · 「${displayNickname(ghost.entry.name)}」`).join(' / ')}` : '本场未载入幽灵。回到发车准备后可以选择。');
     this.controls();
     return Object.freeze(chosen.map(ghost => {
       const replay = copyReplay(ghost.replay);
@@ -336,7 +337,7 @@ export class GhostClient {
   }
   endRace() {
     this.locked = false; this.controls();
-    this.status(this.selected ? `${GHOST_SLOTS[this.activeSlot].colorLabel}已就绪：「${this.selected.entry.name}」 · ${timeLabel(this.selected.entry.timeMs)}`
+    this.status(this.selected ? `${GHOST_SLOTS[this.activeSlot].colorLabel}已就绪：「${displayNickname(this.selected.entry.name)}」 · ${timeLabel(this.selected.entry.timeMs)}`
       : '选择一个颜色，查找想挑战的幽灵；也可以直接发车。');
   }
   menu() { this.endRace(); }
@@ -348,7 +349,7 @@ export class GhostClient {
     for (const [index, entry] of clean.entries()) {
       const row = this.el('li', 'leaderboard-row');
       row.appendChild(this.el('span', 'record-rank', String(index + 1).padStart(2, '0')));
-      const identity = this.el('div', 'record-identity'); identity.appendChild(this.el('strong', '', normalizeName(entry.name)));
+      const identity = this.el('div', 'record-identity'); identity.appendChild(setNicknameText(this.el('strong'),normalizeName(entry.name)));
       identity.appendChild(this.el('small', '', entry.mode === 'ai' ? '单人挑战 AI' : '本地双人'));
       row.appendChild(identity); row.appendChild(this.el('strong', 'record-time', timeLabel(entry.timeMs))); list.appendChild(row);
     }
@@ -378,13 +379,14 @@ export class GhostClient {
       form.appendChild(title); form.appendChild(this.el('p', 'ghost-help', '本局最快有效单圈 · 保存后可按昵称找到幽灵'));
       const label = this.el('label', 'ghost-save-label', '你的昵称');
       card.input = this.el('input'); card.input.type = 'text'; card.input.name = 'ghost-nickname'; card.input.autocomplete = 'nickname';
-      card.input.value = this.remembered(result.playerId); card.input.required = true; card.input.setAttribute('aria-label', `P${result.playerId} 幽灵昵称`);
+      card.rememberedName=this.remembered(result.playerId); card.input.value = card.rememberedName; card.input.required = true; card.input.setAttribute('aria-label', `P${result.playerId} 幽灵昵称`);
       label.appendChild(card.input); form.appendChild(label);
       card.button = this.el('button', 'ghost-button', '保存单圈与幽灵'); card.button.type = 'submit'; form.appendChild(card.button);
       card.message = this.el('p', 'ghost-help', '昵称、单圈时间和驾驶轨迹会公开。榜单只展示个人最快成绩，其他记录继续保留。');
       card.message.setAttribute('role', 'status'); form.appendChild(card.message);
       card.input.addEventListener('compositionstart', () => { card.composing = true; });
-      card.input.addEventListener('compositionend', () => { card.composing = false; card.input.value = normalizeName(card.input.value); });
+      card.input.addEventListener('compositionend', () => { card.composing = false; card.input.value = submissionNickname(card.input.value,card.rememberedName); });
+      card.input.addEventListener('input',event=>{if(!event.isComposing&&!card.composing)limitNicknameInput(card.input,card.rememberedName);});
       form.addEventListener('submit', event => { event.preventDefault(); return this.save(card); });
       this.cards.push(card); list.appendChild(form);
     }
@@ -392,8 +394,8 @@ export class GhostClient {
   }
   async save(card) {
     if (this.locked || card.token !== this.resultsToken || card.submitting || card.done || card.composing) return;
-    const name = card.submissionName || normalizeName(card.input.value);
-    if (!name) { card.message.textContent = '请输入昵称，最多 16 个字符。'; card.input.focus(); return; }
+    const name = card.submissionName || submissionNickname(card.input.value,card.rememberedName);
+    if (!name) { card.message.textContent = '请输入昵称，最多 12 个字符。'; card.input.focus(); return; }
     card.submissionName = name; card.input.value = name; this.remember(card.playerId, name);
     card.submitting = true; card.button.disabled = true; card.input.disabled = true; card.message.textContent = '正在保存单圈与幽灵…';
     try {
@@ -402,8 +404,8 @@ export class GhostClient {
       if (card.token !== this.resultsToken) return;
       if (typeof data.saved !== 'boolean' || !validEntry(data.entry) || nameKey(data.entry.name) !== nameKey(name)) throw new Error('未确认保存结果。');
       card.done = true; card.button.textContent = data.saved ? '已保存' : '已保留更快纪录';
-      card.message.textContent = data.saved ? `「${name}」的单圈与幽灵已保存，下次开赛前搜索这个昵称即可。`
-        : `「${name}」已有更快纪录 ${timeLabel(data.entry.timeMs)}，继续保留原来的幽灵。`;
+      card.message.textContent = data.saved ? `「${displayNickname(name)}」的单圈与幽灵已保存，下次开赛前搜索这个昵称即可。`
+        : `「${displayNickname(name)}」已有更快纪录 ${timeLabel(data.entry.timeMs)}，继续保留原来的幽灵。`;
       this.renderBoard(data.entries); await this.loadBoard();
     } catch {
       if (card.token !== this.resultsToken) return;
