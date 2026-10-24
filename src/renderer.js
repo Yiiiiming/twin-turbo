@@ -15,6 +15,8 @@ import { londonThirdLandmarkPlacements } from './london-third-layout.js';
 import { londonMagicPlacements, londonMagicBlend } from './london-magic-layout.js';
 import { addLondonMagicScenery, addMagicCharacter, addMagicFlyingCar } from './london-magic-models.js';
 import { londonMagicState, magicBodyMatrix, magicArmMatrix, MagicEffects } from './london-magic-effects.js';
+import { addDumbledore } from './london-house-banner-models.js';
+import { HouseCeremony, appendHouseBanners } from './london-house-ceremony.js';
 import { splitFractionsForTrack } from './split-timing.js';
 import { CHALLENGE_COLORS } from './ghost-challenge.js';
 import { createEntryCameraPlan, entryCameraForProgress, entryMeshOcclusion } from './entry-cameras.js';
@@ -1257,12 +1259,18 @@ export class RaceRenderer {
     const gl=this.gl;
     for(const mesh of Object.values(this.magicMeshes||{}))gl.deleteBuffer?.(mesh.buffer);
     this.magicMeshes={};this.magicItems=londonMagicPlacements();this.magicState=null;this.magicEffects=null;
+    this.houseCeremony=null;this.houseState=null;this.magicBannerRange={first:0,count:0};
     if(!this.magicItems.length)return;
     for(const kind of ['harry','voldemort','hermione','deathEater'])for(const part of ['body','arm']){
       const builder=new MeshBuilder();addMagicCharacter(builder,kind,part);
       this.magicMeshes[`${kind}:${part}`]=upload(gl,builder);
     }
     const car=new MeshBuilder();addMagicFlyingCar(car);this.magicMeshes.car=upload(gl,car);
+    for(const part of ['body','arm']){
+      const builder=new MeshBuilder();addDumbledore(builder,part);
+      this.magicMeshes[`dumbledore:${part}`]=upload(gl,builder);
+    }
+    this.houseCeremony=new HouseCeremony();
     this.magicEffects=new MagicEffects();const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
     gl.bufferData(gl.ARRAY_BUFFER,this.magicEffects.data,gl.DYNAMIC_DRAW);
     this.magicMeshes.effects={buffer,count:0};
@@ -1273,8 +1281,10 @@ export class RaceRenderer {
     // One upload before either viewport. Static world/actor buffers never change.
     this.magicEffects.update(this.magicState);const mesh=this.magicMeshes.effects;
     mesh.count=this.magicEffects.count;
+    this.houseState=this.houseCeremony.update(engine);
+    this.magicBannerRange=appendHouseBanners(this.magicEffects,this.houseState);
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER,mesh.buffer);
-    this.gl.bufferSubData?.(this.gl.ARRAY_BUFFER,0,this.magicEffects.data.subarray(0,mesh.count*11));
+    this.gl.bufferSubData?.(this.gl.ARRAY_BUFFER,0,this.magicEffects.data.subarray(0,this.magicEffects.count*11));
   }
   _magicActors(camera) {
     const state=this.magicState;if(!state)return;
@@ -1286,6 +1296,13 @@ export class RaceRenderer {
     const car=state.car;
     if(car&&Math.hypot(car.x-camera.eye[0],car.z-camera.eye[2])<1900)
       this._mesh(this.magicMeshes.car,modelMatrix(car.x,car.y,car.z,car.angle,car.roll,car.pitch));
+    const caster=this.houseState?.caster;
+    if(caster&&Math.hypot(caster.x-camera.eye[0],caster.z-camera.eye[2])<1500){
+      this._mesh(this.magicMeshes['dumbledore:body'],magicBodyMatrix(caster));
+      this._mesh(this.magicMeshes['dumbledore:arm'],magicArmMatrix(caster));
+    }
+    if(this.magicBannerRange.count&&Math.hypot(this.houseState.banners[0].x-camera.eye[0],this.houseState.banners[0].z-camera.eye[2])<2000)
+      this._mesh({buffer:this.magicMeshes.effects.buffer,...this.magicBannerRange});
   }
   _magicSpells() {
     if(!this.magicState||!this.magicMeshes.effects.count)return;
@@ -1375,7 +1392,7 @@ export class RaceRenderer {
     }
     gl.uniform1f(this.uniforms.uLineOffset,mesh.lines ? .002 : 0);
     gl.uniform1f(this.uniforms.uHologramLine,mesh.lines ? 1 : 0);
-    gl.uniformMatrix4fv(this.uniforms.uModel,false,model);gl.drawArrays(mesh.lines?gl.LINES:gl.TRIANGLES,0,mesh.count);
+    gl.uniformMatrix4fv(this.uniforms.uModel,false,model);gl.drawArrays(mesh.lines?gl.LINES:gl.TRIANGLES,mesh.first||0,mesh.count);
   }
   _sky(camera,weights,aspect,magic=0) {
     const gl=this.gl,u=this.skyUniforms;

@@ -13,6 +13,10 @@ const locks = JSON.parse(readFileSync(new URL('./fixtures/hologram-scene-locks.j
 const WORLD = ['terrain', 'water', 'road', 'props', 'magic'];
 const MODES = { terrain: 1, water: 2, road: 4, 'cars[0]': 5, 'cars[1]': 5 };
 const VISIBLE_CITIES = ['coast-london','coast-beijing','coast-shanghai','coast-rio','coast-austin','coast-paris'];
+// October 24: the user explicitly added Dumbledore summoning the four house
+// banners. Preserve every pre-existing snapshot; allow only these two new,
+// nonphysical actor meshes. Cloth reuses the already-reserved spell buffer.
+const CEREMONY_MESHES = ['magicActors.dumbledore:body', 'magicActors.dumbledore:arm'];
 const sha = data => createHash('sha256').update(data).digest('hex');
 const floatHash = data => sha(Buffer.from(data.buffer, data.byteOffset, data.byteLength));
 
@@ -113,8 +117,9 @@ function assertModes(data, name, expected, landmarkRange) {
 
 function assertSceneUnchanged(id, renderer, gl) {
   const expected = locks.tracks[id], actualMeshes = meshes(renderer), owned = new Set();
-  assert.deepEqual(Object.keys(actualMeshes).sort(), [...Object.keys(expected.meshes), 'ambientEdges'].sort(),
-    `${id}: only the single nonphysical environment-edge batch may be added`);
+  const ceremonyNames = id === 'coast-london' ? CEREMONY_MESHES : [];
+  assert.deepEqual(Object.keys(actualMeshes).sort(), [...Object.keys(expected.meshes), 'ambientEdges', ...ceremonyNames].sort(),
+    `${id}: only the environment edges and explicitly requested London ceremony actor may be added`);
   assert.equal(renderer.obstacles.length, expected.obstacles.count, `${id}: collider count changed`);
   assert.equal(sha(JSON.stringify(renderer.obstacles)), expected.obstacles.sha256,
     `${id}: every collider, order, orientation and height interval must remain unchanged`);
@@ -140,6 +145,17 @@ function assertSceneUnchanged(id, renderer, gl) {
   assert.equal(edges.count, edgeData.length / 11);
   assert.ok(edgeData.every(Number.isFinite), 'environment edge vertices and material channels stay finite');
   owned.add(edges.buffer); bytes += edgeData.byteLength;
+  let ceremonyBytes = 0;
+  for (const name of ceremonyNames) {
+    const mesh = actualMeshes[name], data = gl.buffers.get(mesh.buffer);
+    assert.ok(data instanceof Float32Array && data.length > 0, `${name}: missing actor geometry`);
+    assert.equal(mesh.count, data.length / 11);
+    assert.ok(data.every(Number.isFinite), `${name}: finite geometry is required`);
+    assertModes(data, name, 0, expected.landmarkVertices);
+    owned.add(mesh.buffer); ceremonyBytes += data.byteLength;
+  }
+  assert.ok(ceremonyBytes < 35_000, 'the new actor must leave room for all six ghosts under the unchanged 40 MB cap');
+  bytes += ceremonyBytes;
   const extras = [...gl.buffers].filter(([buffer]) => !owned.has(buffer)).map(([, data]) => ({ floats: data.length, raw: floatHash(data) }));
   assert.deepEqual(extras, expected.otherUploads, `${id}: no additional geometry upload beyond the single edge batch`);
   bytes += extras.reduce((sum, entry) => sum + entry.floats * 4, 0);
@@ -284,7 +300,10 @@ for (const sample of [
     renderer.setSinglePlayer(single);
     gl.draws.length = 0;
     renderer.render(engine, 1 / 60, 1);
-    assert.equal(gl.draws.length, expected + (single ? 1 : 2),
+    const ceremonyBuffers = new Set(['dumbledore:body', 'dumbledore:arm'].map(name => renderer.magicMeshes[name]?.buffer).filter(Boolean));
+    const ceremonyDraws = gl.draws.filter(draw => ceremonyBuffers.has(draw.buffer));
+    assert.ok(ceremonyDraws.length <= (single ? 2 : 4), 'each new actor part may render at most once per viewport');
+    assert.equal(gl.draws.length - ceremonyDraws.length, expected + (single ? 1 : 2),
       'measured pre-theme count plus one edge batch, with no ghosts or loaded artwork');
   }
 });
