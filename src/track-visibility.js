@@ -9,7 +9,7 @@ const CITY_NAMES = Object.freeze({
   'coast-london': ['伦敦', 'London'],
   'coast-beijing': ['北京', 'Beijing'],
   'coast-shanghai': ['上海', 'Shanghai'],
-  'coast-rio': ['里约', 'Rio'],
+  'coast-rio': ['里约', 'Rio de Janeiro'],
   'coast-austin': ['奥斯汀', 'Austin'],
   'coast-paris': ['巴黎', 'Paris'],
 });

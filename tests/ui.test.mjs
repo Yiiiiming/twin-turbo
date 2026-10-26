@@ -2478,7 +2478,7 @@ test('pausing again or returning to the menu cancels a fullscreen resume queued 
 test('six public map labels are city names in Chinese and English without changing the route metadata',async t=>{
   const ui=await loadUI(t);
   const ids=['coast-london','coast-beijing','coast-shanghai','coast-rio','coast-austin','coast-paris'];
-  for(const [language,names]of [['zh',['伦敦','北京','上海','里约','奥斯汀','巴黎']],['en',['London','Beijing','Shanghai','Rio','Austin','Paris']]]){
+  for(const [language,names]of [['zh',['伦敦','北京','上海','里约','奥斯汀','巴黎']],['en',['London','Beijing','Shanghai','Rio de Janeiro','Austin','Paris']]]){
     ui.click('language-'+language);
     for(const [index,id]of ids.entries()){
       const card=ui.trackCards.get(id);card.button.click();ui.frame();
