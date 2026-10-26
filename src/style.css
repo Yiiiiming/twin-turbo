@@ -172,3 +172,6 @@ html.orbit-cursor,html.orbit-cursor *,html.orbit-cursor *::before,html.orbit-cur
 .challenge-live li span{min-width:0;white-space:normal;overflow-wrap:anywhere}
 .challenge-live li b{flex:none;white-space:nowrap}
 @media(max-width:700px){.split-readout{width:min(250px,calc(50% - 22px));padding:10px}.solo-mode .split-readout{width:min(280px,calc(100% - 24px))}.split-readout>strong:has(>span),.split-readout>span>span{gap:8px}.split-readout>strong>b{font-size:17px}.split-readout .split-rank-change{font-size:10px}.challenge-live{width:225px;max-width:calc(100% - 24px)}}
+
+/* Keep the driver visible in the same checkpoint order as every opponent. */
+.split-readout .split-self{background:color-mix(in srgb,currentColor 9%,transparent);box-shadow:inset 2px 0 0 currentColor;border-radius:8px;margin-inline:-6px;padding:4px 6px}

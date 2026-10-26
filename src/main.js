@@ -345,25 +345,31 @@ function updateSplitUI(car) {
   panel.classList.toggle('hidden', !visible);
   if (!visible) return;
   $('split-point'+car.id).textContent = `第 ${split.lap} 圈 · ${split.index === 4 ? '终点' : `计时点 0${split.index}`}`;
-  const comparisons=(split.ghostDeltas||[]).filter(value=>Number.isFinite(value.deltaMs))
-    .sort((a,b)=>b.deltaMs-a.deltaMs||a.slotId-b.slotId);
-  const primary=comparisons[0];
-  const ghost=activeGhosts.find(value=>value.slotId===primary?.slotId);
-  const comparison=raceMode==='ai'?primary?.deltaMs:split.deltaMs;
-  const target=raceMode==='ai'?(ghost?challengeLabel(ghost):i18n.t('幽灵')):i18n.t(names[split.opponentId-1]||'对手');
-  const delta = $('split-gap'+car.id);
-  delta.hidden=!Number.isFinite(comparison);
-  delta.style.color=raceMode==='ai'?(ghost?.color||''):'';
-  if(delta.hidden)delta.replaceChildren();else renderSplitRow(delta,target,comparison,raceMode==='ai'?primary?.rankChange:split.opponentRankChange,raceMode==='ai'?(ghost?.displayFullName||ghost?.entry.name||target):target);
-  delta.classList.toggle('split-ahead', Number.isFinite(comparison) && comparison <= -5);
-  delta.classList.toggle('split-behind', Number.isFinite(comparison) && comparison >= 5);
-  const ghostLine = $('split-ghost'+car.id); ghostLine.replaceChildren();
-  const remaining=comparisons.filter(value=>raceMode!=='ai'||value.slotId!==primary?.slotId).slice(0,5);
-  for (const comparison of remaining) {
-    const row=document.createElement('span');row.style.color=comparison.color;
+  const selfName=raceMode==='local'?`P${car.id} · ${i18n.t('你')}`:i18n.t('你');
+  const standings=[{name:selfName,fullName:selfName,deltaMs:0,color:colors[car.id-1],rankChange:split.playerRankChange,self:true,order:-2}];
+  if(raceMode==='local'&&Number.isFinite(split.deltaMs)){
+    const name=i18n.t(names[split.opponentId-1]||'对手');
+    standings.push({name,fullName:name,deltaMs:split.deltaMs,color:colors[split.opponentId-1],rankChange:split.opponentRankChange,order:-1});
+  }
+  for(const comparison of (split.ghostDeltas||[]).filter(value=>Number.isFinite(value.deltaMs)).slice(0,raceMode==='local'?2:6)){
     const ghost=activeGhosts.find(value=>value.slotId===comparison.slotId);
-    renderSplitRow(row,ghost?challengeLabel(ghost):i18n.t(`${comparison.colorLabel}幽灵`),comparison.deltaMs,comparison.rankChange,ghost?.displayFullName||ghost?.entry.name);
-    ghostLine.appendChild(row);
+    const name=ghost?challengeLabel(ghost):i18n.t(`${comparison.colorLabel}幽灵`);
+    standings.push({...comparison,name,fullName:ghost?.displayFullName||ghost?.entry.name||name,color:ghost?.color||comparison.color,order:comparison.slotId});
+  }
+  // Delta is the player's passage minus this driver's passage. Larger deltas
+  // therefore crossed earlier; use raw milliseconds, with the player first in a tie.
+  standings.sort((a,b)=>b.deltaMs-a.deltaMs||a.order-b.order);
+  const renderStanding=(row,standing)=>{
+    row.style.color=standing.color||'';
+    row.classList.toggle('split-self',Boolean(standing.self));
+    row.classList.toggle('split-ahead',standing.deltaMs<=-5);
+    row.classList.toggle('split-behind',standing.deltaMs>=5);
+    renderSplitRow(row,standing.name,standing.deltaMs,standing.rankChange,standing.fullName);
+  };
+  const primary=$('split-gap'+car.id);primary.hidden=false;renderStanding(primary,standings[0]);
+  const remaining=$('split-ghost'+car.id);remaining.replaceChildren();
+  for(const standing of standings.slice(1)){
+    const row=document.createElement('span');renderStanding(row,standing);remaining.appendChild(row);
   }
 }
 function updateUI(now) {

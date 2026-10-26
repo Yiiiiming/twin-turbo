@@ -69,19 +69,26 @@ function previousPoint(record) {
   return record.index > 1 ? keyFor(record.lap, record.index - 1)
     : record.lap > 1 ? keyFor(record.lap - 1, 4) : null;
 }
-function ghostRankChanges(record, previous, ghosts, comparisons) {
-  const changes = comparisons.map(() => null);
-  if (!previous) return changes;
-  const before = ghosts.map(ghost => ghostDelta(previous, ghost.replay, ghost.times));
+function checkpointRankChanges(record, previous, other, otherPrevious, ghosts, comparisons) {
+  const empty = { playerRankChange: null, opponentRankChange: null, ghostChanges: comparisons.map(() => null) };
+  if (!previous) return empty;
+  // Every displayed row belongs to one field: this driver, the measured local
+  // rival (when present), and every ghost with a passage at this checkpoint.
+  // Relative clocks put the current driver at zero without changing ordering.
+  const current = [other ? record.timeMs - other.timeMs : null, ...comparisons.map(value => value.deltaMs)];
+  const before = [otherPrevious ? previous.timeMs - otherPrevious.timeMs : null,
+    ...ghosts.map(ghost => ghostDelta(previous, ghost.replay, ghost.times))];
   // A newly available/missing passage must not look like an overtake.
-  if (comparisons.some((value, index) => Number.isFinite(value.deltaMs) !== Number.isFinite(before[index]))) return changes;
-  const included = comparisons.map((value, index) => Number.isFinite(value.deltaMs) ? index : -1).filter(index => index >= 0);
+  if (current.some((value, index) => Number.isFinite(value) !== Number.isFinite(before[index]))) return empty;
+  const included = current.map((value, index) => Number.isFinite(value) ? index : -1).filter(index => index >= 0);
   // A repeated single-lap ghost starts a new lap clock; it has no cross-lap rank.
-  if (record.index === 1 && included.some(index => ghosts[index].replay?.kind !== 'race')) return changes;
-  const currentTimes = [0, ...included.map(index => -comparisons[index].deltaMs)];
+  if (record.index === 1 && included.some(index => index > 0 && ghosts[index - 1].replay?.kind !== 'race')) return empty;
+  const currentTimes = [0, ...included.map(index => -current[index])];
   const previousTimes = [0, ...included.map(index => -before[index])];
-  for (const index of included) changes[index] = crossingRank(previousTimes, -before[index]) - crossingRank(currentTimes, -comparisons[index].deltaMs);
-  return changes;
+  const changes = current.map(() => null);
+  for (const index of included) changes[index] = crossingRank(previousTimes, -before[index]) - crossingRank(currentTimes, -current[index]);
+  return { playerRankChange: crossingRank(previousTimes, 0) - crossingRank(currentTimes, 0),
+    opponentRankChange: changes[0], ghostChanges: changes.slice(1) };
 }
 
 function snapshot(car, time) {
@@ -156,13 +163,10 @@ export class SplitTiming {
     const other = this.racers.get(opponentId)?.records.get(keyFor(record.lap, record.index));
     const previousKey = previousPoint(record), previous = racer.records.get(previousKey);
     const otherPrevious = this.racers.get(opponentId)?.records.get(previousKey);
-    const opponentRankChange = other && previous && otherPrevious
-      ? crossingRank([previous.timeMs, otherPrevious.timeMs], otherPrevious.timeMs)
-        - crossingRank([record.timeMs, other.timeMs], other.timeMs) : null;
     const ghostDeltas = this.ghosts.map(ghost => ({slotId:ghost.slotId,color:ghost.color,colorLabel:ghost.colorLabel,deltaMs:ghostDelta(record,ghost.replay,ghost.times)}));
-    const changes = ghostRankChanges(record, previous, this.ghosts, ghostDeltas);
-    ghostDeltas.forEach((value,index) => { value.rankChange = changes[index]; });
-    return { ...record, opponentId, opponentRankChange, deltaMs: other ? record.timeMs - other.timeMs : null,
+    const { playerRankChange, opponentRankChange, ghostChanges } = checkpointRankChanges(record, previous, other, otherPrevious, this.ghosts, ghostDeltas);
+    ghostDeltas.forEach((value,index) => { value.rankChange = ghostChanges[index]; });
+    return { ...record, opponentId, playerRankChange, opponentRankChange, deltaMs: other ? record.timeMs - other.timeMs : null,
       ghostDeltaMs: ghostDelta(record, this.ghostReplay, this.ghostTimes),
       ghostDeltas,
       waiting: !other, label: record.index === 4 ? '终点' : `CP ${record.index}` };

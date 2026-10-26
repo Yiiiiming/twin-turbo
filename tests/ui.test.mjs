@@ -1609,15 +1609,18 @@ test('checkpoint HUD reports a real same-point gap, ghost comparison, and resets
     if(one&&!two){
       passedFirst=true;assert.equal(ui.nodes.get('split1').classList.contains('hidden'),false);
       assert.match(ui.nodes.get('split-point1').textContent,/第 1 圈 · 计时点 01/);
-      assert.equal(ui.nodes.get('split-gap1').hidden,true,'a driver with no measured time does not show a sentence');
+      assert.equal(ui.nodes.get('split-gap1').hidden,false);
+      assert.deepEqual(ui.nodes.get('split-gap1').children.map(node=>node.textContent),['P1 · 你','+0.00 秒'],'the current driver is shown while the other local driver has no measured passage');
       const ghostRow=ui.nodes.get('split-ghost1').children[0];
       assert.equal(ghostRow.children[0].textContent,'Split Racer');
       assert.match(ghostRow.children[1].textContent,/^−[0-9.]+ 秒$/);
     }
     if(one&&two){
-      compared=true;assert.deepEqual(ui.nodes.get('split-gap1').children.map(node=>node.textContent),['橙色风暴','−0.10 秒']);
+      compared=true;assert.deepEqual(ui.nodes.get('split-gap1').children.map(node=>node.textContent),['P1 · 你','+0.00 秒']);
+      assert.deepEqual(ui.nodes.get('split-ghost1').children[0].children.map(node=>node.textContent),['橙色风暴','−0.10 秒']);
+      assert.deepEqual(ui.nodes.get('split-ghost2').children[0].children.map(node=>node.textContent),['P2 · 你','+0.00 秒']);
       assert.deepEqual(ui.nodes.get('split-gap2').children.map(node=>node.textContent),['青色闪电','+0.10 秒']);
-      assert.equal(ui.nodes.get('split-gap1').classList.contains('split-ahead'),true);
+      assert.equal(ui.nodes.get('split-ghost1').children[0].classList.contains('split-ahead'),true);
       assert.equal(ui.nodes.get('split-gap2').classList.contains('split-behind'),true);break;
     }
   }
@@ -1661,7 +1664,7 @@ test('nitro charge lives in each speed dial without above-car bars or labels at 
   }
 });
 
-test('all six solo split rivals follow actual checkpoint crossing order without promoting the nearest or dropping the remaining five',async t=>{
+test('the player and all six solo split rivals follow actual checkpoint crossing order without promoting the nearest or dropping anyone',async t=>{
   const fixture=challengeFixture();fixture.entries[0].name='<b>Alice</b>';fixture.board=fixture.entries;
   fixture.replay=entry=>({version:1,durationMs:entry.timeMs,frames:Array.from({length:entry.timeMs/100+1},(_,i)=>{
     const p=trackPoint(TRACK.startDistance+TRACK.length*i*100/entry.timeMs,-24);
@@ -1677,16 +1680,20 @@ test('all six solo split rivals follow actual checkpoint crossing order without 
   const checkpointOrder=ui.splitTiming.ghosts.map(ghost=>({name:ghost.entry.name,timeMs:ghost.times[0]}))
     .sort((a,b)=>a.timeMs-b.timeMs);
   assert.ok(checkpointOrder.every(ghost=>Number.isFinite(ghost.timeMs)));
-  assert.equal(main.hidden,false);assert.equal(rows.length,5);
+  assert.equal(main.hidden,false);assert.equal(rows.length,6);
   const allRows=[main,...rows],shownNames=allRows.map(row=>row.children[0].textContent);
-  assert.deepEqual(shownNames,checkpointOrder.map(ghost=>ghost.name));
-  assert.equal(new Set(shownNames).size,6,'every comparable opponent appears exactly once');
+  const withPlayer=[{name:'你',timeMs:10750},...checkpointOrder].sort((a,b)=>a.timeMs-b.timeMs);
+  assert.deepEqual(shownNames,withPlayer.map(ghost=>ghost.name));
+  assert.equal(new Set(shownNames).size,7,'the player and every comparable opponent appear exactly once');
+  const self=allRows.find(row=>row.classList.contains('split-self'));
+  assert.deepEqual(self.children.map(node=>node.textContent),['你','+0.00 秒']);
+  assert.equal(self.style.color,'#51dfe5');
   assert.notEqual(main.children[0].textContent,'Bob','the tied nearest rival must not jump ahead of earlier checkpoint crossings');
   assert.deepEqual(rows.find(row=>row.children[0].textContent==='Bob').children.map(node=>node.textContent),['Bob','+0.00 秒']);
   for(const [index,row]of allRows.entries()){
     assert.match(row.children[1].textContent,/^[+−]\d+\.\d{2} 秒$/);
     const shown=Number(row.children[1].textContent.replace('−','-').split(' ')[0]);
-    const deltaMs=10750-checkpointOrder[index].timeMs;
+    const deltaMs=10750-withPlayer[index].timeMs;
     assert.equal(shown,Math.sign(deltaMs)*Math.round(Math.abs(deltaMs)/10)/100||0);
   }
   const alice=allRows.find(row=>row.children[0].textContent==='<b>Alice</b>');
@@ -1695,11 +1702,16 @@ test('all six solo split rivals follow actual checkpoint crossing order without 
   assert.ok(!rows.some(row=>row.children[0].textContent===main.children[0].textContent),'the first rival must not be repeated');
   assert.equal(alice.children[0].innerHTML,'','a nickname resembling markup remains literal text');
   const fastest=checkpointOrder[0];ui.splitTiming.racers.get(1).latest.lapTimeMs=fastest.timeMs-100;ui.frame(0);
-  assert.deepEqual(main.children.map(node=>node.textContent),[fastest.name,'−0.10 秒']);
-  assert.equal(main.classList.contains('split-ahead'),true);
-  assert.ok(!ui.nodes.get('split-ghost1').children.some(row=>row.children[0].textContent===fastest.name));
-  assert.deepEqual([main,...ui.nodes.get('split-ghost1').children].map(row=>row.children[0].textContent),shownNames,
-    'changing the player gap never changes the rivals’ checkpoint crossing order');
+  assert.deepEqual(main.children.map(node=>node.textContent),['你','+0.00 秒']);
+  assert.equal(main.classList.contains('split-self'),true);
+  assert.deepEqual(ui.nodes.get('split-ghost1').children[0].children.map(node=>node.textContent),[fastest.name,'−0.10 秒']);
+  assert.deepEqual(ui.nodes.get('split-ghost1').children.map(row=>row.children[0].textContent),checkpointOrder.map(ghost=>ghost.name),
+    'the player moves to first place without changing rival order or dropping the sixth rival');
+  ui.splitTiming.racers.get(1).latest.lapTimeMs=checkpointOrder.at(-1).timeMs+100;ui.frame(0);
+  assert.equal(main.classList.contains('split-self'),false,'first-place highlight clears when the player moves down');
+  const lastRows=[main,...ui.nodes.get('split-ghost1').children];
+  assert.deepEqual(lastRows.map(row=>row.children[0].textContent),[...checkpointOrder.map(ghost=>ghost.name),'你']);
+  assert.equal(lastRows.at(-1).classList.contains('split-self'),true);
 });
 
 
@@ -1712,7 +1724,9 @@ test('checkpoint rank arrows use separate colors and preserve twelve-character n
   const racer=ui.splitTiming.racers.get(1);
   racer.records.set('1:1',{playerId:1,lap:1,index:1,timeMs:10000,lapTimeMs:10000});
   racer.latest={playerId:1,lap:1,index:2,timeMs:20000,lapTimeMs:20000};ui.frame(0);
-  const rows=[ui.nodes.get('split-gap1'),...ui.nodes.get('split-ghost1').children];
+  const allRows=[ui.nodes.get('split-gap1'),...ui.nodes.get('split-ghost1').children];
+  assert.equal(allRows.length,7);assert.equal(allRows.filter(row=>row.classList.contains('split-self')).length,1);
+  const rows=allRows.filter(row=>!row.classList.contains('split-self'));
   const order=[1,2,3,0,4,5],changes=[2,1,1,-4,0,0];
   for(const [index,row]of rows.entries()){
     assert.equal(row.children.length,2,'name and time remain separate columns');
@@ -2489,4 +2503,73 @@ test('six public map labels are city names in Chinese and English without changi
       assert.notEqual(TRACKS[id].name,names[index],'legacy route metadata remains frozen');
     }
   }
+});
+
+
+test('checkpoint current-driver row shows before any opponent crosses and adds the late local result in order',async t=>{
+  const ui=await loadCoastUI(t);ui.launch();ui.advance(3.1);
+  const one=ui.splitTiming.racers.get(1),two=ui.splitTiming.racers.get(2);
+  const own={playerId:1,lap:1,index:1,timeMs:10000,lapTimeMs:9500};one.latest=own;one.records.set('1:1',own);
+  ui.frame(0);
+  const main=ui.nodes.get('split-gap1');
+  assert.deepEqual(main.children.map(node=>node.textContent),['P1 · 你','+0.00 秒']);
+  assert.equal(main.classList.contains('split-self'),true);assert.equal(ui.nodes.get('split-ghost1').children.length,0);
+  assert.equal(ui.nodes.get('split2').classList.contains('hidden'),true,'an unmeasured player has no invented checkpoint');
+  const late={playerId:2,lap:1,index:1,timeMs:10400,lapTimeMs:9900};two.latest=late;two.records.set('1:1',late);ui.frame(0);
+  assert.deepEqual(ui.nodes.get('split-ghost1').children[0].children.map(node=>node.textContent),['橙色风暴','−0.40 秒']);
+  assert.deepEqual(ui.nodes.get('split-gap2').children.map(node=>node.textContent),['青色闪电','+0.40 秒']);
+  assert.deepEqual(ui.nodes.get('split-ghost2').children[0].children.map(node=>node.textContent),['P2 · 你','+0.00 秒']);
+  assert.equal(ui.nodes.get('split-ghost2').children[0].style.color,'#ff9870');
+  ui.click('language-en');ui.frame(0);
+  assert.equal(main.children[0].textContent,'P1 · You');
+  assert.equal(ui.nodes.get('split-ghost2').children[0].children[0].textContent,'P2 · You');
+  late.timeMs=own.timeMs;ui.frame(0);
+  assert.equal(ui.nodes.get('split-gap1').children[0].textContent,'P1 · You');
+  assert.equal(ui.nodes.get('split-gap2').children[0].textContent,'P2 · You','each player leads their own exact-millisecond tie');
+});
+
+test('a solo checkpoint without ghosts still displays the current driver and the exact zero gap',async t=>{
+  const ui=await loadCoastUI(t);ui.modeButtons.find(button=>button.dataset.mode==='ai').click();
+  ui.click('start');await ui.flush();ui.click('setup-skip');ui.advance(3.1);
+  ui.splitTiming.racers.get(1).latest={playerId:1,lap:1,index:1,timeMs:10000,lapTimeMs:9500};ui.frame(0);
+  const main=ui.nodes.get('split-gap1');assert.equal(main.hidden,false);
+  assert.deepEqual(main.children.map(node=>node.textContent),['你','+0.00 秒']);
+  assert.equal(main.classList.contains('split-self'),true);assert.equal(ui.nodes.get('split-ghost1').children.length,0);
+  ui.click('language-en');ui.frame(0);assert.deepEqual(main.children.map(node=>node.textContent),['You','+0.00 s']);
+});
+
+test('the current driver uses measured rank arrows without changing its cyan identity or excluding rivals',async t=>{
+  const fixture=challengeFixture(),ui=await loadCoastUI(t,{fetchImpl:challengeFetch(fixture)});
+  ui.modeButtons.find(button=>button.dataset.mode==='ai').click();await ui.launchPrepared();ui.advance(3.1);
+  ui.splitTiming.ghosts.forEach((ghost,index)=>{ghost.times=[[9000,11000,12000,13000,14000,15000][index],[23000,19000,21000,22000,24000,25000][index],30000,42000];});
+  const racer=ui.splitTiming.racers.get(1);
+  racer.records.set('1:1',{playerId:1,lap:1,index:1,timeMs:10000,lapTimeMs:10000});
+  racer.latest={playerId:1,lap:1,index:2,timeMs:18000,lapTimeMs:18000};ui.frame(0);
+  const rows=()=>[ui.nodes.get('split-gap1'),...ui.nodes.get('split-ghost1').children];
+  let self=rows().find(row=>row.classList.contains('split-self'));
+  assert.equal(self,ui.nodes.get('split-gap1'));assert.equal(self.children[0].children[0].textContent,'↑1');
+  assert.match(self.children[0].children[0].className,/rank-up/);assert.equal(self.children[0].children[1].textContent,'你');
+  assert.equal(self.style.color,'#51dfe5');assert.equal(self.children[1].textContent,'+0.00 秒');assert.equal(rows().length,7);
+  racer.latest.timeMs=26000;racer.latest.lapTimeMs=26000;ui.frame(0);
+  self=rows().at(-1);assert.equal(self.classList.contains('split-self'),true);
+  assert.equal(self.children[0].children[0].textContent,'↓5');assert.match(self.children[0].children[0].className,/rank-down/);
+  assert.equal(self.style.color,'#51dfe5');assert.equal(rows().length,7);
+  assert.equal(ui.nodes.get('split-gap1').classList.contains('split-self'),false);
+});
+
+test('each local checkpoint lists both drivers and both selected ghosts in one four-place order',async t=>{
+  const ui=await loadCoastUI(t),fixture=challengeFixture();
+  ui.nodes.get('ghost-enabled').checked=true;
+  for(const [slotId,entry]of fixture.entries.slice(0,2).entries())ui.ghostClient.select({entry,replay:fixture.replay(entry)},slotId);
+  ui.launch();ui.advance(3.1);assert.equal(ui.application.activeGhosts.length,2);
+  ui.splitTiming.ghosts.forEach((ghost,index)=>{ghost.times=[index===0?9500:11000,22000,33000,42000];});
+  for(const id of [1,2]){
+    const racer=ui.splitTiming.racers.get(id),record={playerId:id,lap:1,index:1,timeMs:id===1?10000:10500,lapTimeMs:id===1?10000:10500};
+    racer.latest=record;racer.records.set('1:1',record);
+  }
+  ui.frame(0);
+  const namesFor=id=>[ui.nodes.get('split-gap'+id),...ui.nodes.get('split-ghost'+id).children].map(row=>row.children[0].textContent);
+  assert.deepEqual(namesFor(1),['Alice','P1 · 你','橙色风暴','Bob']);
+  assert.deepEqual(namesFor(2),['Alice','青色闪电','P2 · 你','Bob']);
+  for(const id of [1,2])assert.equal([ui.nodes.get('split-gap'+id),...ui.nodes.get('split-ghost'+id).children].filter(row=>row.classList.contains('split-self')).length,1);
 });

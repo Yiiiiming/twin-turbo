@@ -247,3 +247,94 @@ test('the moved Austin split appears only after the complete football scoreboard
     }
   } finally {setTrack('coast');}
 });
+
+// Feed measured crossing clocks directly to isolate ranking from interpolation.
+// The real-drive tests above cover how these records are earned on the road.
+function rankField(ghostTimes, {kind='lap'}={}) {
+  const timing=new SplitTiming();
+  timing.ghosts=ghostTimes.map((times,slotId)=>({slotId,replay:{kind},times:[...times]}));
+  return timing;
+}
+function rankRecord(playerId,index,timeMs,{lap=1,lapTimeMs=timeMs}={}) {
+  return {playerId,lap,index,timeMs,lapTimeMs};
+}
+function rankRacer(timing,playerId,records,opponentId=null) {
+  const racer={opponentId,records:new Map(records.map(record=>[`${record.lap}:${record.index}`,record])),latest:records.at(-1)};
+  timing.racers.set(playerId,racer);return racer;
+}
+function appendRank(racer,record) {
+  racer.records.set(`${record.lap}:${record.index}`,record);racer.latest=record;
+}
+
+test('the current driver exposes rank movement across all six ghosts without changing comparison clocks',()=>{
+  const timing=rankField(Array.from({length:6},(_,index)=>[8000+index*100,21000+index*100]));
+  const racer=rankRacer(timing,1,[rankRecord(1,1,10000)]);
+  assert.equal(timing.latest(1).playerRankChange,null,'the first checkpoint has no previous rank');
+  appendRank(racer,rankRecord(1,2,20000));
+  const split=timing.latest(1);
+  assert.equal(split.playerRankChange,6,'the player moves from seventh to first');
+  assert.deepEqual(split.ghostDeltas.map(ghost=>ghost.rankChange),Array(6).fill(-1));
+  assert.deepEqual(split.ghostDeltas.map(ghost=>ghost.deltaMs),Array.from({length:6},(_,index)=>-1000-index*100));
+  assert.equal(timing.forPlayer(1).playerRankChange,6,'the seconds-based API carries the same current-driver movement');
+  const saved=structuredClone(split),records=structuredClone([...timing.racers]);
+  timing.sample({state:'paused',time:999,cars:[]});
+  assert.deepEqual(timing.latest(1),saved);assert.deepEqual([...timing.racers],records);
+});
+
+test('local drivers and selected ghosts share one ranking cohort for every row',()=>{
+  const timing=rankField([[8000,23000],[12000,19000]]);
+  rankRacer(timing,1,[rankRecord(1,1,10000),rankRecord(1,2,20000)],2);
+  rankRacer(timing,2,[rankRecord(2,1,9000),rankRecord(2,2,21000)],1);
+  const first=timing.latest(1),second=timing.latest(2);
+  assert.equal(first.playerRankChange,1);assert.equal(first.opponentRankChange,-1);
+  assert.equal(second.playerRankChange,-1);assert.equal(second.opponentRankChange,1);
+  assert.deepEqual(first.ghostDeltas.map(ghost=>ghost.rankChange),[-3,3],
+    'a ghost crossing both drivers and another ghost changes by three places');
+  assert.deepEqual(second.ghostDeltas.map(ghost=>ghost.rankChange),[-3,3]);
+  assert.equal(first.deltaMs,-1000);assert.equal(second.deltaMs,1000,'physical crossing deltas remain opposite');
+});
+
+test('the current driver and local rival share tied ranks with ghosts independently of display ordering',()=>{
+  const timing=rankField([[10000,19000],[10000,20000]]);
+  rankRacer(timing,1,[rankRecord(1,1,10000),rankRecord(1,2,20000)],2);
+  rankRacer(timing,2,[rankRecord(2,1,10000),rankRecord(2,2,20000)],1);
+  const split=timing.latest(1);
+  assert.equal(split.playerRankChange,-1);assert.equal(split.opponentRankChange,-1);
+  assert.deepEqual(split.ghostDeltas.map(ghost=>ghost.rankChange),[0,-1]);
+  timing.ghosts.reverse();
+  assert.equal(timing.latest(1).playerRankChange,-1);
+  assert.deepEqual(timing.latest(1).ghostDeltas.map(ghost=>ghost.rankChange),[-1,0]);
+});
+
+test('missing or newly available passages suppress every row movement until the same cohort is comparable',()=>{
+  const timing=rankField([[9000,21000]]);
+  rankRacer(timing,1,[rankRecord(1,1,10000),rankRecord(1,2,20000)],2);
+  const other=rankRacer(timing,2,[rankRecord(2,1,11000)],1);
+  const assertNoChanges=()=>{
+    const split=timing.latest(1);assert.equal(split.playerRankChange,null);assert.equal(split.opponentRankChange,null);
+    assert.ok(split.ghostDeltas.every(ghost=>ghost.rankChange===null));
+  };
+  assertNoChanges();
+  appendRank(other,rankRecord(2,2,22000));
+  assert.equal(timing.latest(1).playerRankChange,1,'late local passage makes the same field comparable');
+  assert.equal(timing.latest(1).opponentRankChange,0);
+  assert.deepEqual(timing.latest(1).ghostDeltas.map(ghost=>ghost.rankChange),[-1]);
+  timing.ghosts.push({slotId:1,replay:{kind:'lap'},times:[null,19000]});assertNoChanges();
+  timing.ghosts.at(-1).times[1]=null;
+  assert.equal(timing.latest(1).playerRankChange,1,'a ghost absent at both points never joins the field');
+  timing.racers.get(1).records.delete('1:1');assertNoChanges();
+});
+
+test('current-driver movement resets for a repeating lap ghost, carries across whole-race ghosts, and never survives restart',()=>{
+  const records=[rankRecord(1,4,50000),rankRecord(1,1,65000,{lap:2,lapTimeMs:15000})];
+  const clocks=[10000,20000,30000,49000,66000,80000,90000,100000,115000,130000,145000,160000];
+  const whole=rankField([clocks],{kind:'race'});rankRacer(whole,1,records);
+  assert.equal(whole.latest(1).playerRankChange,1);
+  const lap=rankField([[16000,26000,36000,49000]]);rankRacer(lap,1,records,2);
+  rankRacer(lap,2,[rankRecord(2,4,51000),rankRecord(2,1,64000,{lap:2,lapTimeMs:13000})],1);
+  assert.equal(lap.latest(1).playerRankChange,null);assert.equal(lap.latest(1).opponentRankChange,null);
+  assert.equal(lap.latest(1).ghostDeltas[0].rankChange,null,'every row uses the reset lap-ghost baseline');
+  whole.reset();assert.equal(whole.latest(1),null);
+  rankRacer(whole,1,[rankRecord(1,2,20000)]);
+  assert.equal(whole.latest(1).playerRankChange,null,'a fresh run cannot borrow an older checkpoint');
+});
