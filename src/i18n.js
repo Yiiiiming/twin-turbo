@@ -1,7 +1,7 @@
 // Chinese remains the authoring language; a DOM adapter also translates dynamic
 // status messages. Player-entered nicknames are kept verbatim.
 const PHRASES = [
-['伦敦','London'],['北京','Beijing'],['上海','Shanghai'],['里约','Rio de Janeiro'],['奥斯汀','Austin'],['巴黎','Paris'],
+['伦敦','London'],['北京','Beijing'],['上海','Shanghai'],['里约','Rio de Janeiro'],['里约热内卢','Rio de Janeiro'],['奥斯汀','Austin'],['巴黎','Paris'],
 ['新手教程','Driving tutorial'],
 ['跟着提示练习加速、转向、刹车、氮气与复位。练习不记录成绩。','Practice acceleration, steering, braking, nitro and recovery. Tutorial runs do not save records.'],
 ['跳过','Skip'],
