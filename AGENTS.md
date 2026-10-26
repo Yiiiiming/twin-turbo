@@ -79,3 +79,9 @@ The user requested GitHub cleanup, explicit current-versus-archive labels and gr
 ## Austin split timing authorization implemented, 2026-10-24
 
 The user asked “austin的有一个checkpoint的右边的排名挡住ou still sucks了 把哪个checkpoint挪走”. Austin's first visible split timing gate and player/ghost split measurement now use existing progress gate 30/68 rather than 25%, after the scoreboard view. The physical road, all 68 racing progression checkpoints, and the frozen route baseline remain identical. Only the three authorized Austin scenery hashes are updated in the hologram scene fixture, with the exact request recorded there.
+
+## Fullscreen and background verification, 2026-10-26
+
+The user reported that verification repeatedly pulled their computer into the game while they were using other applications, and asked to stop it. Do not trigger real fullscreen or bring the game/browser to the foreground during background verification. Use deterministic browser/DOM mocks for native fullscreen transitions; do not run automated launch/resume clicks that request fullscreen on the user's desktop. Open any inspection-only tabs in the background.
+
+The game no longer requests fullscreen on page load, refresh, language choice, map selection or a generic first gesture. Only the user's explicit race launch, resume button or fullscreen button may request it. Pausing and finishing exit fullscreen; resuming gives a full 3–2–1 countdown while the race stays frozen.

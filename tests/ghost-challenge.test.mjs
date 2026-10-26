@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { CHALLENGE_COLORS, PACE_PROFILES, PACE_SPEED_LIMIT, paceReplay, createGhostChallenge, loadGhostChallenge } from '../src/ghost-challenge.js';
 import { validateReplay, validateRaceReplay, sampleReplay, ghostVersionForCity, GhostRecorder, GHOST_LIMITS } from '../src/ghost-replay.js';
 import { ghostSplitTimes } from '../src/split-timing.js';
-import { RaceEngine, TRACK, setTrack, trackPoint, projectTrack, mod } from '../src/engine.js';
+import { RaceEngine, TRACK, TRACKS, setTrack, trackPoint, projectTrack, mod } from '../src/engine.js';
 import { RaceAI } from '../src/ai.js';
 import { RaceRenderer } from '../src/renderer.js';
 
@@ -65,12 +65,12 @@ test('human-first ladders keep three human places and three machines without cha
   result.ghosts[0].replay.frames[0][1]=9999;assert.deepEqual(input,original);
 });
 
-test('missing ladder steps use a machine, then resume searching humans from the actual previous clock',()=>{
+test('widely spaced different humans keep all three human places before machines fill the field',()=>{
   const input=[candidate('First',39000),candidate('Third',41000),candidate('Fifth',43000)],result=createGhostChallenge(input);
   assert.equal(result.humanCount,3);assert.equal(result.paceCount,3);
-  assert.deepEqual(result.ghosts.map(g=>g.entry.name),['First','配速幽灵 1','Third','配速幽灵 2','Fifth','配速幽灵 3']);
+  assert.deepEqual(result.ghosts.map(g=>g.entry.name),['First','Third','Fifth','配速幽灵 1','配速幽灵 2','配速幽灵 3']);
   assert.deepEqual(result.ghosts.filter(g=>!g.synthetic).map(g=>g.targetMs),[39000,41000,43000]);
-  for(let i=1;i<result.ghosts.length;i++)assert.ok(result.ghosts[i].targetMs-result.ghosts[i-1].targetMs>=800
+  for(let i=3;i<result.ghosts.length;i++)assert.ok(result.ghosts[i].targetMs-result.ghosts[i-1].targetMs>=800
     &&result.ghosts[i].targetMs-result.ghosts[i-1].targetMs<=1200);
   for(const ghost of result.ghosts.filter(g=>g.synthetic)){
     assert.equal(ghost.targetMs,ghost.replay.durationMs);assert.equal(ghost.entry.timeMs,ghost.targetMs);
@@ -120,14 +120,13 @@ test('normal matching draws fresh random values while a completed roster never c
   }finally{Math.random=savedRandom;}
 });
 
-test('human matching includes zero and 1500 ms gaps but bridges a 1501 ms gap with a machine',()=>{
+test('human matching accepts equal clocks and has no time window that can exclude a different driver',()=>{
   const source=candidate('First',39000,1,'boundary-a000'),sameTime=candidate('Equal',39000,1,'boundary-b000');
   const upper=candidate('Upper',40500),outside=candidate('Outside',40501);
   assert.equal(createGhostChallenge([source,sameTime]).ghosts[1].entry.id,sameTime.entry.id,'equal clocks with distinct record ids are valid');
   assert.equal(createGhostChallenge([source,upper]).ghosts[1].entry.id,upper.entry.id);
-  const bridged=createGhostChallenge([source,outside],1,{random:()=>.5});
-  assert.equal(bridged.ghosts[1].synthetic,true);
-  assert.equal(bridged.ghosts[2].entry.id,outside.entry.id,'the later human remains eligible after a machine bridges the gap');
+  const wider=createGhostChallenge([source,outside],1,{random:()=>.5});
+  assert.equal(wider.ghosts[1].entry.id,outside.entry.id,'a human beyond the old window is selected before any machine');
   const close=candidate('Close',39001),nearOneSecond=candidate('Later',40000);
   assert.deepEqual(createGhostChallenge([source,nearOneSecond,close]).ghosts.slice(0,3).map(g=>g.targetMs),[39000,39001,40000],
     'chronological human matching does not skip a near-tied record for the one-second target');
@@ -230,14 +229,53 @@ test('online matching validates three near-tied humans once each, then uses mach
   assert.deepEqual(details,values.slice(0,3).map(v=>v.entry.id),'duplicate metadata never reloads a selected record and the fourth human is not fetched');
 });
 
-test('different humans take priority within the window; repeated real records receive display-only numbered names',()=>{
+test('all twelve cities prioritize three different players, then fill missing human places from real histories',async()=>{
+  assert.equal(Object.keys(TRACKS).length,12,'visible and temporarily hidden cities share the matching rules');
+  for(const city of Object.keys(TRACKS))for(const laps of [1,3])for(const people of [1,2,4]){
+    const version=ghostVersionForCity(city,laps),start=laps===1?39000:117000;
+    const emery=[0,80,90].map(offset=>candidate('Emery',start+offset,laps));
+    const jy=candidate('jy',start+6000,laps),sam=candidate('Sam',start+15000,laps),fourth=candidate('Fourth',start+21000,laps);
+    const board=[emery[0],...(people>=2?[jy]:[]),...(people>=3?[sam,fourth]:[])];
+    const values=[...emery,...board.slice(1)],before=structuredClone(values),details=[];
+    const expected=people===1?emery:people===2?[emery[0],emery[1],jy]:[emery[0],jy,sam];
+    const result=await loadGhostChallenge({city,laps,random:()=>.5,fetchImpl:async(raw,options)=>{
+      const url=new URL(raw),body={city,version};
+      assert.equal(options.method,undefined);assert.equal(url.searchParams.get('city'),city);
+      assert.equal(url.searchParams.get('version'),version);
+      if(url.pathname==='/api/laps')return{ok:true,json:async()=>({...body,entries:[...board].reverse().map(value=>value.entry)})};
+      if(url.pathname==='/api/ghosts')return{ok:true,json:async()=>({...body,
+        entries:values.filter(value=>value.entry.name===url.searchParams.get('name')).map(value=>value.entry)})};
+      const value=values.find(value=>url.pathname.endsWith('/'+value.entry.id));assert.ok(value);details.push(value.entry.id);
+      return{ok:true,json:async()=>({...body,...value})};
+    }});
+    for(const match of [result,createGhostChallenge([...values].reverse(),laps,{random:()=>.5})]){
+      assert.equal(match.humanCount,3,`${city}: three available human records are selected`);assert.equal(match.paceCount,3);
+      assert.deepEqual(match.ghosts.slice(0,3).map(ghost=>ghost.entry.id),expected.map(value=>value.entry.id));
+      assert.equal(new Set(match.ghosts.slice(0,3).map(ghost=>ghost.entry.name)).size,Math.min(3,people));
+      assert.deepEqual(match.ghosts.map(ghost=>ghost.slotId),[0,1,2,3,4,5]);
+      for(const [index,ghost]of match.ghosts.slice(0,3).entries())assert.deepEqual(ghost.replay,expected[index].replay);
+      for(let index=3;index<6;index++){
+        const gap=match.ghosts[index].targetMs-match.ghosts[index-1].targetMs;
+        assert.ok(gap>=800&&gap<=1200,'machine steps start after the slowest selected human');
+      }
+    }
+    const loadOrder=people===2?[emery[0],jy,emery[1]]:expected;
+    assert.deepEqual(details,loadOrder.map(value=>value.entry.id),'only required trajectories are loaded, different people before histories');
+    assert.deepEqual(values,before,'stored human clocks, names and paths are untouched');
+  }
+});
+
+test('different humans take priority over all histories; repeated real records receive display-only numbered names',()=>{
   const values=[candidate('Emery',39000),candidate('Emery',40000),candidate('Sam',40100),candidate('ＥＭＥＲＹ',41100),candidate('Emery',42100)];
   const before=structuredClone(values),result=createGhostChallenge([...values,values[0]]);
   assert.deepEqual(result.ghosts.slice(0,3).map(g=>g.entry.name),['Emery','Emery','Sam']);
   assert.deepEqual(result.ghosts.slice(0,3).map(g=>g.displayName),['Emery1','Emery2','Sam']);
   assert.equal(result.humanCount,3);assert.equal(result.paceCount,3);
   assert.equal(new Set(result.ghosts.map(g=>g.entry.id)).size,6);assert.deepEqual(values,before);
-  assert.equal(createGhostChallenge([values[0],candidate('Same person later',42000),values[1]]).ghosts[1].entry.id,values[1].entry.id,'different names outside the window do not displace a valid same-person record');
+  const far=candidate('Farther driver',49000),third=candidate('Third driver',59000);
+  const distinct=createGhostChallenge([values[0],far,values[1],third]);
+  assert.deepEqual(distinct.ghosts.slice(0,3).map(g=>g.entry.id),[values[0].entry.id,far.entry.id,third.entry.id],
+    'a close historical run cannot consume a place reserved for another available player');
 });
 
 test('repeated legacy long names fit the race labels while retaining numbered suffixes and original identities',()=>{
@@ -405,9 +443,11 @@ test('failed or mismatched histories retain board records, and broken preferred 
     const value=values.find(value=>url.pathname.endsWith('/'+value.entry.id));
     return{ok:true,json:async()=>({...body,...value,...(value===other?{replay:replay(40101)}:{})})};
   }});
-  assert.deepEqual(result.ghosts.slice(0,4).map(g=>g.entry.name),['Emery','Emery','配速幽灵 1','Lee']);
+  assert.deepEqual(result.ghosts.slice(0,4).map(g=>g.entry.name),['Emery','Emery','Lee','配速幽灵 1']);
   assert.equal(result.failedCount,3);assert.equal(result.ghosts.length,6);
   assert.equal(reads.filter(url=>url.pathname.endsWith('/'+same.entry.id)).length,1,'duplicate metadata does not duplicate a record');
+  assert.deepEqual(reads.filter(url=>url.pathname.startsWith('/api/ghosts/')).map(url=>url.pathname.split('/').at(-1)),
+    [first,other,later,same].map(value=>value.entry.id),'a broken preferred player falls through to the next different person before any repeated name');
 });
 
 test('late history responses cannot mutate a cancelled match even if the fetch mock ignores AbortSignal',async()=>{

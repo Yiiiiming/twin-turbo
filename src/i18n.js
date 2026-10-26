@@ -1,6 +1,7 @@
 // Chinese remains the authoring language; a DOM adapter also translates dynamic
 // status messages. Player-entered nicknames are kept verbatim.
 const PHRASES = [
+['伦敦','London'],['北京','Beijing'],['上海','Shanghai'],['里约','Rio'],['奥斯汀','Austin'],['巴黎','Paris'],
 ['新手教程','Driving tutorial'],
 ['跟着提示练习加速、转向、刹车、氮气与复位。练习不记录成绩。','Practice acceleration, steering, braking, nitro and recovery. Tutorial runs do not save records.'],
 ['跳过','Skip'],
@@ -47,6 +48,11 @@ const PHRASES = [
 ['请按一个键…','Press a key…'],['尚未选择','Not selected'],['选择此颜色','Use this color'],['未加入','Not added'],['未录制','No replay'],['待查询','Checking…'],['正在载入…','Loading…'],['正在读取全站成绩…','Loading records…'],['正在读取全站速度榜…','Loading leaderboard…'],['本场未完赛','Race not finished'],['你的昵称','Your nickname'],['已完成','Saved'],['排名','Rank'],['车手','Driver'],['挑战幽灵','Challenge ghost'],['个人最好成绩','personal best'],['整场成绩','Race result'],['单圈与幽灵','Lap & ghost'],['紫色幽灵','Purple ghost'],['金色幽灵','Gold ghost'],['查找','Search'],['移除','Remove'],['已选','Selected'],['选择','Select'],['替换','Replace '],['加入','Add '],['紫色','Purple'],['金色','Gold'],['青色','Cyan'],['橙色','Orange'],['幽灵','ghost'],['完成','Done'],['计时点','Checkpoint'],['终点','Finish'],['对手','opponent'],['海港','Harbor'],['本圈','Lap'],['最快','Best'],['单人','Solo'],['对战','vs'],['或',' or '],['圈','lap(s)'],
 ];
 PHRASES.push(
+['暂停时退出全屏 · 继续前倒数 3、2、1。','Pausing exits fullscreen. Resume after 3, 2, 1.'],
+['Esc 也可暂停。','Esc also pauses.'],
+['也可暂停。','also pauses.'],
+['暂停时退出全屏 · 继续前倒数 3、2、1。Esc 也可暂停。','Pausing exits fullscreen. Resume after 3, 2, 1. Esc also pauses.'],
+['暂停时退出全屏 · 继续前倒数 3、2、1。P 已用于自定义驾驶。','Pausing exits fullscreen. Resume after 3, 2, 1. P is assigned to driving.'],
 ['暂停 / 继续，保持全屏 · Esc 退出全屏会自动暂停。','Pause / resume without leaving fullscreen. Esc exits fullscreen and pauses.'],
 ['暂停 / 继续，保持全屏 ·','Pause / resume without leaving fullscreen.'],
 ['退出全屏会自动暂停。','exits fullscreen and pauses.'],

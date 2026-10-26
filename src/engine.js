@@ -298,9 +298,13 @@ export class RaceEngine {
     }
   }
 
-  resume() {
+  resume({ countdownSeconds = 0 } = {}) {
     if (this.state === 'paused') {
-      this.state = this._resumeState || 'racing';
+      // A resume countdown preserves the live race, unlike start()/reset().
+      if (Number.isFinite(countdownSeconds) && countdownSeconds > 0) {
+        this.countdown = countdownSeconds;
+        this.state = 'countdown';
+      } else this.state = this._resumeState || 'racing';
       this._resumeState = null;
     }
   }

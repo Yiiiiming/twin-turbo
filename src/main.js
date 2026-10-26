@@ -14,7 +14,7 @@ import { createRaceEntry } from './race-entry.js';
 import { createDrivingTutorial } from './driving-tutorial.js';
 import { applyColorTheme } from './color-theme-ui.js';
 import { themeForTrack } from './color-themes.js';
-import { DEFAULT_TRACK_ID, getVisibleTracks, isTrackSelectable } from './track-visibility.js';
+import { DEFAULT_TRACK_ID, getVisibleTracks, isTrackSelectable, trackDisplayName } from './track-visibility.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
@@ -141,6 +141,8 @@ const colors = ['#51dfe5', '#ff9870'];
 const names = ['青色闪电', '橙色风暴'];
 const selectedLaps = 1;
 let selectedMode = 'ai', raceMode = 'local', lastRescueCounts = [0, 0];
+let lastRaceSettings = null;
+let rememberedGhostMode = {ai:false,local:true};
 let lastTime = performance.now(), lastState = '', lastCount = 0;
 let soundEnabled = false, audio = null, audioNodes = [];
 let lastLaps = [0, 0], notices = ['', ''], noticeUntil = [0, 0], toastTime = 0;
@@ -148,7 +150,7 @@ let lastLaunchResetCounts = [0, 0];
 let entryWindowFocused=true;
 const raceEntry=createRaceEntry(document);
 const drivingTutorial=createDrivingTutorial(document,{bindings,language:()=>i18n.language,translate:value=>i18n.t(value),
-  onExit:()=>returnToMenu(),onComplete:()=>{keys.clear();engine.pause();}});
+  onExit:()=>returnToMenu(),onComplete:()=>{keys.clear();pauseRace();}});
 function cancelRaceEntry(){raceEntry.cancel();renderer?.setEntryProgress?.(null);keys.clear();}
 function skipRaceEntry(){raceEntry.skip();renderer.setEntryProgress?.(null);renderer.resetCameras(engine);keys.clear();}
 const tau = Math.PI * 2;
@@ -181,7 +183,7 @@ function drawMiniMap(c, x, y, playerId) {
   c.strokeStyle = '#f5ecc8'; c.lineWidth = 36 * cityScale;
   c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
   const player=engine.cars.find(car=>car.id===playerId);
-  if(player && ['racing','paused'].includes(engine.state))for(const ghost of activeGhosts) {
+  if(player && ['countdown','racing','paused'].includes(engine.state))for(const ghost of activeGhosts) {
     if(ghost.replay.kind!=='race'&&!player._started)continue;
     const elapsed=(ghost.replay.kind==='race'?engine.time:player.lapTime)*1000;
     if(raceMode==='ai'&&elapsed>ghost.replay.durationMs)continue;
@@ -217,7 +219,7 @@ function drawHUD(now) {
     const region = Object.entries(sceneWeights(car.x, car.y)).sort((a, b) => b[1] - a[1])[0][0];
     const street = TRACK.streets?.find(street => p.s >= street.start && p.s < street.end);
     const sceneName = {coast:'海岸港湾', alpine:'松林山谷', city:'霓虹城区'}[region];
-    $('scene' + car.id).textContent = i18n.t(TRACK.themeName || sceneName);
+    $('scene' + car.id).textContent = trackDisplayName(TRACK,i18n.language);
   }
   if(!solo){
   ctx.fillStyle = '#101921'; ctx.fillRect(597, 0, 6, 700);
@@ -261,7 +263,7 @@ keys.clear();
 void leaderboard.init(TRACK.id);
 
 function trackName(track = TRACK) {
-  return i18n.language === 'en' ? (track.nameEn || 'Coastline Grand Prix') : track.name;
+  return trackDisplayName(track,i18n.language);
 }
 const trackCards = new Map();
 function circuitOutline(track) {
@@ -289,7 +291,7 @@ function refreshTrackUI() {
   $('records-track-choice').value=leaderboard.city;
   const name=trackName();
   $('track-title').textContent=name;
-  $('track-english').textContent=`${String(visibleTracks.findIndex(track=>track.id===TRACK.id)+1).padStart(2,'0')} / ${(TRACK.nameEn||'COASTLINE GRAND PRIX').toUpperCase()}`;
+  $('track-english').textContent=`${String(visibleTracks.findIndex(track=>track.id===TRACK.id)+1).padStart(2,'0')} / ${trackDisplayName(TRACK,'en').toUpperCase()}`;
   $('route-description').textContent=i18n.language==='en'
     ?TRACK.descriptionEn||'Coast, pines and neon. Fast straights, flowing S bends and a hairpin.'
     :TRACK.description||'长直道、连续 S 弯和发夹弯，穿越海岸、松林与霓虹城区。';
@@ -367,7 +369,7 @@ function updateSplitUI(car) {
 function updateUI(now) {
   drivingTutorial.element.hidden=!drivingTutorial.active||(!drivingTutorial.completed&&engine.state!=='racing');
   $('timer').textContent=fmt(engine.time);
-  $('challenge-live').hidden = raceMode !== 'ai' || !activeGhosts.length || !['racing','paused'].includes(engine.state) || engine.time>=3;
+  $('challenge-live').hidden = raceMode !== 'ai' || !activeGhosts.length || !['countdown','racing','paused'].includes(engine.state) || engine.time>=3;
   $('challenge-live').classList.toggle('roster-fading',engine.time>=2.5);
   if(raceMode==='ai' && engine.cars[0])challengeRows.forEach((row,index)=>row.classList.toggle('ghost-finished',challengeElapsed(engine.cars[0])>=activeGhosts[index].entry.timeMs));
   const statuses={menu:'等待发车',countdown:'准备出发',racing:'比赛进行中',paused:'比赛已暂停',finished:'比赛结束'};
@@ -421,6 +423,7 @@ function updateUI(now) {
     document.body.classList.toggle('racing',engine.state==='racing');
     $('arena-tag-text').textContent=engine.state==='racing'?'LIVE / CHASE CAM':'CHASE CAM / P1';
     if(engine.state==='racing' && lastState==='countdown')tone(880,.2,.08);
+    if(['paused','finished'].includes(engine.state))void exitRaceFullscreen();
     if(engine.state==='finished'&&raceMode!=='tutorial'){
       ghostClient.endRace();
       leaderboard.setRaceActive(false);
@@ -473,6 +476,8 @@ function begin(skipGhosts = false) {
   ghostRecorder.reset(); splitTiming.reset(activeGhosts);
   $('ghost-race-label').textContent = selectedMode==='ai' ? i18n.t(activeGhosts.length?'幽灵挑战':'不带幽灵')
     : activeGhosts.map(ghost=>`${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」 · ${fmt(ghost.entry.timeMs/1000)}`).join('  /  ');
+  lastRaceSettings={city:TRACK.id,mode:selectedMode,manualGhosts:manualGhosts||skipGhosts};
+  if(selectedMode!=='tutorial')rememberedGhostMode[selectedMode]=lastRaceSettings.manualGhosts;
   raceMode=selectedMode; if(engine.cars.length!==(raceMode!=='local'?1:2))engine.setPlayerCount(raceMode!=='local'?1:2); renderer.setSinglePlayer(raceMode!=='local'); engine.start(1); applyPlayerColors(); lastRescueCounts=[0,0];
   buildChallengeRacePanel();
   keys.clear(); lastLaps=[0,0]; lastLaunchResetCounts=[0,0]; notices=['','']; lastCount=0; renderer.resetCameras(engine);
@@ -485,12 +490,12 @@ function openRaceSetup() {
   closeRecords(null,false);
   cancelRaceEntry();
   if(selectedMode==='tutorial'){begin(true);return;}
-  if (['racing','countdown'].includes(engine.state)) engine.pause();
-  keys.clear(); ghostClient.menu(); manualGhosts=selectedMode!=='ai';
+  if (['racing','countdown'].includes(engine.state)) pauseRace();
+  keys.clear(); ghostClient.menu(); manualGhosts=rememberedGhostMode[selectedMode]??(selectedMode!=='ai');
   $('race-setup-summary').textContent = `${i18n.t(selectedMode==='ai'?'幽灵挑战':'本地双人')} · ${trackName()} · ${i18n.t(`${selectedLaps} 圈`)}`;
   if (!$('race-setup-dialog').open) $('race-setup-dialog').showModal();
   updateSetupMode();
-  if(selectedMode==='ai')void matchChallenge();else void ghostClient.openPicker(selectedLaps);
+  if(selectedMode==='ai'&&!manualGhosts)void matchChallenge();else void ghostClient.openPicker(selectedLaps);
 }
 $('setup-launch').addEventListener('click',()=>begin());
 $('setup-skip').addEventListener('click',()=>begin(true));
@@ -499,17 +504,22 @@ $('setup-manual').addEventListener('click',chooseManualGhosts);
 $('setup-auto').addEventListener('click',()=>{manualGhosts=false;updateSetupMode();void matchChallenge();});
 $('challenge-retry').addEventListener('click',()=>void matchChallenge());
 $('race-setup-dialog').addEventListener('close',()=>{cancelChallengeLoad();keys.clear();if(raceMode!=='tutorial'&&['racing','countdown','paused'].includes(engine.state))ghostClient.startRace();});
+function pauseRace(){
+  engine.pause();
+  keys.clear();
+  if(engine.state==='paused')void exitRaceFullscreen();
+}
 function resumeRace(fullscreen=false){
   if(drivingTutorial.completed||engine.state!=='paused')return;
   if(fullscreen)void requestRaceFullscreen();
-  fullscreenEscapeGuard=false;keys.clear();engine.resume();canvas.focus({preventScroll:true});
+  fullscreenEscapeGuard=false;keys.clear();lastCount=0;engine.resume({countdownSeconds:3});canvas.focus({preventScroll:true});
 }
 function togglePause(fullscreen=false){
   if(drivingTutorial.completed)return;
   if(raceEntry.active){skipRaceEntry();return;}
   if (engine.state === 'paused') {
     resumeRace(fullscreen);
-  } else engine.pause();
+  } else pauseRace();
   keys.clear();
 }
 function rescue(id){if(engine.cars[id-1].finished)return;const before=engine.cars[id-1].rescueCount;if(raceMode!=='tutorial')ghostRecorder.invalidate(id);engine.rescue(id);if(raceMode==='tutorial')drivingTutorial.manualRescue(before,engine.cars[id-1]);lastRescueCounts[id-1]=engine.cars[id-1].rescueCount;renderer.resetCameras(engine,id);notices[id-1]='返回赛道 · 罚停 2 秒';noticeUntil[id-1]=toastTime+2.2;}
@@ -524,19 +534,27 @@ function raceRecords(cars = engine.cars) {
   }));
 }
 function returnToMenu() {
+  const restore=engine.state!=='menu'?lastRaceSettings:null;
+  void exitRaceFullscreen();
   cancelRaceEntry();drivingTutorial.cancel();
   cancelChallengeLoad();challengeSetup=null;ghostClient.menu(); leaderboard.setRaceActive(false);
   if (raceMode!=='tutorial'&&!['finished','menu'].includes(engine.state)) leaderboard.showResults(raceRecords());
   ghostRecorder.reset(); splitTiming.reset(); activeGhosts=[]; buildChallengeRacePanel(); renderer.setGhostPoses?.([]);
-  engine.reset(); applyPlayerColors();  lastRescueCounts=[0,0]; keys.clear(); renderer.resetCameras(engine);
+  engine.reset();
+  if(restore){
+    selectedMode=restore.mode;manualGhosts=restore.manualGhosts;
+    if(TRACK.id!==restore.city)selectCircuit(restore.city);
+  }
+  updateMode();refreshTrackUI();lastRescueCounts=[0,0];keys.clear();renderer.resetCameras(engine);
   const selected = ghostClient.node('ghost-enabled').checked ? ghostClient.selections() : [];
   $('ghost-race-label').textContent = (selectedMode!=='local'?[]:selected).map(ghost => `${ghost.colorLabel}幽灵 · 「${ghost.entry.name}」`).join('  /  ');
   updateUI(performance.now()/1000);
+  $('start').focus({preventScroll:true});
 }
 let recordsReturnFocus=null;
 function openRecords(event) {
   event?.preventDefault(); keys.clear();
-  if(['racing','countdown'].includes(engine.state))engine.pause();
+  if(['racing','countdown'].includes(engine.state))pauseRace();
   recordsReturnFocus=event?.currentTarget||event?.target||document.activeElement;
   $('records-center').hidden=false;
   $('records-center').focus({preventScroll:true});
@@ -616,7 +634,7 @@ function updateMode() {
 }
 document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{if(engine.state!=='menu')return;selectedMode=['ai','tutorial'].includes(button.dataset.mode)?button.dataset.mode:'local';updateMode();}));
 function openBindings() {
-  engine.pause(); keys.clear(); bindingCapture=null; refreshBindings();
+  pauseRace(); keys.clear(); bindingCapture=null; refreshBindings();
   $('bindings-message').textContent='点击要修改的动作，再按一个新键。重复键会提示；Esc 取消选键。';
   $('bindings-dialog').showModal();
 }
@@ -633,7 +651,7 @@ updateMode();selectLaps(selectedLaps);
 let settingsReturnFocus=null;
 function openSettings(event) {
   keys.clear();
-  if(['racing','countdown'].includes(engine.state))engine.pause();
+  if(['racing','countdown'].includes(engine.state))pauseRace();
   settingsReturnFocus=event?.currentTarget||event?.target||document.activeElement;
   if(!$('settings-dialog').open)$('settings-dialog').showModal();
 }
@@ -641,7 +659,7 @@ for(const id of ['menu-settings','pause-settings'])$(id).addEventListener('click
 $('close-settings').addEventListener('click',()=>$('settings-dialog').close());
 $('settings-dialog').addEventListener('close',()=>{keys.clear();settingsReturnFocus?.focus?.({preventScroll:true});});
 $('sound').addEventListener('click',()=>{soundEnabled=!soundEnabled;$('sound').setAttribute('aria-pressed',String(soundEnabled));$('sound').title=soundEnabled?'关闭声音':'开启声音';$('sound').querySelector('span').textContent=soundEnabled?'声音开':'声音关';$('sound').querySelector('path').setAttribute('d',soundEnabled?'M11 5 6 9H3v6h3l5 4V5Zm5 3c2 2 2 6 0 8m3-11c4 4 4 10 0 14':'M11 5 6 9H3v6h3l5 4V5Zm5 4 5 6m0-6-5 6');if(soundEnabled){initAudio();audio?.resume();tone(600,.08,.04);}if(['racing','countdown'].includes(engine.state))canvas.focus({preventScroll:true});});
-$('help').addEventListener('click',()=>{engine.pause();keys.clear();$('help-dialog').showModal();});
+$('help').addEventListener('click',()=>{pauseRace();keys.clear();$('help-dialog').showModal();});
 $('close-help').addEventListener('click',()=>$('help-dialog').close());$('help-done').addEventListener('click',()=>$('help-dialog').close());
 $('help-dialog').addEventListener('click',event=>{if(event.target===$('help-dialog')){const r=$('help-dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('help-dialog').close();}});
 function refreshPauseUI() {
@@ -649,7 +667,7 @@ function refreshPauseUI() {
   $('pause').innerHTML=`${i18n.t(engine.state==='paused'?'继续':'暂停')} <kbd>${shortcut}</kbd>`;
   $('pause').setAttribute('aria-label',i18n.t(engine.state==='paused'?'继续比赛':'暂停比赛'));
   $('pause-shortcut').textContent=shortcut;
-  const help=i18n.t(customP?'暂停 / 继续 · 退出全屏会自动暂停。P 已用于自定义驾驶。':'暂停 / 继续，保持全屏 · Esc 退出全屏会自动暂停。');
+  const help=i18n.t(customP?'暂停时退出全屏 · 继续前倒数 3、2、1。P 已用于自定义驾驶。':'暂停时退出全屏 · 继续前倒数 3、2、1。Esc 也可暂停。');
   $('pause-help-text').replaceChildren(...help.split(/\b(Esc|P)\b/).filter(Boolean).map(text=>{
     const part=document.createElement(text==='Esc'||text==='P'?'kbd':'span');part.textContent=text;return part;
   }));
@@ -660,23 +678,43 @@ function refreshFullscreenUI() {
   $('fullscreen').setAttribute('aria-label',label);
   $('fullscreen').setAttribute('title',label);
 }
-let firstFullscreenGesture=true,fullscreenActive=Boolean(document.fullscreenElement),fullscreenEscapeGuard=false;
+let fullscreenActive=Boolean(document.fullscreenElement),fullscreenEscapeGuard=false;
+// Native exit promises and fullscreenchange can arrive in either order.
+// Keep our own exit intent until the exit event, so a quick resume cannot be
+// mistaken for a fresh Escape and the browser has finished resizing first.
+let fullscreenExitTransition=null,fullscreenRequestSerial=0;
+function finishFullscreenExit(transition){
+  if(!transition.observed)return;
+  if(fullscreenExitTransition===transition)fullscreenExitTransition=null;
+  transition.resolve();
+}
+function exitRaceFullscreen(){
+  fullscreenRequestSerial++;
+  if(fullscreenExitTransition)return fullscreenExitTransition.promise;
+  if(!document.fullscreenElement||typeof document.exitFullscreen!=='function')return Promise.resolve();
+  const transition={settled:false,observed:false};
+  transition.promise=new Promise(resolve=>{transition.resolve=resolve;});
+  fullscreenExitTransition=transition;
+  try{
+    Promise.resolve(document.exitFullscreen()).then(()=>{
+      transition.settled=true;finishFullscreenExit(transition);
+    },()=>{transition.settled=true;transition.observed=true;finishFullscreenExit(transition);});
+  }catch{transition.settled=true;transition.observed=true;finishFullscreenExit(transition);}
+  return transition.promise;
+}
 async function requestRaceFullscreen() {
+  const request=++fullscreenRequestSerial;
+  if(fullscreenExitTransition){
+    await fullscreenExitTransition.promise;
+    if(request!==fullscreenRequestSerial||['paused','finished'].includes(engine.state))return;
+  }
   const stage=$('race-stage');
   if(document.fullscreenElement || document.fullscreenEnabled===false || typeof stage.requestFullscreen!=='function')return;
   try {
-    // Gesture callers reach the native request before the first await.
+    // Gesture callers reach the native request before the first await unless
+    // they need to wait for a just-requested fullscreen exit to complete.
     await stage.requestFullscreen();
   } catch {}
-}
-function fullscreenOnFirstGesture(event) {
-  if(!firstFullscreenGesture || !event.isTrusted || event.repeat || event.metaKey || event.ctrlKey || event.altKey
-    || (event.type==='keydown'&&!['Enter','Space'].includes(event.code)))return;
-  firstFullscreenGesture=false;
-  // These controls own their request, especially the user's explicit exit.
-  const button=event.target?.closest?.('button');
-  if(['fullscreen','fullscreen-exit','setup-launch','setup-skip','resume','pause'].includes(button?.id))return;
-  void requestRaceFullscreen();
 }
 async function toggleFullscreen() {
   try {
@@ -688,13 +726,10 @@ async function toggleFullscreen() {
 }
 $('fullscreen').addEventListener('click', toggleFullscreen);
 $('fullscreen-exit').addEventListener('click', toggleFullscreen);
-window.addEventListener('click',fullscreenOnFirstGesture,{capture:true});
-window.addEventListener('keydown',fullscreenOnFirstGesture,{capture:true});
 document.addEventListener('fullscreenchange',()=>{
   const active=Boolean(document.fullscreenElement),exited=fullscreenActive&&!active;fullscreenActive=active;
   if(active){
     fullscreenEscapeGuard=false;
-    firstFullscreenGesture=false;
     const languageDialog=$('language-dialog');
     if(languageDialog.open){
       const focused=languageDialog.contains(document.activeElement)?document.activeElement:null;
@@ -702,6 +737,8 @@ document.addEventListener('fullscreenchange',()=>{
       languageDialog.close();languageDialog.showModal();
       focused?.focus({preventScroll:true});
     }
+  }else if(exited&&fullscreenExitTransition){
+    fullscreenExitTransition.observed=true;finishFullscreenExit(fullscreenExitTransition);
   }else if(exited){
     // Some browsers consume Escape; others dispatch it before or after this
     // event. Exiting always pauses, and the same key press must never resume.
@@ -757,7 +794,7 @@ window.addEventListener('keydown',event=>{
     return;
   }
   if(event.code==='Escape'&&!event.repeat){
-    if(document.fullscreenElement||fullscreenEscapeGuard){keys.clear();engine.pause();}else togglePause();
+    if(document.fullscreenElement||fullscreenEscapeGuard){keys.clear();pauseRace();}else togglePause();
     return;
   }
   if(event.code==='KeyP'&&!bindings.recognizes('KeyP')){if(!event.repeat)togglePause();return;}
@@ -766,15 +803,15 @@ window.addEventListener('keydown',event=>{
   if (['racing', 'countdown'].includes(engine.state) && bindings.recognizes(event.code)) keys.add(event.code);
 });
 window.addEventListener('keyup',event=>{keys.delete(event.code);heldBoostKeys.delete(event.code);if(event.code==='Escape')fullscreenEscapeGuard=false;if(controlKeys.has(event.code)&&!$('settings-dialog').open&&!$('help-dialog').open&&!$('bindings-dialog').open&&!$('race-setup-dialog').open&&$('records-center').hidden&&!leaderboard.busyDialog&&!typingTarget(event)&&!nativeActivation(event))event.preventDefault();});
-window.addEventListener('blur',()=>{entryWindowFocused=false;keys.clear();heldBoostKeys.clear();if(!raceEntry.active)engine.pause();});
+window.addEventListener('blur',()=>{entryWindowFocused=false;keys.clear();heldBoostKeys.clear();if(!raceEntry.active)pauseRace();});
 window.addEventListener('focus',()=>{entryWindowFocused=true;});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();heldBoostKeys.clear();if(!raceEntry.active)engine.pause();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();heldBoostKeys.clear();if(!raceEntry.active)pauseRace();}});
 function loop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, .05);
   lastTime = timestamp;
   const now = timestamp / 1000;
   toastTime += engine.state === 'racing' ? dt : 0;
-  if (!renderer.available) { keys.clear(); heldBoostKeys.clear(); if(!raceEntry.active)engine.pause(); }
+  if (!renderer.available) { keys.clear(); heldBoostKeys.clear(); if(!raceEntry.active)pauseRace(); }
   const entering=raceEntry.active;
   const entryState=raceEntry.update(entering&&!document.hidden&&entryWindowFocused&&renderer.available?dt:0);
   renderer.setEntryProgress?.(entryState.active?(entryState.previewProgress??0):null);
@@ -788,7 +825,8 @@ function loop(timestamp) {
     if(raceMode!=='tutorial'){ghostRecorder.sample(engine,raceMode==='ai'?[1]:[1,2]);splitTiming.sample(engine);}
     // Present the clear track at time zero before applying any racing input.
     // A frame crossing the final beat must not drive beneath the old overlay.
-    engine.step(engine.state==='countdown'?Math.min(dt,engine.countdown):dt, frameKeys);
+    if(!(engine.state==='countdown'&&fullscreenExitTransition))
+      engine.step(engine.state==='countdown'?Math.min(dt,engine.countdown):dt, frameKeys);
     if(raceMode==='tutorial'){
       if(engine.state==='racing')drivingTutorial.update(engine.cars[0],frameKeys);
       if(engine.state==='finished')drivingTutorial.finish('lap');
@@ -803,7 +841,7 @@ function loop(timestamp) {
     lastRescueCounts[i]=car.rescueCount;
   }
   if(!entering&&raceMode!=='tutorial'){splitTiming.sample(engine);ghostRecorder.sample(engine,raceMode==='ai'?[1]:[1,2]);}
-  renderer.setGhostPoses?.(engine.cars.map(car => !car.finished && ['racing','paused'].includes(engine.state) ? activeGhosts.filter(ghost=>(ghost.replay.kind==='race'||car._started) && (raceMode!=='ai'||challengeElapsed(car)<=ghost.replay.durationMs)).map(ghost => ({...sampleReplay(ghost.replay,(ghost.replay.kind==='race'?engine.time:car.lapTime)*1000),slotId:ghost.slotId})).filter(pose=>Number.isFinite(pose.x)) : []));
+  renderer.setGhostPoses?.(engine.cars.map(car => !car.finished && ['countdown','racing','paused'].includes(engine.state) ? activeGhosts.filter(ghost=>(ghost.replay.kind==='race'||car._started) && (raceMode!=='ai'||challengeElapsed(car)<=ghost.replay.durationMs)).map(ghost => ({...sampleReplay(ghost.replay,(ghost.replay.kind==='race'?engine.time:car.lapTime)*1000),slotId:ghost.slotId})).filter(pose=>Number.isFinite(pose.x)) : []));
   updateRaceNotices();
   renderer.render(engine, dt, now);
   drawHUD(now);
@@ -811,7 +849,6 @@ function loop(timestamp) {
   updateAudio();
   requestAnimationFrame(loop);
 }
-$('language-toggle').addEventListener('click',()=>{keys.clear();engine.pause();});
+$('language-toggle').addEventListener('click',()=>{keys.clear();pauseRace();});
 i18n.init();
-void requestRaceFullscreen();
 resize();requestAnimationFrame(loop);
