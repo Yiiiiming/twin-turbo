@@ -150,25 +150,45 @@ export function createGhostChallenge(candidates = [], laps = 1, {random=Math.ran
 
 /** Read public metadata, then load only the replay candidates needed by the roster. */
 export async function loadGhostChallenge({ city, laps = 1, fetchImpl = (...args) => globalThis.fetch(...args),
-  origin = API_ORIGIN, signal, timeoutMs = 20000, random = Math.random } = {}) {
+  origin = API_ORIGIN, signal, timeoutMs = 20000, requestTimeoutMs = 5000, random = Math.random } = {}) {
   if (!validDistance(laps) || typeof city !== 'string') throw new TypeError('Invalid ghost challenge category.');
   const version = ghostVersionForCity(city, laps), controller = new AbortController();
   const abort = () => controller.abort(signal?.reason);
   if (signal?.aborted) abort();
   else signal?.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(() => controller.abort(new Error('Ghost challenge request timed out.')), timeoutMs);
+  let budgetExpired=false;
+  const timer = setTimeout(() => {
+    budgetExpired=true;controller.abort(new Error('Ghost challenge request timed out.'));
+  }, timeoutMs);
   const base = origin.replace(/\/$/, '');
   const checkAbort=()=>{if(controller.signal.aborted)throw controller.signal.reason||new Error('Ghost challenge cancelled.');};
-  const read = async (path,extra={}) => {
+  const checkCancelled=()=>{if(signal?.aborted)throw signal.reason||new Error('Ghost challenge cancelled.');};
+  const read = async (path,extra={},deadline=Infinity) => {
     checkAbort();
-    const params=new URLSearchParams({city,version,...extra});
-    const response = await fetchImpl(`${base}${path}?${params}`, { signal: controller.signal, cache: 'no-store' });
-    checkAbort();
-    if (!response.ok) throw new Error('Ghost challenge request failed.');
-    const body = await response.json();
-    checkAbort();
-    if (body?.city !== city || body?.version !== version) throw new Error('Ghost challenge category mismatch.');
-    return body;
+    const request=new AbortController(),params=new URLSearchParams({city,version,...extra});
+    let requestTimer,onAbort;
+    // AbortSignal alone cannot bound a fetch implementation or response body
+    // that ignores cancellation. Race the complete read, including JSON, and
+    // remove the parent listener even when the losing task never settles.
+    const stopped=new Promise((_,reject)=>{
+      onAbort=()=>{request.abort(controller.signal.reason);reject(controller.signal.reason||new Error('Ghost challenge cancelled.'));};
+      controller.signal.addEventListener('abort',onAbort,{once:true});
+      requestTimer=setTimeout(()=>{
+        const error=new Error('Ghost challenge request timed out.');request.abort(error);reject(error);
+      },Math.max(0,Math.min(requestTimeoutMs,deadline-Date.now())));
+    });
+    const task=Promise.resolve().then(async()=>{
+      checkAbort();
+      const response=await fetchImpl(`${base}${path}?${params}`,{signal:request.signal,cache:'no-store'});
+      checkAbort();
+      if(!response.ok)throw new Error('Ghost challenge request failed.');
+      const body=await response.json();
+      checkAbort();
+      if(body?.city!==city||body?.version!==version)throw new Error('Ghost challenge category mismatch.');
+      return body;
+    });
+    try{return await Promise.race([task,stopped]);}
+    finally{clearTimeout(requestTimer);controller.signal.removeEventListener('abort',onAbort);}
   };
   try {
     const board = await read('/api/laps');
@@ -180,21 +200,25 @@ export async function loadGhostChallenge({ city, laps = 1, fetchImpl = (...args)
     }
     let failedCount=0,nextName=0;
     const historyNames=[...names.entries()];
+    // Histories enrich the three human places but cannot consume the whole
+    // match budget before any of the already-known board records are loaded.
+    const historyDeadline=Date.now()+Math.min(timeoutMs/2,requestTimeoutMs);
     const loadHistory=async()=>{
-      while(nextName<historyNames.length){
+      while(nextName<historyNames.length&&Date.now()<historyDeadline&&!budgetExpired){
         const [key,name]=historyNames[nextName++];
         try{
-          const history=await read('/api/ghosts',{name});
+          const history=await read('/api/ghosts',{name},historyDeadline);
           if(!Array.isArray(history.entries))throw new Error('Invalid ghost challenge history.');
           for(const entry of history.entries.filter(entry=>validEntry(entry,laps)&&leaderboardNameKey(entry.name)===key)
             .sort(compareEntries).slice(0,20))if(!entries.has(entry.id))entries.set(entry.id,entry);
-        }catch(error){if(controller.signal.aborted)throw error;failedCount++;}
+        }catch(error){checkCancelled();failedCount++;}
       }
     };
     await Promise.all(Array.from({length:Math.min(4,historyNames.length)},loadHistory));
     const roster=challengeRoster(laps,random),failedIds=new Set();let detailReads=0;
     while(roster.ghosts.length<CHALLENGE_COLORS.length){
-      const candidates=roster.hasHumanPlace?humanCandidates([...entries.values()].filter(entry=>!failedIds.has(entry.id)),
+      checkCancelled();
+      const candidates=roster.hasHumanPlace&&!budgetExpired?humanCandidates([...entries.values()].filter(entry=>!failedIds.has(entry.id)),
         roster.usedNames,roster.usedIds):[];
       let loaded=false;
       for(const entry of candidates.slice(0,Math.max(0,32-detailReads)))try{
@@ -204,7 +228,7 @@ export async function loadGhostChallenge({ city, laps = 1, fetchImpl = (...args)
           ||data.entry.timeMs!==entry.timeMs||!validEntry(data.entry,laps)||!replayValid(data.replay,laps)
           ||data.replay.durationMs!==entry.timeMs)throw new Error('Invalid challenge replay.');
         roster.human({entry:data.entry,replay:data.replay});loaded=true;break;
-      }catch(error){if(controller.signal.aborted)throw error;failedCount++;failedIds.add(entry.id);}
+      }catch(error){checkCancelled();failedCount++;failedIds.add(entry.id);if(budgetExpired)break;}
       if(!loaded&&!roster.pace())break;
     }
     return {...roster.result(),city,version,failedCount};

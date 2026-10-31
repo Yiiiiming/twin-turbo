@@ -398,7 +398,116 @@ test('loader rejects category mismatch and supports canceling an in-flight prepa
   await assert.rejects(loadGhostChallenge({ city: 'coast', fetchImpl: async () => ({ ok: true, json: async () => ({ city: 'coast-london', version: 'coast-ghost-v1', entries: [] }) }) }), /category mismatch/);
   const controller = new AbortController();
   const promise = loadGhostChallenge({ city: 'coast', signal: controller.signal, fetchImpl: (_, { signal }) => new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })) });
-  controller.abort(); await assert.rejects(promise, /cancelled/);
+  controller.abort(); await assert.rejects(promise, /aborted|cancelled/);
+});
+
+test('stalled optional histories cannot prevent valid board ghosts from matching, even when fetch or JSON ignores abort', {timeout:2000}, async()=>{
+  const city='coast-beijing',version=ghostVersionForCity(city),values=['Emery','jy','Sam'].map((name,index)=>candidate(name,39000+index*1000));
+  for(const stage of ['fetch','json']){
+    const stalledSignals=[],details=[];
+    const result=await loadGhostChallenge({city,timeoutMs:500,requestTimeoutMs:20,fetchImpl:async(raw,{signal})=>{
+      const url=new URL(raw),body={city,version};
+      if(url.pathname==='/api/laps')return{ok:true,json:async()=>({...body,entries:values.map(value=>value.entry)})};
+      if(url.pathname==='/api/ghosts'){
+        stalledSignals.push(signal);
+        const hung=new Promise(()=>{});
+        return stage==='fetch'?hung:{ok:true,json:()=>hung};
+      }
+      const value=values.find(value=>url.pathname.endsWith('/'+value.entry.id));details.push(value.entry.id);
+      return{ok:true,json:async()=>({...body,...value})};
+    }});
+    assert.deepEqual(details,values.map(value=>value.entry.id));
+    assert.deepEqual(result.ghosts.slice(0,3).map(ghost=>ghost.entry.name),['Emery','jy','Sam']);
+    assert.equal(result.humanCount,3);assert.equal(result.paceCount,3);assert.equal(result.failedCount,3);
+    assert.ok(stalledSignals.every(signal=>signal.aborted),'each timed-out underlying operation is also asked to abort');
+  }
+});
+
+test('a stalled replay is skipped without discarding good people or accepting a late result', {timeout:2000}, async()=>{
+  const city='coast',version=ghostVersionForCity(city),values=['Stalled','Emery','jy','Sam'].map((name,index)=>candidate(name,39000+index*1000));
+  for(const stage of ['fetch','json']){
+    let release,stalledSignal;
+    const result=await loadGhostChallenge({city,timeoutMs:500,requestTimeoutMs:20,fetchImpl:async(raw,{signal})=>{
+      const url=new URL(raw),body={city,version};
+      if(url.pathname==='/api/laps')return{ok:true,json:async()=>({...body,entries:values.map(value=>value.entry)})};
+      if(url.pathname==='/api/ghosts')return{ok:true,json:async()=>({...body,entries:[]})};
+      const value=values.find(value=>url.pathname.endsWith('/'+value.entry.id)),data={...body,...value};
+      if(value===values[0]){
+        stalledSignal=signal;const hung=new Promise(resolve=>{release=()=>resolve(stage==='fetch'?{ok:true,json:async()=>data}:data);});
+        return stage==='fetch'?hung:{ok:true,json:()=>hung};
+      }
+      return{ok:true,json:async()=>data};
+    }});
+    assert.deepEqual(result.ghosts.slice(0,3).map(ghost=>ghost.entry.name),['Emery','jy','Sam']);
+    assert.equal(result.humanCount,3);assert.equal(result.paceCount,3);assert.equal(result.failedCount,1);
+    assert.equal(stalledSignal.aborted,true);
+    const before=structuredClone(result);release();await new Promise(resolve=>setTimeout(resolve,0));
+    assert.deepEqual(result,before,'a late response cannot replace a matched racer');
+  }
+});
+
+test('overall deadline keeps validated human ghosts and fills with pace ghosts instead of losing the roster', {timeout:2000}, async()=>{
+  const city='coast',version=ghostVersionForCity(city),values=['Emery','jy','Stalled','Unread'].map((name,index)=>candidate(name,39000+index*1000)),details=[];
+  const result=await loadGhostChallenge({city,timeoutMs:40,requestTimeoutMs:500,random:()=>.5,fetchImpl:async raw=>{
+    const url=new URL(raw),body={city,version};
+    if(url.pathname==='/api/laps')return{ok:true,json:async()=>({...body,entries:values.map(value=>value.entry)})};
+    if(url.pathname==='/api/ghosts')return{ok:true,json:async()=>({...body,entries:[]})};
+    const value=values.find(value=>url.pathname.endsWith('/'+value.entry.id));details.push(value.entry.name);
+    return value===values[2]?new Promise(()=>{}):{ok:true,json:async()=>({...body,...value})};
+  }});
+  assert.deepEqual(details,['Emery','jy','Stalled'],'no further network reads start after the overall budget');
+  assert.equal(result.humanCount,2);assert.equal(result.paceCount,4);assert.equal(result.ghosts.length,6);assert.equal(result.failedCount,1);
+  assert.deepEqual(result.ghosts.slice(0,2).map(ghost=>ghost.replay),values.slice(0,2).map(value=>value.replay));
+  for(const ghost of result.ghosts.filter(ghost=>ghost.synthetic))assertSegmentBounds(values[0].replay,ghost.replay);
+});
+
+test('a stalled initial board also has a hard deadline when cancellation is ignored', {timeout:2000}, async()=>{
+  for(const stage of ['fetch','json']){
+    let requestSignal;
+    await assert.rejects(loadGhostChallenge({city:'coast',timeoutMs:500,requestTimeoutMs:20,fetchImpl:async(_,{signal})=>{
+      requestSignal=signal;const hung=new Promise(()=>{});
+      return stage==='fetch'?hung:{ok:true,json:()=>hung};
+    }}),/timed out/);
+    assert.equal(requestSignal.aborted,true);
+  }
+});
+
+test('explicit cancellation rejects promptly even with valid humans and an abort-ignoring response body', {timeout:2000}, async()=>{
+  const city='coast',version=ghostVersionForCity(city),values=[candidate('Emery'),candidate('Stalled',40000)],controller=new AbortController();
+  let stalled,details=0;
+  const entered=new Promise(resolve=>{stalled=resolve;});
+  const pending=loadGhostChallenge({city,signal:controller.signal,timeoutMs:1000,requestTimeoutMs:1000,fetchImpl:async raw=>{
+    const url=new URL(raw),body={city,version};
+    if(url.pathname==='/api/laps')return{ok:true,json:async()=>({...body,entries:values.map(value=>value.entry)})};
+    if(url.pathname==='/api/ghosts')return{ok:true,json:async()=>({...body,entries:[]})};
+    const value=values.find(value=>url.pathname.endsWith('/'+value.entry.id));details++;
+    return{ok:true,json:async()=>{
+      if(value===values[1]){stalled();return new Promise(()=>{});}
+      return{...body,...value};
+    }};
+  }});
+  await entered;const reason=new Error('Player cancelled this match');controller.abort(reason);
+  await assert.rejects(pending,error=>error===reason);assert.equal(details,2);
+});
+
+test('match completion, timeout, and cancellation leave no parent abort listeners', {timeout:2000}, async()=>{
+  const add=AbortSignal.prototype.addEventListener,remove=AbortSignal.prototype.removeEventListener,tracked=new Map();
+  AbortSignal.prototype.addEventListener=function(type,listener,...rest){
+    if(type==='abort'){if(!tracked.has(this))tracked.set(this,new Set());tracked.get(this).add(listener);}
+    return add.call(this,type,listener,...rest);
+  };
+  AbortSignal.prototype.removeEventListener=function(type,listener,...rest){
+    if(type==='abort')tracked.get(this)?.delete(listener);
+    return remove.call(this,type,listener,...rest);
+  };
+  try{
+    const city='coast',version=ghostVersionForCity(city);
+    await loadGhostChallenge({city,signal:new AbortController().signal,fetchImpl:async()=>({ok:true,json:async()=>({city,version,entries:[]})})});
+    await assert.rejects(loadGhostChallenge({city,signal:new AbortController().signal,requestTimeoutMs:10,fetchImpl:()=>new Promise(()=>{})}),/timed out/);
+    const controller=new AbortController(),pending=loadGhostChallenge({city,signal:controller.signal,fetchImpl:()=>new Promise(()=>{})});
+    controller.abort(new Error('cancelled'));await assert.rejects(pending,/cancelled/);
+    for(const listeners of tracked.values())assert.equal(listeners.size,0);
+  }finally{AbortSignal.prototype.addEventListener=add;AbortSignal.prototype.removeEventListener=remove;}
 });
 
 test('loader searches per-driver histories, keeps different people beyond twenty same-person entries, and lazily validates chosen replays',async()=>{
