@@ -59,11 +59,14 @@ for key, filename in (('mormon', 'book-of-mormon.jpg'), ('wrong', 'play-that-goe
 
 for name in ('THREE-LICENSE.txt', 'THIRD-PARTY-LICENSES.txt'):
     shutil.copy2(ROOT / 'vendor' / name, web_directory / name)
-(web_directory / 'index.html').write_text(edition(css))
+traffic_tag = '<script defer src="./src/traffic.js"></script>'
+if html.count(traffic_tag) != 1: raise ValueError('Missing or duplicate traffic entry point')
+traffic_script = (SOURCE / 'traffic.js').read_text().replace('</script', '<\\/script')
+(web_directory / 'index.html').write_text(edition(css).replace(traffic_tag, '<script>\n' + traffic_script + '\n</script>'))
 destination = ROOT / 'Twin Turbo.html'
 prelude = 'globalThis.TWIN_SCENE_ART=' + json.dumps(embedded) + ';\n'
 prelude += 'for(const [name,url] of Object.entries(TWIN_SCENE_ART)) document.documentElement.style.setProperty("--scene-"+name,`url("${url}")`);\n'
 prelude += 'globalThis.__TWIN_TURBO_POSTERS__=' + json.dumps(posters) + ';\n'
-destination.write_text(edition(offline_css, prelude))
+destination.write_text(edition(offline_css, prelude).replace(traffic_tag, ''))
 print(f'Built: {destination.name} ({destination.stat().st_size:,} bytes)')
 print('Built: dist/index.html + dist/assets/ (GitHub Pages edition)')
